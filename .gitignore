@@ -1,0 +1,38 @@
+# Binaries
+src/barry
+*.o
+*.test
+
+# Dev playgrounds
+sandbox/
+tmp/
+
+# Autotools
+Makefile.in
+Makefile
+aclocal.m4
+autom4te.cache/
+compile
+config.guess
+config.log
+config.status
+config.sub
+configure
+depcomp
+install-sh
+missing
+.deps
+.dirstamp
+src/config.h
+src/config.h.in
+src/stamp-h1
+test-driver
+*.log
+*.trs
+*~
+
+# Eclipse
+.cproject
+.project
+.settings/
+/Debug/
