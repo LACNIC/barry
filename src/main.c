@@ -113,7 +113,7 @@ parse_options(int argc, char **argv)
 		{ OPTLONG_RSYNC_URI,  required_argument, 0, 1024 },
 		{ OPTLONG_RSYNC_PATH, required_argument, 0, 1025 },
 		{ OPTLONG_TAL_PATH,   required_argument, 0, 't' },
-		{ OPTLONG_NOW,        required_argument, 0, 'n' },
+		{ OPTLONG_NOW,        required_argument, 0, 'P' },
 		{ OPTLONG_LATER,      required_argument, 0, 1026 },
 		{ OPTLONG_PR_OBJS,    no_argument,       0, 'p' },
 		{ OPTLONG_VERBOSE,    no_argument,       0, 'v' },
@@ -124,7 +124,7 @@ parse_options(int argc, char **argv)
 	char *optnow = NULL;
 	char *optlater = NULL;
 
-	while ((opt = getopt_long(argc, argv, "t:n:pvh", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:P:pvh", opts, NULL)) != -1) {
 		switch (opt) {
 		case 1024:
 			rsync_uri = optarg;
@@ -135,7 +135,7 @@ parse_options(int argc, char **argv)
 		case 't':
 			tal_path = optarg;
 			break;
-		case 'n':
+		case 'P':
 			optnow = optarg;
 			break;
 		case 1026:
@@ -164,7 +164,6 @@ parse_options(int argc, char **argv)
 	repo_descriptor = argv[optind];
 	if (tal_path == NULL)
 		tal_path = tal_autogenerate_path(repo_descriptor);
-
 	init_times(optnow, optlater);
 
 	pr_debug("Configuration:");
@@ -172,7 +171,7 @@ parse_options(int argc, char **argv)
 	pr_debug("   --" OPTLONG_RSYNC_URI "          : %s", rsync_uri);
 	pr_debug("   --" OPTLONG_RSYNC_PATH "         : %s", rsync_path);
 	pr_debug("   --" OPTLONG_TAL_PATH "       (-t): %s", tal_path);
-	pr_debug("   --" OPTLONG_NOW "            (-n): %s", optnow);
+	pr_debug("   --" OPTLONG_NOW "            (-P): %s", optnow);
 	pr_debug("   --" OPTLONG_LATER "              : %s", optlater);
 	pr_debug("   --" OPTLONG_PR_OBJS       "  (-p): %u", print_objs);
 	pr_debug("   --" OPTLONG_VERBOSE "        (-v): %u", verbosity);
