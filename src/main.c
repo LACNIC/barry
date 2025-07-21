@@ -50,6 +50,7 @@ Time_t default_now;
 Time_t default_later;
 GeneralizedTime_t default_gnow;
 GeneralizedTime_t default_glater;
+char const *keys_path;
 bool print_objs = false;
 unsigned int verbosity = 0;
 
@@ -58,6 +59,7 @@ unsigned int verbosity = 0;
 #define OPTLONG_TAL_PATH	"tal-path"
 #define OPTLONG_NOW		"now"
 #define OPTLONG_LATER		"later"
+#define OPTLONG_KEYS		"keys"
 #define OPTLONG_PR_OBJS		"print-objects"
 #define OPTLONG_VERBOSE		"verbose"
 #define OPTLONG_HELP		"help"
@@ -70,6 +72,7 @@ print_help(void)
 	printf("		[--" OPTLONG_TAL_PATH "=<Path>]\n");
 	printf("		[--" OPTLONG_NOW "=<Datetime>]\n");
 	printf("		[--" OPTLONG_LATER "=<Datetime>]\n");
+	printf("		[--" OPTLONG_KEYS "=<Path>]\n");
 	printf("		[--" OPTLONG_PR_OBJS "]\n");
 	printf("		[--" OPTLONG_VERBOSE " [--" OPTLONG_VERBOSE "]]\n");
 	printf("		[--" OPTLONG_HELP "]\n");
@@ -115,6 +118,7 @@ parse_options(int argc, char **argv)
 		{ OPTLONG_TAL_PATH,   required_argument, 0, 't' },
 		{ OPTLONG_NOW,        required_argument, 0, 'P' },
 		{ OPTLONG_LATER,      required_argument, 0, 1026 },
+		{ OPTLONG_KEYS,       required_argument, 0, 'k' },
 		{ OPTLONG_PR_OBJS,    no_argument,       0, 'p' },
 		{ OPTLONG_VERBOSE,    no_argument,       0, 'v' },
 		{ OPTLONG_HELP,       no_argument,       0, 'h' },
@@ -124,7 +128,7 @@ parse_options(int argc, char **argv)
 	char *optnow = NULL;
 	char *optlater = NULL;
 
-	while ((opt = getopt_long(argc, argv, "t:P:pvh", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:P:k:pvh", opts, NULL)) != -1) {
 		switch (opt) {
 		case 1024:
 			rsync_uri = optarg;
@@ -140,6 +144,9 @@ parse_options(int argc, char **argv)
 			break;
 		case 1026:
 			optlater = optarg;
+			break;
+		case 'k':
+			keys_path = optarg;
 			break;
 		case 'p':
 			print_objs = true;
@@ -173,6 +180,7 @@ parse_options(int argc, char **argv)
 	pr_debug("   --" OPTLONG_TAL_PATH "       (-t): %s", tal_path);
 	pr_debug("   --" OPTLONG_NOW "            (-P): %s", optnow);
 	pr_debug("   --" OPTLONG_LATER "              : %s", optlater);
+	pr_debug("   --" OPTLONG_KEYS "               : %s", keys_path);
 	pr_debug("   --" OPTLONG_PR_OBJS       "  (-p): %u", print_objs);
 	pr_debug("   --" OPTLONG_VERBOSE "        (-v): %u", verbosity);
 	pr_debug("");
