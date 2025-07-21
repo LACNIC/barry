@@ -122,13 +122,13 @@ str2tm(char const *str, struct tm *tm)
 	    &tm->tm_year, &tm->tm_mon, &tm->tm_mday,
 	    &tm->tm_hour, &tm->tm_min, &tm->tm_sec);
 	if (res != 6)
-		panic("sscanf: %d", res);
+		panic("Unparseable date: %s", str);
 	tm->tm_mon -= 1;
 	tm->tm_year -= 1900;
 }
 
-static void
-__init_time(Time_t *time, struct tm *tm)
+void
+init_time_tm(Time_t *time, struct tm *tm)
 {
 	if (tm->tm_year < 150) {
 		time->present = Time_PR_utcTime;
@@ -142,47 +142,25 @@ __init_time(Time_t *time, struct tm *tm)
 }
 
 void
-init_time(Time_t *time, char const *str)
+init_time_str(Time_t *time, char const *str)
 {
 	struct tm tm;
 	str2tm(str, &tm);
-	__init_time(time, &tm);
-}
-
-static void
-__init_time_now(struct tm *tm)
-{
-	time_t now_t;
-
-	now_t = time(NULL);
-	if (now_t == ((time_t) -1))
-		panic("Cannot get the current time: %s", strerror(errno));
-	if (gmtime_r(&now_t, tm) != tm)
-		panic("Cannot convert current time to tm format; unknown cause.");
+	init_time_tm(time, &tm);
 }
 
 void
 init_time_now(Time_t *time)
 {
-	static struct tm now;
-
-	if (now.tm_year == 0)
-		__init_time_now(&now);
-
-	__init_time(time, &now);
+	extern Time_t default_now;
+	*time = default_now;
 }
 
 void
 init_time_later(Time_t *time)
 {
-	static struct tm later;
-
-	if (later.tm_year == 0) {
-		__init_time_now(&later);
-		later.tm_year++;
-	}
-
-	__init_time(time, &later);
+	extern Time_t default_later;
+	*time = default_later;
 }
 
 Time_t *
@@ -191,42 +169,37 @@ create_time(char const *str)
 	Time_t *result;
 
 	result = pzalloc(sizeof(Time_t));
-	init_time(result, str);
+	init_time_str(result, str);
 	return result;
 }
 
 void
-init_gtime(GeneralizedTime_t *time, char const *str)
+init_gtime_str(GeneralizedTime_t *time, char const *str)
 {
 	struct tm tm;
-
 	str2tm(str, &tm);
+	init_gtime_tm(time, &tm);
+}
 
-	if (asn_time2GT(time, &tm, true) == NULL)
+void
+init_gtime_tm(GeneralizedTime_t *time, struct tm *tm)
+{
+	if (asn_time2GT(time, tm, true) == NULL)
 		panic("GeneralizedTime");
 }
 
 void
 init_gtime_now(GeneralizedTime_t *time)
 {
-	struct tm now;
-
-	__init_time_now(&now);
-
-	if (asn_time2GT(time, &now, true) == NULL)
-		panic("GeneralizedTime");
+	extern GeneralizedTime_t default_gnow;
+	*time = default_gnow;
 }
 
 void
 init_gtime_later(GeneralizedTime_t *time)
 {
-	struct tm now;
-
-	__init_time_now(&now);
-	now.tm_year++;
-
-	if (asn_time2GT(time, &now, true) == NULL)
-		panic("GeneralizedTime");
+	extern GeneralizedTime_t default_glater;
+	*time = default_glater;
 }
 
 void

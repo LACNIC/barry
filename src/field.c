@@ -504,7 +504,7 @@ print_name(void *val)
 static error_msg
 parse_time_str(char const *src, void *dst)
 {
-	init_time(dst, src);
+	init_time_str(dst, src);
 	return NULL;
 }
 
@@ -520,7 +520,7 @@ print_utcTime(void *arg)
 		return;
 	}
 
-	printf("\"%04d-%02d-%02dT%02d:%02d:%02dZ\"",
+	printf("%04d-%02d-%02dT%02d:%02d:%02dZ",
 	    tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 	    tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
@@ -537,7 +537,7 @@ print_gtime(void *arg)
 		return;
 	}
 
-	printf("\"%04d-%02d-%02dT%02d:%02d:%02dZ\"",
+	printf("%04d-%02d-%02dT%02d:%02d:%02dZ",
 	    tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 	    tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
@@ -562,7 +562,7 @@ print_time(void *val)
 static error_msg
 parse_gtime_str(char const *src, void *dst)
 {
-	init_gtime(dst, src);
+	init_gtime_str(dst, src);
 	return NULL;
 }
 

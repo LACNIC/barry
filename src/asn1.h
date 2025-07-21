@@ -37,11 +37,13 @@ void init_oid(OBJECT_IDENTIFIER_t *, int const *);
 ANY_t *create_null(void);
 void init_name(Name_t *, char const *);
 void init_any_str(ANY_t *, char const *);
-void init_time(Time_t *, char const *);
+void init_time_str(Time_t *, char const *);
+void init_time_tm(Time_t *, struct tm *);
 void init_time_now(Time_t *);
 void init_time_later(Time_t *);
 Time_t *create_time(char const *);
-void init_gtime(GeneralizedTime_t *, char const *);
+void init_gtime_str(GeneralizedTime_t *, char const *);
+void init_gtime_tm(GeneralizedTime_t *, struct tm *);
 void init_gtime_now(GeneralizedTime_t *);
 void init_gtime_later(GeneralizedTime_t *);
 

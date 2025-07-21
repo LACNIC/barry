@@ -46,12 +46,18 @@ char const *repo_descriptor = NULL;
 char const *rsync_uri = "rsync://localhost:8873/rpki";
 char const *rsync_path = "rsync/";
 char const *tal_path = NULL;
+Time_t default_now;
+Time_t default_later;
+GeneralizedTime_t default_gnow;
+GeneralizedTime_t default_glater;
 bool print_objs = false;
 unsigned int verbosity = 0;
 
 #define OPTLONG_RSYNC_URI	"rsync-uri"
 #define OPTLONG_RSYNC_PATH	"rsync-path"
 #define OPTLONG_TAL_PATH	"tal-path"
+#define OPTLONG_NOW		"now"
+#define OPTLONG_LATER		"later"
 #define OPTLONG_PR_OBJS		"print-objects"
 #define OPTLONG_VERBOSE		"verbose"
 #define OPTLONG_HELP		"help"
@@ -62,10 +68,42 @@ print_help(void)
 	printf("Usage: barry	[--" OPTLONG_RSYNC_URI "=<URL>]\n");
 	printf("		[--" OPTLONG_RSYNC_PATH "=<Path>]\n");
 	printf("		[--" OPTLONG_TAL_PATH "=<Path>]\n");
+	printf("		[--" OPTLONG_NOW "=<Datetime>]\n");
+	printf("		[--" OPTLONG_LATER "=<Datetime>]\n");
 	printf("		[--" OPTLONG_PR_OBJS "]\n");
 	printf("		[--" OPTLONG_VERBOSE " [--" OPTLONG_VERBOSE "]]\n");
 	printf("		[--" OPTLONG_HELP "]\n");
 	printf("		<Path>    # Repository Descriptor\n");
+}
+
+static void
+init_times(char const *optnow, char const *optlater)
+{
+	time_t now_t;
+	struct tm tm;
+
+	now_t = time(NULL);
+	if (now_t == ((time_t) -1))
+		panic("Cannot get the current time: %s", strerror(errno));
+	if (gmtime_r(&now_t, &tm) != &tm)
+		panic("Cannot convert current time to tm format; unknown cause.");
+
+	if (optnow != NULL) {
+		init_time_str(&default_now, optnow);
+		init_gtime_str(&default_gnow, optnow);
+	} else {
+		init_time_tm(&default_now, &tm);
+		init_gtime_tm(&default_gnow, &tm);
+	}
+
+	if (optlater != NULL) {
+		init_time_str(&default_later, optlater);
+		init_gtime_str(&default_glater, optlater);
+	} else {
+		tm.tm_year++;
+		init_time_tm(&default_later, &tm);
+		init_gtime_tm(&default_glater, &tm);
+	}
 }
 
 static void
@@ -75,14 +113,18 @@ parse_options(int argc, char **argv)
 		{ OPTLONG_RSYNC_URI,  required_argument, 0, 1024 },
 		{ OPTLONG_RSYNC_PATH, required_argument, 0, 1025 },
 		{ OPTLONG_TAL_PATH,   required_argument, 0, 't' },
+		{ OPTLONG_NOW,        required_argument, 0, 'n' },
+		{ OPTLONG_LATER,      required_argument, 0, 1026 },
 		{ OPTLONG_PR_OBJS,    no_argument,       0, 'p' },
 		{ OPTLONG_VERBOSE,    no_argument,       0, 'v' },
 		{ OPTLONG_HELP,       no_argument,       0, 'h' },
 		{ 0 }
 	};
 	int opt;
+	char *optnow = NULL;
+	char *optlater = NULL;
 
-	while ((opt = getopt_long(argc, argv, "t:pvh", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:n:pvh", opts, NULL)) != -1) {
 		switch (opt) {
 		case 1024:
 			rsync_uri = optarg;
@@ -92,6 +134,12 @@ parse_options(int argc, char **argv)
 			break;
 		case 't':
 			tal_path = optarg;
+			break;
+		case 'n':
+			optnow = optarg;
+			break;
+		case 1026:
+			optlater = optarg;
 			break;
 		case 'p':
 			print_objs = true;
@@ -112,15 +160,20 @@ parse_options(int argc, char **argv)
 		print_help();
 		exit(EXIT_FAILURE);
 	}
+
 	repo_descriptor = argv[optind];
 	if (tal_path == NULL)
 		tal_path = tal_autogenerate_path(repo_descriptor);
+
+	init_times(optnow, optlater);
 
 	pr_debug("Configuration:");
 	pr_debug("   Repository Descriptor"          ": %s", repo_descriptor);
 	pr_debug("   --" OPTLONG_RSYNC_URI "          : %s", rsync_uri);
 	pr_debug("   --" OPTLONG_RSYNC_PATH "         : %s", rsync_path);
 	pr_debug("   --" OPTLONG_TAL_PATH "       (-t): %s", tal_path);
+	pr_debug("   --" OPTLONG_NOW "            (-n): %s", optnow);
+	pr_debug("   --" OPTLONG_LATER "              : %s", optlater);
 	pr_debug("   --" OPTLONG_PR_OBJS       "  (-p): %u", print_objs);
 	pr_debug("   --" OPTLONG_VERBOSE "        (-v): %u", verbosity);
 	pr_debug("");
