@@ -116,10 +116,10 @@ init_extensions_ta(struct rpki_certificate *ta)
 	init_ext(exts->list.array[4], &asn_DEF_CertificatePolicies, NID_certificate_policies, true, &cp);
 
 	/* IP Address Blocks */
-	init_ext(exts->list.array[5], &asn_DEF_IPAddrBlocks, NID_ip_v2, true, &ta->ip);
+	init_ext(exts->list.array[5], &asn_DEF_IPAddrBlocks, NID_sbgp_ipAddrBlockv2, true, &ta->ip);
 
 	/* ASNs */
-	init_ext(exts->list.array[6], &asn_DEF_ASIdentifiers, NID_asn_v2, true, &ta->asn);
+	init_ext(exts->list.array[6], &asn_DEF_ASIdentifiers, NID_sbgp_autonomousSysNumv2, true, &ta->asn);
 }
 
 static void
@@ -176,10 +176,10 @@ init_extensions_ca(struct rpki_certificate *ca)
 	init_ext(exts->list.array[7], &asn_DEF_CertificatePolicies, NID_certificate_policies, true, &cp);
 
 	/* IP Address Blocks */
-	init_ext(exts->list.array[8], &asn_DEF_IPAddrBlocks, NID_ip_v2, true, &ca->ip);
+	init_ext(exts->list.array[8], &asn_DEF_IPAddrBlocks, NID_sbgp_ipAddrBlockv2, true, &ca->ip);
 
 	/* ASNs */
-	init_ext(exts->list.array[9], &asn_DEF_ASIdentifiers, NID_asn_v2, true, &ca->asn);
+	init_ext(exts->list.array[9], &asn_DEF_ASIdentifiers, NID_sbgp_autonomousSysNumv2, true, &ca->asn);
 }
 
 static void
@@ -228,10 +228,10 @@ init_extensions_ee(struct rpki_certificate *ee, char const *so_uri)
 	init_ext(exts->list.array[6], &asn_DEF_CertificatePolicies, NID_certificate_policies, true, &cp);
 
 	/* IP Address Blocks */
-	init_ext(exts->list.array[7], &asn_DEF_IPAddrBlocks, NID_ip_v2, true, &ee->ip);
+	init_ext(exts->list.array[7], &asn_DEF_IPAddrBlocks, NID_sbgp_ipAddrBlockv2, true, &ee->ip);
 
 	/* ASNs */
-	init_ext(exts->list.array[8], &asn_DEF_ASIdentifiers, NID_asn_v2, true, &ee->asn);
+	init_ext(exts->list.array[8], &asn_DEF_ASIdentifiers, NID_sbgp_autonomousSysNumv2, true, &ee->asn);
 }
 
 struct rpki_certificate *

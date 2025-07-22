@@ -328,15 +328,8 @@ print_int_dec(void *val)
 static error_msg
 parse_oid_str(char const *src, void *oid)
 {
-	ASN1_OBJECT *obj;
 	ssize_t narcs;
 	asn_oid_arc_t *arcs;
-
-	obj = OBJ_txt2obj(src, 0);
-	if (obj) {
-		obj2oid(obj, oid);
-		return NULL;
-	}
 
 	narcs = OBJECT_IDENTIFIER_parse_arcs(src, -1, NULL, 0, NULL);
 	if (narcs < 0)

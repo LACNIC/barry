@@ -14,7 +14,6 @@
 #include "cer.h"
 #include "crl.h"
 #include "mft.h"
-#include "oid.h"
 #include "print.h"
 #include "roa.h"
 #include "rpki_tree.h"
@@ -907,8 +906,6 @@ int
 main(int argc, char **argv)
 {
 	/* register_signal_handlers(); TODO */
-
-	oid_setup();
 
 	parse_options(argc, argv);
 

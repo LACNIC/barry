@@ -114,7 +114,7 @@ void
 init_cp(CertificatePolicies_t *cp)
 {
 	INIT_ASN1_ARRAY(&cp->list, 1, PolicyInformation_t);
-	init_oid(&cp->list.array[0]->policyIdentifier, NID_resource_policy_v1);
+	init_oid(&cp->list.array[0]->policyIdentifier, NID_ipAddr_asNumberv2);
 }
 
 void

@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <openssl/objects.h>
 
 #include <libasn1fort/AttributeTypeAndValue.h>
 #include <libasn1fort/PrintableString.h>
@@ -51,27 +52,18 @@ void
 init_oid(OBJECT_IDENTIFIER_t *oid, int nid)
 {
 	ASN1_OBJECT *obj;
+	const unsigned char *data;
 
 	obj = OBJ_nid2obj(nid);
 	if (!obj)
 		panic("libcrypto does not know NID %d", nid);
-
-	obj2oid(obj, oid);
-}
-
-/* Converts libcrypto OID to asn1c OID */
-void
-obj2oid(ASN1_OBJECT *src, OBJECT_IDENTIFIER_t *dst)
-{
-	const unsigned char *data;
-
-	data = OBJ_get0_data(src);
+	data = OBJ_get0_data(obj);
 	if (!data)
-		panic("libcrypto object contains no data");
+		panic("libcrypto object for NID %d contains no data", nid);
 
-	dst->size = OBJ_length(src);
-	dst->buf = pmalloc(dst->size);
-	memcpy(dst->buf, data, dst->size);
+	oid->size = OBJ_length(obj);
+	oid->buf = pmalloc(oid->size);
+	memcpy(oid->buf, data, oid->size);
 }
 
 ANY_t *
