@@ -48,17 +48,30 @@ init_INTEGER(INTEGER_t *field, intmax_t value)
 }
 
 void
-init_oid(OBJECT_IDENTIFIER_t *oid, int const *raw)
+init_oid(OBJECT_IDENTIFIER_t *oid, int nid)
 {
-	size_t i;
+	ASN1_OBJECT *obj;
 
-	for (i = 0; raw[i]; i++)
-		;
+	obj = OBJ_nid2obj(nid);
+	if (!obj)
+		panic("libcrypto does not know NID %d", nid);
 
-	oid->size = i;
-	oid->buf = pmalloc(i);
-	for (i = 0; i < oid->size; i++)
-		oid->buf[i] = raw[i];
+	obj2oid(obj, oid);
+}
+
+/* Converts libcrypto OID to asn1c OID */
+void
+obj2oid(ASN1_OBJECT *src, OBJECT_IDENTIFIER_t *dst)
+{
+	const unsigned char *data;
+
+	data = OBJ_get0_data(src);
+	if (!data)
+		panic("libcrypto object contains no data");
+
+	dst->size = OBJ_length(src);
+	dst->buf = pmalloc(dst->size);
+	memcpy(dst->buf, data, dst->size);
 }
 
 ANY_t *
@@ -96,7 +109,7 @@ init_name(Name_t *name, char const *value)
 
 	atv = pzalloc(sizeof(struct AttributeTypeAndValue));
 	rdn->list.array[0] = atv;
-	init_oid(&atv->type, OID_COMMON_NAME);
+	init_oid(&atv->type, NID_commonName);
 	init_8str(&ps, value);
 	der_encode_any(&asn_DEF_PrintableString, &ps, &atv->value);
 }

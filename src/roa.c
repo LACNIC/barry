@@ -37,7 +37,7 @@ roa_new(char const *filename, struct rpki_certificate *parent)
 	struct ROAIPAddressFamily *riaf;
 	ROAIPAddress_t *ria;
 
-	so = signed_object_new(filename, parent, OID_RPKI_ROA);
+	so = signed_object_new(filename, parent, NID_id_ct_routeOriginAuthz);
 	roa = &so->obj.roa;
 
 	roa->version = intmax2INTEGER(0);

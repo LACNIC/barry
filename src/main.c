@@ -14,9 +14,11 @@
 #include "cer.h"
 #include "crl.h"
 #include "mft.h"
+#include "oid.h"
 #include "print.h"
 #include "roa.h"
 #include "rpki_tree.h"
+#include "str.h"
 #include "tal.h"
 
 static unsigned int line = 1;
@@ -262,38 +264,6 @@ next_char(void)
 	return reader.buf + reader.offset++;
 }
 
-static size_t
-next_power_of_2(size_t src)
-{
-	size_t power = 1;
-	while (power < src)
-		power <<= 1;
-	return power;
-}
-
-struct dynamic_string {
-	char *buf;
-	size_t len;
-	size_t size;
-};
-
-static void
-grow_string(struct dynamic_string *str, unsigned char *addend, size_t addlen)
-{
-	size_t total;
-
-	total = str->len + addlen;
-	if (total > str->size) {
-		str->size = next_power_of_2(total);
-		str->buf = realloc(str->buf, str->size);
-		if (!str->buf)
-			enomem;
-	}
-
-	memcpy(str->buf + str->len, addend, addlen);
-	str->len += addlen;
-}
-
 static char *
 tokenize(bool (*chr_matches)(char))
 {
@@ -303,16 +273,16 @@ tokenize(bool (*chr_matches)(char))
 	do {
 		for (i = reader.offset; i < reader.size; i++) {
 			if (!chr_matches(reader.buf[i])) {
-				grow_string(&result,
+				dstr_append(&result,
 				    reader.buf + reader.offset,
 				    i - reader.offset);
-				grow_string(&result, (unsigned char *)"", 1);
+				dstr_append(&result, (unsigned char *)"", 1);
 				reader.offset = i;
 				return result.buf;
 			}
 		}
 
-		grow_string(&result,
+		dstr_append(&result,
 		    reader.buf + reader.offset,
 		    i - reader.offset);
 
@@ -937,6 +907,8 @@ int
 main(int argc, char **argv)
 {
 	/* register_signal_handlers(); TODO */
+
+	oid_setup();
 
 	parse_options(argc, argv);
 

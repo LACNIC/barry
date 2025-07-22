@@ -268,12 +268,34 @@ content.encapContentInfo.eContent.version = 0x01/1000
 
 I haven't implemented negative `INTEGER`s yet.
 
-### Object Identifiers
+### Object Identifiers (OIDs)
 
-Only the numerical representation is supported right now.
+Either input the numerical representation or one of the libcrypto names:
 
 ```
-content.encapContentInfo.eContentType = 1.2.840.113549.1.9.16.1.26
+content.encapContentInfo.eContentType = 1.2.840.113549.1.9.16.1.26   # numerical representation
+content.encapContentInfo.eContentType = RSA-SHA256                   # libcrypto Short Name (SN)
+content.encapContentInfo.eContentType = sha256WithRSAEncryption      # libcrypto Long Name (LN)
+```
+
+Name usage is **not** portable. (The available named OIDs depend on your libcrypto version.) The few exceptions are the ones `barry` itself [declares](src/oid.c#L27-L43):
+
+| Numeric            | SN        | LN                  | Source   |
+|--------------------|-----------|---------------------|----------|
+| 1.3.6.1.5.5.7.1.28 | ip2       | ipAddrBlocks-v2     | [8360#4.2.2.1](https://datatracker.ietf.org/doc/html/rfc8360#section-4.2.2.1) |
+| 1.3.6.1.5.5.7.1.29 | asn2      | autonomousSysIds-v2 | [8360#4.2.2.3](https://datatracker.ietf.org/doc/html/rfc8360#section-4.2.2.3) |
+| 1.3.6.1.5.5.7.14.2 | ip-asn    | ipAddr-asNumber     | [6484#1.2](https://datatracker.ietf.org/doc/html/rfc6484#section-1.2) |
+| 1.3.6.1.5.5.7.14.3 | ip-asn-v2 | ipAddr-asNumber-v2  | [8360#4.2.1](https://datatracker.ietf.org/doc/html/rfc8360#section-4.2.1) |
+
+Refer to (your own) [openss/obj_mac.h](https://github.com/openssl/openssl/blob/master/include/openssl/obj_mac.h) for the full list of libcrypto OIDs, along with their LNs and SNs.
+
+Also, `barry` tells you the LN during `-p` (but this is mostly intended for readability):
+
+```
+$ barry -p bad.repo | grep -F "algorithm ="
+content.certificates[0].signatureAlgorithm.algorithm = 1.2.840.113549.1.1.11 (sha256WithRSAEncryption)
+content.signerInfos[0].digestAlgorithm.algorithm = 2.16.840.1.101.3.4.2.1 (sha256)
+content.signerInfos[0].signatureAlgorithm.algorithm = 1.2.840.113549.1.1.1 (rsaEncryption)
 ```
 
 ### Dates
@@ -304,3 +326,7 @@ Add Github issues:
 - I commented the RRDP code to force myself to upload the prototype today
 - The key pair generation is taking too long; maybe provide a means to weaken the RNG
 - May want to purge all the memory leaks
+- Implement extensions
+- Document
+	- Program arguments
+	- '#' comments in RD

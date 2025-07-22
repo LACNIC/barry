@@ -24,6 +24,7 @@
 #include "asn1.h"
 #include "oid.h"
 #include "print.h"
+#include "str.h"
 
 static error_msg const HEX_EMPTY = "Hexadecimal string is empty";
 static error_msg const HEX_ODD_DIGITS = "Hexadecimal numbers need an even number of digits";
@@ -327,8 +328,15 @@ print_int_dec(void *val)
 static error_msg
 parse_oid_str(char const *src, void *oid)
 {
+	ASN1_OBJECT *obj;
 	ssize_t narcs;
 	asn_oid_arc_t *arcs;
+
+	obj = OBJ_txt2obj(src, 0);
+	if (obj) {
+		obj2oid(obj, oid);
+		return NULL;
+	}
 
 	narcs = OBJECT_IDENTIFIER_parse_arcs(src, -1, NULL, 0, NULL);
 	if (narcs < 0)
@@ -349,28 +357,35 @@ parse_oid_str(char const *src, void *oid)
 }
 
 static int
-drop_preamble(const void *buffer, size_t size, void *arg)
+stringify_oid(const void *buffer, size_t size, void *arg)
 {
-	char const *str = buffer;
+	char const *input = buffer;
 
-	if (size == 2 && ((str[0] == '{' && str[1] == ' ')))
+	/* asn1c prints braces for some reason; discard them. */
+	if (size == 2 && ((input[0] == '{' && input[1] == ' ')))
 		return 0;
-	if (size == 2 && ((str[0] == ' ' && str[1] == '}')))
+	if (size == 2 && ((input[0] == ' ' && input[1] == '}')))
 		return 0;
 
-	printf("%.*s", (int)size, (char *)buffer);
+	dstr_append(arg, buffer, size);
 	return 0;
 }
 
 static void
 print_oid(void *val)
 {
+	struct dynamic_string str = { 0 };
 	char const *name;
 
+	/* Convert OID to string */
 	OBJECT_IDENTIFIER_print(&asn_DEF_OBJECT_IDENTIFIER, val, 0,
-	    drop_preamble, NULL);
+	    stringify_oid, &str);
 
-	name = oid2str(val);
+	dstr_append(&str, (unsigned char *)"", 1); /* Add null character */
+
+	printf("%s", str.buf);
+
+	name = oid2str(str.buf);
 	if (name)
 		printf(" (%s)", name);
 }

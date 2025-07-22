@@ -74,11 +74,11 @@ init_extensions_crl(struct rpki_crl *crl)
 
 	/* AKI */
 	init_aki(&aki, crl->parent->spki);
-	init_ext(exts->list.array[0], &asn_DEF_AuthorityKeyIdentifier, OID_AKI, false, &aki);
+	init_ext(exts->list.array[0], &asn_DEF_AuthorityKeyIdentifier, NID_authority_key_identifier, false, &aki);
 
 	/* CRL Number */
 	init_INTEGER(&crln, 1);
-	init_ext(exts->list.array[1], &asn_DEF_CRLNumber, OID_CRLN, false, &crln);
+	init_ext(exts->list.array[1], &asn_DEF_CRLNumber, NID_crl_number, false, &crln);
 }
 
 static void
@@ -111,7 +111,7 @@ crl_new(struct rpki_certificate *parent)
 
 	tbs = &crl->obj.tbsCertList;
 	tbs->version = intmax2INTEGER(1);
-	init_oid(&tbs->signature.algorithm, OID_SHA256_WITH_RSA_ENCRYPTION);
+	init_oid(&tbs->signature.algorithm, NID_sha256WithRSAEncryption);
 	tbs->signature.parameters = create_null();
 	/* issuer: Postpone (needs parent's subject) */
 	init_time_now(&tbs->thisUpdate);
@@ -119,7 +119,7 @@ crl_new(struct rpki_certificate *parent)
 	init_time_later(tbs->nextUpdate);
 
 	/* tbs->extensions: Not implemented yet */
-	init_oid(&crl->obj.signatureAlgorithm.algorithm, OID_SHA256_WITH_RSA_ENCRYPTION);
+	init_oid(&crl->obj.signatureAlgorithm.algorithm, NID_sha256WithRSAEncryption);
 	crl->obj.signatureAlgorithm.parameters = create_null();
 	/* crl->signature: Postpone (needs all other fields ready) */
 

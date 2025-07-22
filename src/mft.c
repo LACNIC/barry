@@ -44,14 +44,14 @@ mft_new(char const *filename, struct rpki_certificate *parent)
 	struct signed_object *so;
 	Manifest_t *mft;
 
-	so = signed_object_new(filename, parent, OID_RPKI_MANIFEST);
+	so = signed_object_new(filename, parent, NID_id_ct_rpkiManifest);
 	mft = &so->obj.mft;
 
 	mft->version = intmax2INTEGER(0);
 	init_INTEGER(&mft->manifestNumber, 1);
 	init_gtime_now(&mft->thisUpdate);
 	init_gtime_later(&mft->nextUpdate);
-	init_oid(&mft->fileHashAlg, OID_SHA256);
+	init_oid(&mft->fileHashAlg, NID_sha256);
 
 	return so;
 }

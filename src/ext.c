@@ -5,9 +5,9 @@
 #include "oid.h"
 
 void
-init_ext(Extension_t *ext, asn_TYPE_descriptor_t *td, int const oid[], bool critical, void *obj)
+init_ext(Extension_t *ext, asn_TYPE_descriptor_t *td, int nid, bool critical, void *obj)
 {
-	init_oid(&ext->extnID, oid);
+	init_oid(&ext->extnID, nid);
 	ext->critical = critical ? 0xFF : 0;
 	der_encode_8str(td, obj, &ext->extnValue);
 }
@@ -72,9 +72,9 @@ init_crldp(CRLDistributionPoints_t *crldp, char const *url)
 }
 
 void
-init_ad(AccessDescription_t *ad, const int *oid, char const *value)
+init_ad(AccessDescription_t *ad, int nid, char const *value)
 {
-	init_oid(&ad->accessMethod, oid);
+	init_oid(&ad->accessMethod, nid);
 	init_gn_uri(&ad->accessLocation, value);
 }
 
@@ -82,7 +82,7 @@ void
 init_aia(AuthorityInfoAccessSyntax_t *aia, char const *url)
 {
 	INIT_ASN1_ARRAY(&aia->list, 1, AccessDescription_t);
-	init_ad(aia->list.array[0], OID_CA_ISSUERS, url);
+	init_ad(aia->list.array[0], NID_ad_ca_issuers, url);
 }
 
 void
@@ -96,25 +96,25 @@ init_sia_ca(SubjectInfoAccessSyntax_t *sia, char const *repo, char const *mft,
 
 	ads = 0;
 	if (repo)
-		init_ad(sia->list.array[ads++], OID_CA_REPOSITORY, repo);
+		init_ad(sia->list.array[ads++], NID_caRepository, repo);
 	if (mft)
-		init_ad(sia->list.array[ads++], OID_SIA_RPKI_MANIFEST, mft);
+		init_ad(sia->list.array[ads++], NID_rpkiManifest, mft);
 	if (notif)
-		init_ad(sia->list.array[ads++], OID_RPKI_NOTIFY, notif);
+		init_ad(sia->list.array[ads++], NID_rpkiNotify, notif);
 }
 
 void
 init_sia_ee(SubjectInfoAccessSyntax_t *sia, char const *so)
 {
 	INIT_ASN1_ARRAY(&sia->list, 1, AccessDescription_t);
-	init_ad(sia->list.array[0], OID_SIGNED_OBJECT, so);
+	init_ad(sia->list.array[0], NID_signedObject, so);
 }
 
 void
 init_cp(CertificatePolicies_t *cp)
 {
 	INIT_ASN1_ARRAY(&cp->list, 1, PolicyInformation_t);
-	init_oid(&cp->list.array[0]->policyIdentifier, OID_RESOURCE_POLICY);
+	init_oid(&cp->list.array[0]->policyIdentifier, NID_resource_policy_v1);
 }
 
 void

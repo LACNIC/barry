@@ -92,7 +92,7 @@ const struct field so_metadata[] = {
 static void
 init_content_info(ContentInfo_t *ci)
 {
-	init_oid(&ci->contentType, OID_SIGNED_DATA);
+	init_oid(&ci->contentType, NID_pkcs7_signed);
 }
 
 static void
@@ -127,7 +127,7 @@ finish_signer_info(SignerInfo_t *si, struct rpki_certificate *ee,
 	attr = si->signedAttrs->list.array[1];
 	if (attr->attrValues.list.count == 0) {
 		pr_debug("- Hashing the eContent into the Message-Digest CMSAttribute");
-		init_oid(&attr->attrType, OID_MSG_DIGEST);
+		init_oid(&attr->attrType, NID_pkcs9_messageDigest);
 		INIT_ASN1_ARRAY(&attr->attrValues.list, 1, CMSAttributeValue_t);
 		hash_sha256(eContent->buf, eContent->size, &md);
 		der_encode_any(&asn_DEF_OCTET_STRING, &md,
@@ -171,7 +171,7 @@ finish_content_info(struct signed_object *so, asn_TYPE_descriptor_t *td)
 
 static void
 init_signer_info(SignerInfo_t *si, /* struct entity *ee, OCTET_STRING_t *eContent,
-    EVP_PKEY *sign_key, */ const int *oid)
+    EVP_PKEY *sign_key, */ int nid)
 {
 	CMSAttribute_t *attr;
 	OBJECT_IDENTIFIER_t ct;
@@ -181,30 +181,30 @@ init_signer_info(SignerInfo_t *si, /* struct entity *ee, OCTET_STRING_t *eConten
 
 	/* ski postponed */
 
-	init_oid(&si->digestAlgorithm.algorithm, OID_SHA256);
+	init_oid(&si->digestAlgorithm.algorithm, NID_sha256);
 
 	si->signedAttrs = pzalloc(sizeof(SignedAttributes_t));
 	INIT_ASN1_ARRAY(&si->signedAttrs->list, 3, CMSAttribute_t);
 
 	attr = si->signedAttrs->list.array[0];
-	init_oid(&attr->attrType, OID_CONTENT_TYPE);
+	init_oid(&attr->attrType, NID_pkcs9_contentType);
 	INIT_ASN1_ARRAY(&attr->attrValues.list, 1, CMSAttributeValue_t);
-	init_oid(&ct, oid);
+	init_oid(&ct, nid);
 	der_encode_any(&asn_DEF_OBJECT_IDENTIFIER, &ct, attr->attrValues.list.array[0]);
 
 	/* signedAttrs[1] postponed */
 
 	attr = si->signedAttrs->list.array[2];
-	init_oid(&attr->attrType, OID_MSG_SIGNING_TIME);
+	init_oid(&attr->attrType, NID_pkcs9_signingTime);
 	INIT_ASN1_ARRAY(&attr->attrValues.list, 1, CMSAttributeValue_t);
 	init_time_now(&st);
 	der_encode_any(&asn_DEF_Time, &st, attr->attrValues.list.array[0]);
 
-	init_oid(&si->signatureAlgorithm.algorithm, OID_RSA_ENCRYPTION);
+	init_oid(&si->signatureAlgorithm.algorithm, NID_rsaEncryption);
 }
 
 static void
-init_signed_data(struct signed_object *so, const int *oid)
+init_signed_data(struct signed_object *so, int nid)
 {
 	SignedData_t *sd = &so->sd;
 	DigestAlgorithmIdentifier_t *dai;
@@ -213,9 +213,9 @@ init_signed_data(struct signed_object *so, const int *oid)
 
 	INIT_ASN1_ARRAY(&sd->digestAlgorithms.list, 1, DigestAlgorithmIdentifier_t);
 	dai = (DigestAlgorithmIdentifier_t *)sd->digestAlgorithms.list.array[0];
-	init_oid(&dai->algorithm, OID_SHA256);
+	init_oid(&dai->algorithm, NID_sha256);
 
-	init_oid(&sd->encapContentInfo.eContentType, oid);
+	init_oid(&sd->encapContentInfo.eContentType, nid);
 	/* eContent postponed */
 
 	sd->certificates = pzalloc(sizeof(struct CertificateSet));
@@ -229,17 +229,17 @@ init_signed_data(struct signed_object *so, const int *oid)
 
 struct signed_object *
 signed_object_new(char const *filename, struct rpki_certificate *parent,
-    const int *oid)
+    int nid)
 {
 	struct signed_object *so;
 
 	so = pzalloc(sizeof(struct signed_object));
 
 	init_content_info(&so->ci);
-	init_signed_data(so, oid);
+	init_signed_data(so, nid);
 	so->parent = parent;
 	cer_init(&so->ee, filename, parent);
-	init_signer_info(&so->si, oid);
+	init_signer_info(&so->si, nid);
 
 	return so;
 }

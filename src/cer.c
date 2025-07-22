@@ -97,29 +97,29 @@ init_extensions_ta(struct rpki_certificate *ta)
 
 	/* Basic Constraints */
 	init_bc(&bc);
-	init_ext(exts->list.array[0], &asn_DEF_BasicConstraints, OID_BC, true, &bc);
+	init_ext(exts->list.array[0], &asn_DEF_BasicConstraints, NID_basic_constraints, true, &bc);
 
 	/* Subject Key Identifier */
 	init_ski(&ski, &ta->obj.tbsCertificate.subjectPublicKeyInfo);
-	init_ext(exts->list.array[1], &asn_DEF_SubjectKeyIdentifier, OID_SKI, false, &ski);
+	init_ext(exts->list.array[1], &asn_DEF_SubjectKeyIdentifier, NID_subject_key_identifier, false, &ski);
 
 	/* Key Usage */
 	init_ku_ca(&eku);
-	init_ext(exts->list.array[2], &asn_DEF_KeyUsage, OID_KU, true, &eku);
+	init_ext(exts->list.array[2], &asn_DEF_KeyUsage, NID_key_usage, true, &eku);
 
 	/* SIA */
 	init_sia_ca(&sia, ta->rpp.caRepository, ta->rpp.rpkiManifest, ta->rpp.rpkiNotify);
-	init_ext(exts->list.array[3], &asn_DEF_SubjectInfoAccessSyntax, OID_SIA, false, &sia);
+	init_ext(exts->list.array[3], &asn_DEF_SubjectInfoAccessSyntax, NID_sinfo_access, false, &sia);
 
 	/* Certificate Policies */
 	init_cp(&cp);
-	init_ext(exts->list.array[4], &asn_DEF_CertificatePolicies, OID_CP, true, &cp);
+	init_ext(exts->list.array[4], &asn_DEF_CertificatePolicies, NID_certificate_policies, true, &cp);
 
 	/* IP Address Blocks */
-	init_ext(exts->list.array[5], &asn_DEF_IPAddrBlocks, OID_IP, true, &ta->ip);
+	init_ext(exts->list.array[5], &asn_DEF_IPAddrBlocks, NID_ip_v2, true, &ta->ip);
 
 	/* ASNs */
-	init_ext(exts->list.array[6], &asn_DEF_ASIdentifiers, OID_ASN, true, &ta->asn);
+	init_ext(exts->list.array[6], &asn_DEF_ASIdentifiers, NID_asn_v2, true, &ta->asn);
 }
 
 static void
@@ -145,41 +145,41 @@ init_extensions_ca(struct rpki_certificate *ca)
 
 	/* Basic Constraints */
 	init_bc(&bc);
-	init_ext(exts->list.array[0], &asn_DEF_BasicConstraints, OID_BC, true, &bc);
+	init_ext(exts->list.array[0], &asn_DEF_BasicConstraints, NID_basic_constraints, true, &bc);
 
 	/* Subject Key Identifier */
 	init_ski(&ca->ski, ca->spki);
-	init_ext(exts->list.array[1], &asn_DEF_SubjectKeyIdentifier, OID_SKI, false, &ca->ski);
+	init_ext(exts->list.array[1], &asn_DEF_SubjectKeyIdentifier, NID_subject_key_identifier, false, &ca->ski);
 
 	/* Authority Key Identifier */
 	init_aki(&aki, ca->parent->spki);
-	init_ext(exts->list.array[2], &asn_DEF_AuthorityKeyIdentifier, OID_AKI, false, &aki);
+	init_ext(exts->list.array[2], &asn_DEF_AuthorityKeyIdentifier, NID_authority_key_identifier, false, &aki);
 
 	/* Extended Key Usage */
 	init_ku_ca(&eku);
-	init_ext(exts->list.array[3], &asn_DEF_KeyUsage, OID_KU, true, &eku);
+	init_ext(exts->list.array[3], &asn_DEF_KeyUsage, NID_key_usage, true, &eku);
 
 	/* CRL Distribution Points */
 	init_crldp(&crldp, ca->parent->rpp.crldp);
-	init_ext(exts->list.array[4], &asn_DEF_CRLDistributionPoints, OID_CRLDP, false, &crldp);
+	init_ext(exts->list.array[4], &asn_DEF_CRLDistributionPoints, NID_crl_distribution_points, false, &crldp);
 
 	/* AIA */
 	init_aia(&aia, ca->parent->uri);
-	init_ext(exts->list.array[5], &asn_DEF_AuthorityInfoAccessSyntax, OID_AIA, false, &aia);
+	init_ext(exts->list.array[5], &asn_DEF_AuthorityInfoAccessSyntax, NID_info_access, false, &aia);
 
 	/* SIA */
 	init_sia_ca(&sia, ca->rpp.caRepository, ca->rpp.rpkiManifest, ca->rpp.rpkiNotify);
-	init_ext(exts->list.array[6], &asn_DEF_SubjectInfoAccessSyntax, OID_SIA, false, &sia);
+	init_ext(exts->list.array[6], &asn_DEF_SubjectInfoAccessSyntax, NID_sinfo_access, false, &sia);
 
 	/* Certificate Policies */
 	init_cp(&cp);
-	init_ext(exts->list.array[7], &asn_DEF_CertificatePolicies, OID_CP, true, &cp);
+	init_ext(exts->list.array[7], &asn_DEF_CertificatePolicies, NID_certificate_policies, true, &cp);
 
 	/* IP Address Blocks */
-	init_ext(exts->list.array[8], &asn_DEF_IPAddrBlocks, OID_IP, true, &ca->ip);
+	init_ext(exts->list.array[8], &asn_DEF_IPAddrBlocks, NID_ip_v2, true, &ca->ip);
 
 	/* ASNs */
-	init_ext(exts->list.array[9], &asn_DEF_ASIdentifiers, OID_ASN, true, &ca->asn);
+	init_ext(exts->list.array[9], &asn_DEF_ASIdentifiers, NID_asn_v2, true, &ca->asn);
 }
 
 static void
@@ -201,37 +201,37 @@ init_extensions_ee(struct rpki_certificate *ee, char const *so_uri)
 
 	/* Subject Key Identifier */
 	init_ski(&ee->ski, ee->spki);
-	init_ext(exts->list.array[0], &asn_DEF_SubjectKeyIdentifier, OID_SKI, false, &ee->ski);
+	init_ext(exts->list.array[0], &asn_DEF_SubjectKeyIdentifier, NID_subject_key_identifier, false, &ee->ski);
 
 	/* Authority Key Identifier */
 	init_aki(&aki, ee->parent->spki);
-	init_ext(exts->list.array[1], &asn_DEF_AuthorityKeyIdentifier, OID_AKI, false, &aki);
+	init_ext(exts->list.array[1], &asn_DEF_AuthorityKeyIdentifier, NID_authority_key_identifier, false, &aki);
 
 	/* Extended Key Usage */
 	init_ek_ee(&eku);
-	init_ext(exts->list.array[2], &asn_DEF_KeyUsage, OID_KU, true, &eku);
+	init_ext(exts->list.array[2], &asn_DEF_KeyUsage, NID_key_usage, true, &eku);
 
 	/* CRL Distribution Points */
 	init_crldp(&crldp, ee->parent->rpp.crldp);
-	init_ext(exts->list.array[3], &asn_DEF_CRLDistributionPoints, OID_CRLDP, false, &crldp);
+	init_ext(exts->list.array[3], &asn_DEF_CRLDistributionPoints, NID_crl_distribution_points, false, &crldp);
 
 	/* AIA */
 	init_aia(&aia, ee->parent->uri);
-	init_ext(exts->list.array[4], &asn_DEF_AuthorityInfoAccessSyntax, OID_AIA, false, &aia);
+	init_ext(exts->list.array[4], &asn_DEF_AuthorityInfoAccessSyntax, NID_info_access, false, &aia);
 
 	/* SIA */
 	init_sia_ee(&sia, so_uri);
-	init_ext(exts->list.array[5], &asn_DEF_SubjectInfoAccessSyntax, OID_SIA, false, &sia);
+	init_ext(exts->list.array[5], &asn_DEF_SubjectInfoAccessSyntax, NID_sinfo_access, false, &sia);
 
 	/* Certificate Policies */
 	init_cp(&cp);
-	init_ext(exts->list.array[6], &asn_DEF_CertificatePolicies, OID_CP, true, &cp);
+	init_ext(exts->list.array[6], &asn_DEF_CertificatePolicies, NID_certificate_policies, true, &cp);
 
 	/* IP Address Blocks */
-	init_ext(exts->list.array[7], &asn_DEF_IPAddrBlocks, OID_IP, true, &ee->ip);
+	init_ext(exts->list.array[7], &asn_DEF_IPAddrBlocks, NID_ip_v2, true, &ee->ip);
 
 	/* ASNs */
-	init_ext(exts->list.array[8], &asn_DEF_ASIdentifiers, OID_ASN, true, &ee->asn);
+	init_ext(exts->list.array[8], &asn_DEF_ASIdentifiers, NID_asn_v2, true, &ee->asn);
 }
 
 struct rpki_certificate *
@@ -259,7 +259,7 @@ cer_init(struct rpki_certificate *cer, char const *filename,
 	tbs = &cer->obj.tbsCertificate;
 	tbs->version = intmax2INTEGER(2);
 	init_INTEGER(&tbs->serialNumber, 0);
-	init_oid(&tbs->signature.algorithm, OID_SHA256_WITH_RSA_ENCRYPTION);
+	init_oid(&tbs->signature.algorithm, NID_sha256WithRSAEncryption);
 	tbs->signature.parameters = create_null();
 	/* issuer: Postpone (needs parent's subject) */
 	init_time_now(&tbs->validity.notBefore);
@@ -269,7 +269,7 @@ cer_init(struct rpki_certificate *cer, char const *filename,
 	/* tbs->issuerUniqueID: Not implemented yet */
 	/* tbs->subjectUniqueID: Not implemented yet */
 	/* tbs->extensions: Not implemented yet */
-	init_oid(&cer->obj.signatureAlgorithm.algorithm, OID_SHA256_WITH_RSA_ENCRYPTION);
+	init_oid(&cer->obj.signatureAlgorithm.algorithm, NID_sha256WithRSAEncryption);
 	cer->obj.signatureAlgorithm.parameters = create_null();
 	/* cer->signature: Postpone (needs all other fields ready) */
 

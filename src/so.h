@@ -35,7 +35,7 @@ struct signed_object {
 };
 
 struct signed_object *signed_object_new(char const *, struct rpki_certificate *,
-    const int *);
+    int);
 void signed_object_finish(struct signed_object *, asn_TYPE_descriptor_t *);
 
 #endif /* SRC_SO_H_ */

@@ -4,6 +4,8 @@
 // XXX remember the vulnerability with some libasn1fort object
 
 #include <stdbool.h>
+#include <openssl/objects.h>
+
 #include <libasn1fort/ANY.h>
 #include <libasn1fort/BIT_STRING.h>
 #include <libasn1fort/Extension.h>
@@ -31,9 +33,11 @@
 	} while (0)
 
 void init_8str(OCTET_STRING_t *, char const *);
+
 INTEGER_t *intmax2INTEGER(intmax_t src);
 void init_INTEGER(INTEGER_t *field, intmax_t value);
-void init_oid(OBJECT_IDENTIFIER_t *, int const *);
+void init_oid(OBJECT_IDENTIFIER_t *, int);
+void obj2oid(ASN1_OBJECT *src, OBJECT_IDENTIFIER_t *dst);
 ANY_t *create_null(void);
 void init_name(Name_t *, char const *);
 void init_any_str(ANY_t *, char const *);
@@ -46,6 +50,7 @@ void init_gtime_str(GeneralizedTime_t *, char const *);
 void init_gtime_tm(GeneralizedTime_t *, struct tm *);
 void init_gtime_now(GeneralizedTime_t *);
 void init_gtime_later(GeneralizedTime_t *);
+
 
 void der_encode_any(const asn_TYPE_descriptor_t *, void *, ANY_t *);
 void der_encode_8str(const asn_TYPE_descriptor_t *, void *, OCTET_STRING_t *);
