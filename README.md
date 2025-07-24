@@ -286,6 +286,21 @@ tbsCertificate.validity.notBefore = 2025-07-15T19:39:38Z
 
 Applies to both `Time`s and `GeneralizedTime`s. Notice the UTC+0 enforcement.
 
+### Names
+
+`Name`s are arrays of maps:
+
+```
+tbsCertificate.subject = [ { commonName=potato, 2.5.4.4=potatoes }, { commonName=tomato, 2.5.4.4=tomatoes } ]
+```
+
+But you can also enter a simple string, which will be assumed to be the `commonName` (OID 2.5.4.3) of a one-element map in a one-element array. The following two are equivalent:
+
+```
+tbsCertificate.subject = [ { commonName:potato } ]
+tbsCertificate.subject = potato
+```
+
 ### IP Resources
 
 ```
