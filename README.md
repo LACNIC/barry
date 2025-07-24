@@ -261,8 +261,7 @@ tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x10/136
 Prefixing is actually also compatible with the other "numeric" data types, but they actually require the length to be a multiple of 8. You may abuse this to produce big numbers:
 
 ```
-# Big integer whose hexadecimal representation consists of '1' followed
-# by 124 zeroes.
+# Big integer whose hexadecimal representation consists of '1' followed by 248 zeroes.
 content.encapContentInfo.eContent.version = 0x01/1000
 ```
 
@@ -297,7 +296,7 @@ tbsCertificate.subject = [ { commonName=potato, 2.5.4.4=potatoes }, { commonName
 But you can also enter a simple string, which will be assumed to be the `commonName` (OID 2.5.4.3) of a one-element map in a one-element array. The following two are equivalent:
 
 ```
-tbsCertificate.subject = [ { commonName:potato } ]
+tbsCertificate.subject = [ { commonName=potato } ]
 tbsCertificate.subject = potato
 ```
 
