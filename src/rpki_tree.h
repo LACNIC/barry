@@ -1,6 +1,7 @@
 #ifndef SRC_RPKI_TREE_H_
 #define SRC_RPKI_TREE_H_
 
+#include <stdbool.h>
 #include "keyval.h"
 #include "uthash.h"
 
@@ -28,11 +29,28 @@ struct rpki_tree_node {
 	UT_hash_handle ghook; /* Global hash table hook */
 };
 
+struct rpki_tree {
+	/* Array; all nodes, listed without hierarchy */
+	struct rpki_tree_node *nodes;
+	/* Nodes in tree form */
+	struct rpki_tree_node *root;
+};
+
+struct rpki_tree rpkitree_load(char const *);
+
 void
 rpkitree_pre_order(
-    struct rpki_tree_node *root,
-    void (*cb)(struct rpki_tree_node *, void *),
+    struct rpki_tree *tree,
+    void (*cb)(struct rpki_tree *, struct rpki_tree_node *, void *),
     void *arg
 );
+
+void rpkitree_add(
+    struct rpki_tree *,
+    struct rpki_tree_node *,
+    struct rpki_tree_node *
+);
+
+void rpkitree_print(struct rpki_tree *);
 
 #endif /* SRC_RPKI_TREE_H_ */

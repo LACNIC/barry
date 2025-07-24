@@ -36,3 +36,10 @@ dstr_append(struct dynamic_string *str, unsigned char const *addend,
 	memcpy(str->buf + str->len, addend, addlen);
 	str->len += addlen;
 }
+
+/* Appends the null character */
+void
+dstr_finish(struct dynamic_string *str)
+{
+	dstr_append(str, (unsigned char *)"", 1);
+}

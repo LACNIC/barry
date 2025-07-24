@@ -210,7 +210,8 @@ find_child(struct rpki_tree_node *parent, enum file_type type)
 }
 
 static void
-add_missing_objs(struct rpki_tree_node *parent, void *arg)
+add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
+    void *arg)
 {
 	struct rpki_tree_node *child;
 	struct rpki_certificate *ca;
@@ -229,8 +230,7 @@ add_missing_objs(struct rpki_tree_node *parent, void *arg)
 		child->obj = mft_new(child->name, ca);
 		mft_generate_paths(child->obj, child->name);
 		child->parent = parent;
-		__add_node(child);
-		add_child(parent, child);
+		rpkitree_add(tree, parent, child);
 	}
 
 	if (find_child(parent, FT_CRL) == NULL) {
@@ -242,8 +242,7 @@ add_missing_objs(struct rpki_tree_node *parent, void *arg)
 		child->obj = crl_new(ca);
 		crl_generate_paths(child->obj, child->name);
 		child->parent = parent;
-		__add_node(child);
-		add_child(parent, child);
+		rpkitree_add(tree, parent, child);
 	}
 }
 
@@ -262,7 +261,7 @@ get_parent(struct rpki_tree_node *node)
 }
 
 static void
-init_object(struct rpki_tree_node *node, void *arg)
+init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Initializing: %s", node->name);
 
@@ -281,12 +280,12 @@ init_object(struct rpki_tree_node *node, void *arg)
 		node->obj = roa_new(node->name, get_parent(node));
 		break;
 	default:
-		BADCFG("Unknown file type: %s", node->name);
+		panic("Unknown file type: %s", node->name);
 	}
 }
 
 static void
-generate_paths(struct rpki_tree_node *node, void *arg)
+generate_paths(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Generating paths: %s", node->name);
 
@@ -305,12 +304,12 @@ generate_paths(struct rpki_tree_node *node, void *arg)
 		roa_generate_paths(node->obj, node->name);
 		break;
 	default:
-		BADCFG("Unknown file type: %s", node->name);
+		panic("Unknown file type: %s", node->name);
 	}
 }
 
 static void
-apply_keyvals(struct rpki_tree_node *node, void *arg)
+apply_keyvals(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Applying keyvals: %s", node->name);
 
@@ -329,12 +328,12 @@ apply_keyvals(struct rpki_tree_node *node, void *arg)
 		roa_apply_keyvals(node->obj, &node->props);
 		break;
 	default:
-		BADCFG("Unknown file type: %s", node->name);
+		panic("Unknown file type: %s", node->name);
 	}
 }
 
 static void
-finish_not_mfts(struct rpki_tree_node *node, void *arg)
+finish_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Finishing (unless it's a manifest): %s", node->name);
 
@@ -354,12 +353,12 @@ finish_not_mfts(struct rpki_tree_node *node, void *arg)
 		roa_finish(node->obj);
 		break;
 	default:
-		BADCFG("Unknown file type: %s", node->name);
+		panic("Unknown file type: %s", node->name);
 	}
 }
 
 static void
-finish_mfts(struct rpki_tree_node *node, void *arg)
+finish_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	if (infer_type(node) != FT_MFT)
 		return;
@@ -369,7 +368,7 @@ finish_mfts(struct rpki_tree_node *node, void *arg)
 }
 
 static void
-write_not_mfts(struct rpki_tree_node *node, void *arg)
+write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Writing file (unless it's a manifest): %s", node->name);
 
@@ -387,12 +386,12 @@ write_not_mfts(struct rpki_tree_node *node, void *arg)
 		roa_write(node->obj);
 		break;
 	default:
-		BADCFG("Unknown file type: %s", node->name);
+		panic("Unknown file type: %s", node->name);
 	}
 }
 
 static void
-write_mfts(struct rpki_tree_node *node, void *arg)
+write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	if (infer_type(node) != FT_MFT)
 		return;
@@ -402,17 +401,17 @@ write_mfts(struct rpki_tree_node *node, void *arg)
 }
 
 static void
-print_repository(void)
+print_repository(struct rpki_tree *tree)
 {
 	struct rpki_tree_node *node, *tmp;
 
 	printf("# Tree\n\n");
 	printf("```\n");
-	print_node(root, 0);
+	rpkitree_print(tree);
 	printf("```\n\n");
 
 	printf("# Files\n\n");
-	HASH_ITER(ghook, nodes, node, tmp) {
+	HASH_ITER(ghook, tree->nodes, node, tmp) {
 		printf("## %s\n\n", node->name);
 
 		switch (infer_type(node)) {
@@ -430,7 +429,7 @@ print_repository(void)
 			roa_print(node->obj);
 			break;
 		default:
-			BADCFG("Unknown file type: %s", node->name);
+			panic("Unknown file type: %s", node->name);
 		}
 
 		printf("\n");
@@ -440,64 +439,52 @@ print_repository(void)
 int
 main(int argc, char **argv)
 {
+	struct rpki_tree tree;
+
 	/* register_signal_handlers(); TODO */
 
 	parse_options(argc, argv);
 
-	if (strcmp(repo_descriptor, "-") != 0) {
-		reader.fd = open(repo_descriptor, O_RDONLY, 0);
-		if (reader.fd < 0)
-			BADCFG("%s: %s", repo_descriptor, strerror(errno));
-	} else {
-		reader.fd = STDIN_FILENO;
-	}
-
-	pr_debug("Reading tree from input...");
-	read_tree();
-	pr_debug("Done.\n");
-
-	pr_debug("Reading keyvals from input...");
-	read_keyvals();
-	pr_debug("Done.\n");
+	tree = rpkitree_load(repo_descriptor);
 
 	pr_debug("Instancing generic RPKI objects...");
-	rpkitree_pre_order(root, init_object, NULL);
+	rpkitree_pre_order(&tree, init_object, NULL);
 	pr_debug("Done.\n");
 
 	pr_debug("Generating default paths...");
-	rpkitree_pre_order(root, generate_paths, NULL);
+	rpkitree_pre_order(&tree, generate_paths, NULL);
 	pr_debug("Done.\n");
 
 	pr_debug("Adding missing CRLs and Manifests...");
-	rpkitree_pre_order(root, add_missing_objs, NULL);
+	rpkitree_pre_order(&tree, add_missing_objs, NULL);
 	pr_debug("Done.\n");
 
 	pr_debug("Applying keyvals...");
-	rpkitree_pre_order(root, apply_keyvals, NULL);
+	rpkitree_pre_order(&tree, apply_keyvals, NULL);
 	pr_debug("Done.\n");
 
 	pr_debug("Post-processing (except manifests)...");
-	rpkitree_pre_order(root, finish_not_mfts, NULL);
+	rpkitree_pre_order(&tree, finish_not_mfts, NULL);
 	pr_debug("Done.\n");
 
 	pr_debug("Writing files (except manifests)...");
 	exec_mkdir_p(rsync_path, true);
-	rpkitree_pre_order(root, write_not_mfts, NULL);
+	rpkitree_pre_order(&tree, write_not_mfts, NULL);
 	// XXX assuming type cer
-	tal_write(root->obj, tal_path);
+	tal_write(tree.root->obj, tal_path);
 	pr_debug("Done.\n");
 
 	pr_debug("Post-processing (manifests)...");
-	rpkitree_pre_order(root, finish_mfts, NULL);
+	rpkitree_pre_order(&tree, finish_mfts, NULL);
 	pr_debug("Done.\n");
 
 	pr_debug("Writing files (manifests)...");
-	rpkitree_pre_order(root, write_mfts, NULL);
+	rpkitree_pre_order(&tree, write_mfts, NULL);
 	pr_debug("Done.\n");
 
 	if (print_objs) {
 		pr_debug("Printing objects...");
-		print_repository();
+		print_repository(&tree);
 		pr_debug("Done.\n");
 	}
 

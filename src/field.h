@@ -6,14 +6,12 @@
 #include "uthash.h"
 
 typedef char const *error_msg;
-typedef error_msg (*parse_str)(char const *, void *);
-typedef error_msg (*parse_list)(struct kv_list *, void *);
+typedef error_msg (*field_parser)(struct kv_value *, void *);
 typedef void (*print_field)(void *);
 
 struct field_type {
 	char const *name;
-	parse_str str_parser;
-	parse_list list_parser;
+	field_parser parser;
 	print_field print;
 };
 

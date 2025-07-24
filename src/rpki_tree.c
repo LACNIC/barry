@@ -1,53 +1,70 @@
 #include "rpki_tree.h"
 
-static unsigned int line = 1;
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define BADCFG(fmt, ...) panic("Line %u: " fmt, line, ##__VA_ARGS__)
+#include "alloc.h"
+#include "print.h"
+#include "str.h"
 
-struct file_reader {
+#define BADCFG(rdr, fmt, ...) panic("Line %u: " fmt, rdr->line, ##__VA_ARGS__)
+#define UNEXPECTED_TOKEN(rdr, tkn) BADCFG(rdr, "Unexpected token: %s", tkn)
+
+struct rd_parse_context {
+	/* File descriptor for reading into @buf */
 	int fd;
+	/* Path to the file from where we opened the file descriptor */
+	char const *path;
+	/* Current line number, to report during errors */
+	unsigned int line;
+
 	unsigned char buf[4096];
+	/* Number of bytes we've already consumed from @buf */
 	size_t offset;
+	/* Total meaningful bytes in @buf, since buf[0] */
 	size_t size;
-} reader;
+
+	struct rpki_tree result;
+};
 
 enum token_type {
 	TKNT_STR,
 	TKNT_ASSIGNMENT = '=',
-	TKNT_START = '[',
-	TKNT_END = ']',
+	TKNT_SET_START = '[',
+	TKNT_SET_END = ']',
+	TKNT_MAP_START = '{',
+	TKNT_MAP_END = '}',
 	TKNT_SEPARATOR = ',',
 	TKNT_EOF,
 };
 
-static struct rpki_tree_node *nodes;
-static struct rpki_tree_node *root;
-
 static struct rpki_tree_node *
-find_node(char const *name)
+find_node(struct rd_parse_context *ctx, char const *name)
 {
 	struct rpki_tree_node *node;
 	size_t keylen;
 
 	keylen = strlen(name);
-	HASH_FIND(ghook, nodes, name, keylen, node);
+	HASH_FIND(ghook, ctx->result.nodes, name, keylen, node);
 
 	return node;
 }
 
 static void
-__add_node(struct rpki_tree_node *node)
+__add_node(struct rpki_tree *tree, struct rpki_tree_node *node)
 {
 	size_t keylen = strlen(node->name);
-	HASH_ADD_KEYPTR(ghook, nodes, node->name, keylen, node);
+	HASH_ADD_KEYPTR(ghook, tree->nodes, node->name, keylen, node);
 }
 
 static void
-add_node(struct rpki_tree_node *node)
+add_node(struct rd_parse_context *ctx, struct rpki_tree_node *node)
 {
-	if (find_node(node->name) != NULL)
+	if (find_node(ctx, node->name) != NULL)
 		panic("There is more than one node named '%s'.", node->name);
-	__add_node(node);
+	__add_node(&ctx->result, node);
 }
 
 static void
@@ -67,73 +84,70 @@ is_alphanumeric(char chr)
 }
 
 static bool
-refresh_reader(void)
+refresh_reader(struct rd_parse_context *ctx)
 {
 	ssize_t bytes;
 
-	if (reader.fd == -1)
+	if (ctx->fd == -1)
 		return false;
 
-	bytes = read(reader.fd, reader.buf, sizeof(reader.buf));
+	bytes = read(ctx->fd, ctx->buf, sizeof(ctx->buf));
 	if (bytes < 0)
-		panic("%s: %s", repo_descriptor, strerror(errno));
+		panic("%s: %s", ctx->path, strerror(errno));
 	if (bytes == 0) {
-		if (reader.fd != STDIN_FILENO)
-			close(reader.fd);
-		reader.fd = -1;
+		if (ctx->fd != STDIN_FILENO)
+			close(ctx->fd);
+		ctx->fd = -1;
 		return false;
 	}
 
-	reader.offset = 0;
-	reader.size = bytes;
+	ctx->offset = 0;
+	ctx->size = bytes;
 	return true;
 }
 
 static unsigned char *
-next_char(void)
+next_char(struct rd_parse_context *ctx)
 {
-	if (reader.offset >= reader.size && !refresh_reader())
+	if (ctx->offset >= ctx->size && !refresh_reader(ctx))
 		return NULL;
 
 	/* pr_trace("	Character '%c'", reader.buf[reader.offset]); */
-	return reader.buf + reader.offset++;
+	return ctx->buf + ctx->offset++;
 }
 
 static char *
-tokenize(bool (*chr_matches)(char))
+tokenize(struct rd_parse_context *ctx, bool (*chr_matches)(char))
 {
 	struct dynamic_string result = { 0 };
 	size_t i;
 
 	do {
-		for (i = reader.offset; i < reader.size; i++) {
-			if (!chr_matches(reader.buf[i])) {
-				dstr_append(&result,
-				    reader.buf + reader.offset,
-				    i - reader.offset);
-				dstr_append(&result, (unsigned char *)"", 1);
-				reader.offset = i;
+		for (i = ctx->offset; i < ctx->size; i++) {
+			if (!chr_matches(ctx->buf[i])) {
+				dstr_append(&result, ctx->buf + ctx->offset,
+				    i - ctx->offset);
+				dstr_finish(&result);
+				ctx->offset = i;
 				return result.buf;
 			}
 		}
 
-		dstr_append(&result,
-		    reader.buf + reader.offset,
-		    i - reader.offset);
+		dstr_append(&result, ctx->buf + ctx->offset, i - ctx->offset);
 
 		// TODO If ID is EOF, this triggers
-		if (!refresh_reader())
-			BADCFG("Unterminated token at the end of file");
+		if (!refresh_reader(ctx))
+			BADCFG(ctx, "Unterminated token at the end of file");
 	} while (true);
 }
 
 static unsigned char *
-skip_until(unsigned char delim)
+skip_until(struct rd_parse_context *ctx, unsigned char delim)
 {
 	unsigned char *chr;
 
 	do {
-		chr = next_char();
+		chr = next_char(ctx);
 		if (chr == NULL)
 			return NULL;
 	} while (*chr != delim);
@@ -145,18 +159,14 @@ static char const *
 tknt2str(enum token_type type)
 {
 	switch (type) {
-	case TKNT_STR:
-		return "String";
-	case TKNT_ASSIGNMENT:
-		return "=";
-	case TKNT_START:
-		return "[";
-	case TKNT_END:
-		return "]";
-	case TKNT_SEPARATOR:
-		return ",";
-	case TKNT_EOF:
-		return "EOF";
+	case TKNT_STR:		return "String";
+	case TKNT_ASSIGNMENT:	return "=";
+	case TKNT_SET_START:	return "[";
+	case TKNT_SET_END:	return "]";
+	case TKNT_MAP_START:	return "{";
+	case TKNT_MAP_END:	return "}";
+	case TKNT_SEPARATOR:	return ",";
+	case TKNT_EOF:		return "EOF";
 	}
 
 	return "Unknown";
@@ -169,8 +179,10 @@ is_unquoted_string_chr(char chr)
 	    && chr != '\t'
 	    && chr != '\n'
 	    && chr != TKNT_ASSIGNMENT
-	    && chr != TKNT_START
-	    && chr != TKNT_END
+	    && chr != TKNT_SET_START
+	    && chr != TKNT_SET_END
+	    && chr != TKNT_MAP_START
+	    && chr != TKNT_MAP_END
 	    && chr != TKNT_SEPARATOR;
 }
 
@@ -180,167 +192,194 @@ is_quoted_string_chr(char chr)
 	return chr != '"';
 }
 
+struct token {
+	enum token_type type;
+	char *str;
+};
+
 static enum token_type
-next_token(char **tkn)
+init_token(struct token *tkn, enum token_type type, char *str)
+{
+	tkn->type = type;
+	tkn->str = str;
+	pr_trace("Token: %s", str);
+	return type;
+}
+
+static enum token_type
+next_token(struct rd_parse_context *ctx, struct token *tkn)
 {
 	unsigned char *_chr, chr;
 
-	*tkn = NULL;
-
 	do {
-		_chr = next_char();
-		if (_chr == NULL) {
-			pr_trace("Token: EOF1");
-			*tkn = "EOF";
-			return TKNT_EOF;
-		}
+		_chr = next_char(ctx);
+		if (_chr == NULL)
+			return init_token(tkn, TKNT_EOF, "EOF");
 		chr = *_chr;
 
 		if (is_alphanumeric(chr)) {
-			reader.offset--;
-			*tkn = tokenize(is_unquoted_string_chr);
-			pr_trace("Token: %s", *tkn);
-			return TKNT_STR;
+			ctx->offset--;
+			return init_token(tkn, TKNT_STR,
+			    tokenize(ctx, is_unquoted_string_chr));
 		}
 
 		switch (chr) {
 		case '#': /* Comment */
-			if (!skip_until('\n')) {
-				pr_trace("Token: EOF2");
-				*tkn = "EOF";
-				return TKNT_EOF;
-			}
+			if (!skip_until(ctx, '\n'))
+				return init_token(tkn, TKNT_EOF, "EOF");
 			/* No break */
 		case '\n':
-			line++;
+			ctx->line++;
 			/* No break */
 		case ' ':
 		case '\t':
 			break;
 
 		case '"':
-			*tkn = tokenize(is_quoted_string_chr);
-			pr_trace("Token String: \"%s\"", *tkn);
-			reader.offset++;
-			return TKNT_STR;
+			init_token(tkn, TKNT_STR,
+			    tokenize(ctx, is_quoted_string_chr));
+			ctx->offset++;
+			return tkn->type;
 
 		case TKNT_ASSIGNMENT:
-			*tkn = "=";
-			pr_trace("Token %c", chr);
-			return chr;
+			return init_token(tkn, TKNT_ASSIGNMENT, "=");
 
-		case TKNT_START:
-			*tkn = "[";
-			pr_trace("Token %c", chr);
-			return chr;
+		case TKNT_SET_START:
+			return init_token(tkn, TKNT_SET_START, "[");
 
-		case TKNT_END:
-			*tkn = "]";
-			pr_trace("Token %c", chr);
-			return chr;
+		case TKNT_SET_END:
+			return init_token(tkn, TKNT_SET_END, "]");
+
+		case TKNT_MAP_START:
+			return init_token(tkn, TKNT_MAP_START, "{");
+
+		case TKNT_MAP_END:
+			return init_token(tkn, TKNT_MAP_END, "}");
 
 		case TKNT_SEPARATOR:
-			*tkn = ",";
-			pr_trace("Token %c", chr);
-			return chr;
+			return init_token(tkn, TKNT_SEPARATOR, ",");
 
 		default:
-			BADCFG("Unexpected character: %c (0x%x)", chr, chr);
+			BADCFG(ctx, "Unexpected character: %c (0x%x)", chr, chr);
 		}
 	} while (true);
 }
 
 static char *
-expect_token(enum token_type expected)
+expect_token(struct rd_parse_context *ctx, enum token_type expected)
 {
-	enum token_type actual;
-	char *token;
+	struct token tkn;
 
-	actual = next_token(&token);
-	if (expected != actual)
-		BADCFG("Expected %s, got %s '%s'",
-		    tknt2str(expected), tknt2str(actual),
-		    token);
+	if (expected != next_token(ctx, &tkn))
+		BADCFG(ctx, "Expected %s, got %s '%s'", tknt2str(expected),
+		    tknt2str(tkn.type), tkn.str);
 
-	return token;
+	return tkn.str;
 }
 
 static struct kv_value
-accept_value(char const *key)
+accept_value(struct rd_parse_context *ctx, struct token *peek)
 {
-	char *token;
-	struct kv_value value;
+	struct token tkn;
+	struct kv_value result;
 	struct kv_node *node;
+	struct keyval *kv;
 
-	switch (next_token(&token)) {
+	if (peek)
+		tkn = *peek;
+	else
+		next_token(ctx, &tkn);
+
+	switch (tkn.type) {
 	case TKNT_STR:
-		value.type = VALT_STR;
-		value.v.str = token;
+		result.type = VALT_STR;
+		result.v.str = tkn.str;
 		break;
 
-	case TKNT_START:
-		value.type = VALT_ARRAY;
-		STAILQ_INIT(&value.v.list);
+	case TKNT_SET_START:
+		result.type = VALT_SET;
+		STAILQ_INIT(&result.v.set);
 
-list_next:	switch (next_token(&token)) {
-		case TKNT_STR:
+		if (next_token(ctx, &tkn) == TKNT_SET_END)
+			return result;
+
+		do {
 			node = pzalloc(sizeof(struct kv_node));
-			node->value = token;
-			STAILQ_INSERT_TAIL(&value.v.list, node, hook);
+			node->value = accept_value(ctx, &tkn);
+			STAILQ_INSERT_TAIL(&result.v.set, node, hook);
 
-			switch (next_token(&token)) {
-			case TKNT_SEPARATOR:
-				goto list_next;
-			case TKNT_END:
-				goto list_end;
-			default:
-				BADCFG("Don't know what to do with '%s' "
-				    "while parsing array '%s'.",
-				    token, key);
+			switch (next_token(ctx, &tkn)) {
+			case TKNT_SET_END:	return result;
+			case TKNT_SEPARATOR:	break;
+			default:		UNEXPECTED_TOKEN(ctx, tkn.str);
 			}
 
-		case TKNT_END:
-list_end:		break;
+			next_token(ctx, &tkn);
+		} while (true);
 
-		default:
-			BADCFG("Don't know what to do with '%s' "
-			    "while parsing array '%s'.",
-			    token, key);
-		}
-		break;
+	case TKNT_MAP_START:
+		result.type = VALT_MAP;
+		STAILQ_INIT(&result.v.map);
+
+		do {
+			switch (next_token(ctx, &tkn)) {
+			case TKNT_STR:
+				kv = pzalloc(sizeof(struct keyval));
+				kv->key = tkn.str;
+				expect_token(ctx, TKNT_ASSIGNMENT);
+				kv->value = accept_value(ctx, NULL);
+				STAILQ_INSERT_TAIL(&result.v.map, kv, hook);
+
+				switch (next_token(ctx, &tkn)) {
+				case TKNT_MAP_END:
+					return result;
+				case TKNT_SEPARATOR:
+					break;
+				default:
+					UNEXPECTED_TOKEN(ctx, tkn.str);
+				}
+
+				break;
+			case TKNT_MAP_END:
+				return result;
+			default:
+				UNEXPECTED_TOKEN(ctx, tkn.str);
+			}
+		} while (true);
 
 	default:
-		BADCFG("Don't know what to do with token '%s'.", token);
-		memset(&value, 0, sizeof(value));
+		UNEXPECTED_TOKEN(ctx, tkn.str);
+		memset(&result, 0, sizeof(result));
 	}
 
-	return value;
+	return result;
 }
 
 static void
-read_keyvals(void)
+read_keyvals(struct rd_parse_context *ctx)
 {
-	char *tkn;
+	struct token tkn;
 	char *filename;
 	struct rpki_tree_node *file;
 	struct keyval *kv;
 
 	do {
-		switch (next_token(&tkn)) {
-		case TKNT_START:
-			filename = expect_token(TKNT_STR);
-			file = find_node(filename);
+		switch (next_token(ctx, &tkn)) {
+		case TKNT_SET_START:
+			filename = expect_token(ctx, TKNT_STR);
+			file = find_node(ctx, filename);
 			if (file == NULL)
-				BADCFG("The tree does not declare file '%s'",
+				BADCFG(ctx,
+				    "The tree does not declare file '%s'",
 				    filename);
-			expect_token(TKNT_END);
+			expect_token(ctx, TKNT_SET_END);
 			break;
 
 		case TKNT_STR:
 			kv = pzalloc(sizeof(struct keyval));
-			kv->key = tkn;
-			expect_token(TKNT_ASSIGNMENT);
-			kv->val = accept_value(kv->key);
+			kv->key = tkn.str;
+			expect_token(ctx, TKNT_ASSIGNMENT);
+			kv->value = accept_value(ctx, NULL);
 			STAILQ_INSERT_TAIL(&file->props, kv, hook);
 			break;
 
@@ -349,13 +388,13 @@ read_keyvals(void)
 			return;
 
 		default:
-			BADCFG("Unexpected keyval token: %s", tkn);
+			BADCFG(ctx, "Unexpected keyval token: %s", tkn.str);
 		}
 	} while (true);
 }
 
 static unsigned int
-count_indentation(void)
+count_indentation(struct rd_parse_context *ctx)
 {
 	unsigned int indent;
 	unsigned char *chr;
@@ -363,7 +402,7 @@ count_indentation(void)
 	indent = 0;
 
 	do {
-		chr = next_char();
+		chr = next_char(ctx);
 		if (!chr)
 			return indent;
 
@@ -375,50 +414,46 @@ count_indentation(void)
 			indent = (indent & ~7u) + 8;
 			break;
 		case '#':
-			if (!skip_until('\n'))
+			if (!skip_until(ctx, '\n'))
 				return indent;
 			/* No break */
 		case '\n':
-			line++;
+			ctx->line++;
 			indent = 0;
 			break;
 		default:
-			reader.offset--;
+			ctx->offset--;
 			return indent;
 		}
 	} while (true);
 }
 
 static void
-read_tree(void)
+read_tree(struct rd_parse_context *ctx)
 {
 	unsigned int indent;
-	char *token;
+	struct token tkn;
 
 	struct rpki_tree_node *last;
 	struct rpki_tree_node *current;
 
-	refresh_reader();
+	refresh_reader(ctx);
 
-	root = last = NULL;
+	ctx->result.root = last = NULL;
 	do {
-		indent = count_indentation();
+		indent = count_indentation(ctx);
 
-		switch (next_token(&token)) {
-		case TKNT_START:
-			reader.offset--;
-			return;
-
+		switch (next_token(ctx, &tkn)) {
 		case TKNT_STR:
 			current = pzalloc(sizeof(struct rpki_tree_node));
-			current->name = token;
+			current->name = tkn.str;
 			current->indent = indent;
 			STAILQ_INIT(&current->props);
 
-			add_node(current);
+			add_node(ctx, current);
 
-			if (root == NULL) {
-				root = last = current;
+			if (ctx->result.root == NULL) {
+				ctx->result.root = last = current;
 
 			} else if (current->indent > last->indent) {
 				add_child(last, current);
@@ -426,7 +461,8 @@ read_tree(void)
 
 			} else if (current->indent == last->indent) {
 sibling:			if (last->parent == NULL)
-					BADCFG("'%s' is disconnected from the tree.",
+					BADCFG(ctx,
+					    "'%s' is disconnected from the tree.",
 					    current->name);
 				add_child(last->parent, current);
 				last = current;
@@ -435,36 +471,82 @@ sibling:			if (last->parent == NULL)
 				for (last = last->parent; last != NULL; last = last->parent)
 					if (current->indent == last->indent)
 						goto sibling;
-				BADCFG("Node '%s' seems misaligned; "
+				BADCFG(ctx, "Node '%s' seems misaligned; "
 				    "please review its indentation.",
 				    current->name);
 			}
 			break;
 
+		case TKNT_SET_START:
+			ctx->offset--;
+			/* No break */
 		case TKNT_EOF:
 			return;
-
 		default:
-			BADCFG("Unexpected tree token: %s", token);
+			BADCFG(ctx, "Unexpected tree token: %s", tkn.str);
 		}
 	} while (true);
 }
 
-void
-rpkitree_pre_order(
-    struct rpki_tree_node *root,
-    void (*cb)(struct rpki_tree_node *, void *),
+struct rpki_tree
+rpkitree_load(char const *rd_path)
+{
+	struct rd_parse_context ctx = { 0 };
+
+	if (strcmp(rd_path, "-") != 0) {
+		ctx.fd = open(rd_path, O_RDONLY, 0);
+		if (ctx.fd < 0)
+			panic("%s: %s", rd_path, strerror(errno));
+	} else {
+		ctx.fd = STDIN_FILENO;
+	}
+
+	ctx.path = rd_path;
+	ctx.line = 1;
+
+	pr_debug("Reading tree from input...");
+	read_tree(&ctx);
+	pr_debug("Done.\n");
+
+	pr_debug("Reading keyvals from input...");
+	read_keyvals(&ctx);
+	pr_debug("Done.\n");
+
+	return ctx.result;
+}
+
+static void
+__preorder(
+    struct rpki_tree *tree,
+    struct rpki_tree_node *node,
+    void (*cb)(struct rpki_tree *, struct rpki_tree_node *, void *),
     void *arg
 ) {
 	struct rpki_tree_node *child, *tmp;
 
-	if (root == NULL)
-		return;
-	cb(root, arg);
+	cb(tree, node, arg);
 
 	// TODO ditch recursion
-	HASH_ITER(phook, root->children, child, tmp)
-		rpkitree_pre_order(child, cb, arg);
+	HASH_ITER(phook, node->children, child, tmp)
+		__preorder(tree, child, cb, arg);
+}
+
+void
+rpkitree_pre_order(
+    struct rpki_tree *tree,
+    void (*cb)(struct rpki_tree *, struct rpki_tree_node *, void *),
+    void *arg
+) {
+	if (tree != NULL && tree->root != NULL)
+		__preorder(tree, tree->root, cb, arg);
+}
+
+void
+rpkitree_add(struct rpki_tree *tree, struct rpki_tree_node *parent,
+    struct rpki_tree_node *child)
+{
+	__add_node(tree, child);
+	add_child(parent, child);
 }
 
 static void
@@ -480,4 +562,10 @@ print_node(struct rpki_tree_node *node, unsigned int indent)
 	indent++;
 	HASH_ITER(phook, node->children, child, tmp)
 		print_node(child, indent);
+}
+
+void
+rpkitree_print(struct rpki_tree *tree)
+{
+	print_node(tree->root, 0);
 }

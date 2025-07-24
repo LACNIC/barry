@@ -2,6 +2,11 @@
 
 #include <check.h>
 
+Time_t default_now;
+Time_t default_later;
+GeneralizedTime_t default_gnow;
+GeneralizedTime_t default_glater;
+
 unsigned int verbosity = 0;
 
 #define ck_hexstr(input, bytes, unused) do {				\
@@ -265,15 +270,20 @@ END_TEST
 
 START_TEST(check_parse_int_dec)
 {
+	struct kv_value kv;
 	INTEGER_t num;
 
+	kv.type = VALT_STR;
+
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("123", &num));
+	kv.v.str = "123";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 1);
 	ck_assert_int_eq(num.buf[0], 0x7B);
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("1234567890", &num));
+	kv.v.str = "1234567890";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 4);
 	ck_assert_int_eq(num.buf[0], 0x49);
 	ck_assert_int_eq(num.buf[1], 0x96);
@@ -286,6 +296,7 @@ END_TEST
 
 START_TEST(check_tutorial_examples)
 {
+	struct kv_value kv;
 	INTEGER_t num;
 	OCTET_STRING_t os;
 	BIT_STRING_t bs;
@@ -295,44 +306,52 @@ START_TEST(check_tutorial_examples)
 	unsigned char buf[64] = { 0 };
 	long int i;
 
+	kv.type = VALT_STR;
+
 	/*
 	 * Because of their numeric natures, `INTEGER`, `OCTET STRING`s,
 	 * `BIT STRING`s and `ANY` share the same parser:
 	 */
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("4660", &num));
+	kv.v.str = "4660";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0x1234", &num));
+	kv.v.str = "0x1234";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0b0001001000110100", &num));
+	kv.v.str = "0b0001001000110100";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&os, 0, sizeof(os));
-	ck_assert_pstr_eq(NULL, parse_8str_str("4660", &os));
+	kv.v.str = "4660";
+	ck_assert_pstr_eq(NULL, parse_8str(&kv, &os));
 	ck_assert_int_eq(os.size, 2);
 	ck_assert_int_eq(os.buf[0], 0x12);
 	ck_assert_int_eq(os.buf[1], 0x34);
 
 	memset(&bs, 0, sizeof(bs));
-	ck_assert_pstr_eq(NULL, parse_bitstr_str("0x1234", &bs));
+	kv.v.str = "0x1234";
+	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
 	ck_assert_int_eq(bs.size, 2);
 	ck_assert_int_eq(bs.buf[0], 0x12);
 	ck_assert_int_eq(bs.buf[1], 0x34);
 	ck_assert_int_eq(bs.bits_unused, 0);
 
 	memset(&any, 0, sizeof(any));
-	ck_assert_pstr_eq(NULL, parse_any_str("0b0001001000110100", &any));
+	kv.v.str = "0b0001001000110100";
+	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
 	ck_assert_int_eq(any.size, 2);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -343,14 +362,16 @@ START_TEST(check_tutorial_examples)
 	 */
 
 	memset(&any, 0, sizeof(any));
-	ck_assert_pstr_eq(NULL, parse_any_str("0x123456", &any));
+	kv.v.str = "0x123456";
+	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
 	ck_assert_int_eq(any.size, 3);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
 	ck_assert_int_eq(any.buf[2], 0x56);
 
 	memset(&any, 0, sizeof(any));
-	ck_assert_pstr_eq(NULL, parse_any_str("0b000100100011010001010110", &any));
+	kv.v.str = "0b000100100011010001010110";
+	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
 	ck_assert_int_eq(any.size, 3);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -363,7 +384,8 @@ START_TEST(check_tutorial_examples)
 	 */
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0x00000001", &num));
+	kv.v.str = "0x00000001";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 4);
 	ck_assert_int_eq(num.buf[0], 0x00);
 	ck_assert_int_eq(num.buf[1], 0x00);
@@ -377,7 +399,8 @@ START_TEST(check_tutorial_examples)
 	ck_assert_int_eq(1, buf[2]);
 
 	memset(&any, 0, sizeof(any));
-	ck_assert_pstr_eq(NULL, parse_any_str("0x00000001", &any));
+	kv.v.str = "0x00000001";
+	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
 	ck_assert_int_eq(any.size, 4);
 	ck_assert_int_eq(any.buf[0], 0x00);
 	ck_assert_int_eq(any.buf[1], 0x00);
@@ -399,19 +422,22 @@ START_TEST(check_tutorial_examples)
 	 */
 
 	memset(&bs, 0, sizeof(bs));
-	ck_assert_pstr_eq(NULL, parse_bitstr_str("0b111110", &bs));
+	kv.v.str = "0b111110";
+	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
 
 	memset(&bs, 0, sizeof(bs));
-	ck_assert_pstr_eq(NULL, parse_bitstr_str("0xF8/6", &bs));
+	kv.v.str = "0xF8/6";
+	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
 
 	memset(&bs, 0, sizeof(bs));
-	ck_assert_pstr_eq(NULL, parse_bitstr_str("0b11111/6", &bs));
+	kv.v.str = "0b11111/6";
+	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
@@ -423,27 +449,31 @@ START_TEST(check_tutorial_examples)
 	 */
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0x1234", &num));
+	kv.v.str = "0x1234";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0x001234", &num));
+	kv.v.str = "0x001234";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x00);
 	ck_assert_int_eq(num.buf[1], 0x12);
 	ck_assert_int_eq(num.buf[2], 0x34);
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0x1234/24", &num));
+	kv.v.str = "0x1234/24";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 	ck_assert_int_eq(num.buf[2], 0x00);
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0x123400", &num));
+	kv.v.str = "0x123400";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
@@ -455,10 +485,8 @@ START_TEST(check_tutorial_examples)
 	 */
 
 	memset(&bs, 0, sizeof(bs));
-	ck_assert_pstr_eq(
-	    NULL,
-	    parse_bitstr_str("0x1000000000000000000000000000000000", &bs)
-	);
+	kv.v.str = "0x1000000000000000000000000000000000";
+	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
 	ck_assert_int_eq(bs.size, 17);
 	ck_assert_int_eq(bs.buf[0], 0x10);
 	for (i = 1; i < 17; i++)
@@ -466,7 +494,8 @@ START_TEST(check_tutorial_examples)
 	ck_assert_int_eq(bs.bits_unused, 0);
 
 	memset(&bs, 0, sizeof(bs));
-	ck_assert_pstr_eq(NULL, parse_bitstr_str("0x10/136", &bs));
+	kv.v.str = "0x10/136";
+	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
 	ck_assert_int_eq(bs.size, 17);
 	ck_assert_int_eq(bs.buf[0], 0x10);
 	for (i = 1; i < 17; i++)
@@ -480,7 +509,8 @@ START_TEST(check_tutorial_examples)
 	 */
 
 	memset(&num, 0, sizeof(num));
-	ck_assert_pstr_eq(NULL, parse_int_str("0x01/1000", &num));
+	kv.v.str = "0x01/1000";
+	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
 	ck_assert_int_eq(num.size, 125);
 	ck_assert_int_eq(num.buf[0], 0x01);
 	for (i = 1; i < 125; i++)
@@ -490,10 +520,14 @@ END_TEST
 
 START_TEST(check_parse_oid)
 {
+	struct kv_value kv;
 	OBJECT_IDENTIFIER_t oid;
 
+	kv.type = VALT_STR;
+
 	memset(&oid, 0, sizeof(oid));
-	parse_oid_str("1.2.840.113549.1.7.2", &oid);
+	kv.v.str = "1.2.840.113549.1.7.2";
+	parse_oid(&kv, &oid);
 	ck_assert_int_eq(oid.size, 9);
 	ck_assert_int_eq(oid.buf[0], 0x2A);
 	ck_assert_int_eq(oid.buf[1], 0x86);
@@ -680,19 +714,21 @@ START_TEST(check_find_last_1_index)
 END_TEST
 
 static void
-init_kvs(struct kv_list *input, ...)
+init_kv_set(struct kv_value *input, ...)
 {
 	char *str;
 	struct kv_node *node;
 	va_list ap;
 
+	input->type = VALT_SET;
 	va_start(ap, input);
 
-	STAILQ_INIT(input);
+	STAILQ_INIT(&input->v.set);
 	while ((str = va_arg(ap, char *)) != NULL) {
 		node = pzalloc(sizeof(struct kv_node));
-		node->value = pstrdup(str);
-		STAILQ_INSERT_TAIL(input, node, hook);
+		node->value.type = VALT_STR;
+		node->value.v.str = pstrdup(str);
+		STAILQ_INSERT_TAIL(&input->v.set, node, hook);
 	}
 
 	va_end(ap);
@@ -725,17 +761,17 @@ ck_addr(struct ROAIPAddress *addr, size_t size, int bits_unused, ...)
 
 START_TEST(check_parse_ip)
 {
-	struct kv_list input;
+	struct kv_value input;
 	A_SEQUENCE_OF(struct ROAIPAddressFamily) output;
 
-	init_kvs(&input, NULL);
-	ck_assert_pstr_eq(NULL, parse_ip_roa_list(&input, &output));
+	init_kv_set(&input, NULL);
+	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
 	ck_assert_int_eq(0, output.count);
 
 	/* ========= */
 
-	init_kvs(&input, "192.0.2.0/24", "2001:db8::/32", NULL);
-	ck_assert_pstr_eq(NULL, parse_ip_roa_list(&input, &output));
+	init_kv_set(&input, "192.0.2.0/24", "2001:db8::/32", NULL);
+	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
 	ck_assert_int_eq(2, output.count);
 
 	/* IPv4 */
@@ -750,8 +786,8 @@ START_TEST(check_parse_ip)
 
 	/* ========= */
 
-	init_kvs(&input, "192.0.2.0/24", NULL);
-	ck_assert_pstr_eq(NULL, parse_ip_roa_list(&input, &output));
+	init_kv_set(&input, "192.0.2.0/24", NULL);
+	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
 	ck_assert_int_eq(1, output.count);
 
 	ck_af(&output.array[0]->addressFamily, 1);
@@ -760,8 +796,8 @@ START_TEST(check_parse_ip)
 
 	/* ========= */
 
-	init_kvs(&input, "2001:db8::/32", NULL);
-	ck_assert_pstr_eq(NULL, parse_ip_roa_list(&input, &output));
+	init_kv_set(&input, "2001:db8::/32", NULL);
+	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
 	ck_assert_int_eq(1, output.count);
 
 	ck_af(&output.array[0]->addressFamily, 2);
@@ -770,10 +806,10 @@ START_TEST(check_parse_ip)
 
 	/* ========= */
 
-	init_kvs(&input,
+	init_kv_set(&input,
 	    "192.0.2.0/24", "203.0.113.224/29", "198.51.100.0/130",
 	    "2001:db8::/32", "::/0", "2001:db8::ffff/150", NULL);
-	ck_assert_pstr_eq(NULL, parse_ip_roa_list(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
 	ck_assert_int_eq(2, output.count);
 
 	/* IPv4 */
@@ -798,19 +834,19 @@ START_TEST(check_parse_ip)
 
 	/* ========= */
 
-	init_kvs(&input, "192.0.2.0/4", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ip_roa_list(&input, &output));
-	init_kvs(&input, "192.0.2.255/31", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ip_roa_list(&input, &output));
-	init_kvs(&input, "192.0.2.255/32", NULL);
-	ck_assert_pstr_eq(NULL, parse_ip_roa_list(&input, &output));
+	init_kv_set(&input, "192.0.2.0/4", NULL);
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	init_kv_set(&input, "192.0.2.255/31", NULL);
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	init_kv_set(&input, "192.0.2.255/32", NULL);
+	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
 
-	init_kvs(&input, "2001:db8::/2", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ip_roa_list(&input, &output));
-	init_kvs(&input, "2001:db8::ff/127", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ip_roa_list(&input, &output));
-	init_kvs(&input, "2001:db8::ff/128", NULL);
-	ck_assert_pstr_eq(NULL, parse_ip_roa_list(&input, &output));
+	init_kv_set(&input, "2001:db8::/2", NULL);
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	init_kv_set(&input, "2001:db8::ff/127", NULL);
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	init_kv_set(&input, "2001:db8::ff/128", NULL);
+	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
 }
 END_TEST
 

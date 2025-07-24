@@ -10,5 +10,6 @@ struct dynamic_string {
 };
 
 void dstr_append(struct dynamic_string *, unsigned char const *, size_t);
+void dstr_finish(struct dynamic_string *);
 
 #endif /* SRC_STR_H_ */

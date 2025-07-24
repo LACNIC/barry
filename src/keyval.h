@@ -5,27 +5,27 @@
 
 enum kv_type {
 	VALT_STR,
-	VALT_ARRAY,
-};
-
-struct kv_node {
-	char *value;
-	STAILQ_ENTRY(kv_node) hook;
+	VALT_SET,
+	VALT_MAP,
 };
 
 struct kv_value {
 	enum kv_type type;
 	union {
 		char *str;
-		STAILQ_HEAD(kv_list, kv_node) list;
-		char *src;
+		STAILQ_HEAD(kv_set, kv_node) set;
+		STAILQ_HEAD(kv_map, keyval) map;
 	} v;
+};
+
+struct kv_node {
+	struct kv_value value;
+	STAILQ_ENTRY(kv_node) hook;
 };
 
 struct keyval {
 	char *key;
-	struct kv_value val;
-
+	struct kv_value value;
 	STAILQ_ENTRY(keyval) hook;
 };
 

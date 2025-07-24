@@ -2,6 +2,7 @@
 #define SRC_PRINT_H_
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define C_RED		"\x1B[31m"
 #define C_GRN		"\x1B[32m"

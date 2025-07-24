@@ -88,19 +88,12 @@ init_name(Name_t *name, char const *value)
 	PrintableString_t ps;
 
 	name->present = Name_PR_rdnSequence;
-	name->choice.rdnSequence.list.count = 1;
-	name->choice.rdnSequence.list.size = name->choice.rdnSequence.list.count * sizeof(struct RelativeDistinguishedName *);
-	name->choice.rdnSequence.list.array = pmalloc(name->choice.rdnSequence.list.size);
+	INIT_ASN1_ARRAY(&name->choice.rdnSequence.list, 1, RelativeDistinguishedName_t);
 
-	rdn = pzalloc(sizeof(struct RelativeDistinguishedName));
-	name->choice.rdnSequence.list.array[0] = rdn;
+	rdn = name->choice.rdnSequence.list.array[0];
+	INIT_ASN1_ARRAY(&rdn->list, 1, AttributeTypeAndValue_t);
 
-	rdn->list.count = 1;
-	rdn->list.size = rdn->list.count * sizeof(struct AttributeTypeAndValue *);
-	rdn->list.array = pmalloc(rdn->list.size);
-
-	atv = pzalloc(sizeof(struct AttributeTypeAndValue));
-	rdn->list.array[0] = atv;
+	atv = rdn->list.array[0];
 	init_oid(&atv->type, NID_commonName);
 	init_8str(&ps, value);
 	der_encode_any(&asn_DEF_PrintableString, &ps, &atv->value);

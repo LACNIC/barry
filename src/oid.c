@@ -2,6 +2,7 @@
 
 #include <openssl/objects.h>
 
+/* Returns the libcrypto long name of the numeric representation @txt. */
 char const *
 oid2str(char const *txt)
 {
