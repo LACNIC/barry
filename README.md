@@ -4,6 +4,8 @@ A program that can generate a BAd Rpki RepositorY.
 
 Meant for Relying Party testing.
 
+WIP.
+
 ## Installation
 
 ```bash
@@ -329,7 +331,7 @@ tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, asn ]
 tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
 
 # End-Entities
-TODO
+content.certificates.0.tbsCertificate.extensions = [ ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
 ```
 
 The presently implemented extensions are
@@ -346,16 +348,18 @@ The presently implemented extensions are
 | cp       | Certificate Policies         | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.4), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.9) |
 | ip       | IP Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.10) |
 | asn      | AS Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-3), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.11) |
+| crln     | CRL Number                   | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-5.2.3) |
 
 Every extension gets an `extnID` OID, a `critical` boolean and a type-dependent `extnValue`, all editable through subfields:
 
 ```
 tbsCertificate.extensions.ip.extnID = 1.3.6.1.5.5.7.1.28
-tbsCertificate.extensions.ip.critical = 0xff
+tbsCertificate.extensions.ip.critical = true
 tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24, 2001:db8::/96 ]
 tbsCertificate.extensions.asn.extnID = 1.3.6.1.5.5.7.1.29
-tbsCertificate.extensions.asn.critical = 0xff
-tbsCertificate.extensions.asn.extnValue.extnValue = [ 0x1234, 0x5678 ]
+tbsCertificate.extensions.asn.critical = true
+tbsCertificate.extensions.asn.extnValue.asnum = [ 0x1234, 0x5678 ]
+tbsCertificate.extensions.asn.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
 ```
 
 If you want a different extension list, override it. Assignments are handled sequentially:
