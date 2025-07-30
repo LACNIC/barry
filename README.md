@@ -201,13 +201,16 @@ Incidentally, this is an okay way to find all the available keys for a given fil
 
 ### Numerics
 
-Because of their numeric natures, `INTEGER`, `OCTET STRING`s, `BIT STRING`s and `ANY`s largely share the same parser:
+Because of their numeric natures, `INTEGER`, `BOOLEAN`s, `OCTET STRING`s, `BIT STRING`s and `ANY`s largely share the same parser:
 
 ```
 # INTEGER
 content.encapContentInfo.eContent.version = 4660
 content.encapContentInfo.eContent.version = 0x1234
 content.encapContentInfo.eContent.version = 0b0001001000110100
+
+# BOOLEAN
+tbsCertificate.extensions.bc.critical = 9999
 
 # OCTET STRING
 content.signerInfos[0].sid.subjectKeyIdentifier = 4660
@@ -229,7 +232,7 @@ tbsCertificate.signature.parameters = 0x123456
 tbsCertificate.signature.parameters = "0b_0001:0010_0011,0100 0101 0110"
 ```
 
-Notice, this is the human-readable value. It later gets DER-encoded, which might result in some mutations, such as truncated leading zeroes on `INTEGER`s:
+Notice, this is the human-readable value. It later gets DER-encoded, which might result in some mutations, such as truncated leading zeroes on `INTEGER`s.
 
 ```
 # This INTEGER Becomes { 2, 1, 1 } when encoded.
@@ -249,7 +252,7 @@ tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0xF8/6
 tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b11111/6
 ```
 
-> Please note that prefixing swaps the anchoring of the number! As an `INTEGER`, `0x1234` equals `0x001234`, but `0x1234/24` equals `0x123400`.
+Please note that prefixing swaps the anchoring of the number! As an `INTEGER`, `0x1234` equals `0x001234`, but `0x1234/24` equals `0x123400`.
 
 Prefix lengths give you free padding, I guess. The following two are equivalent:
 
@@ -266,6 +269,20 @@ content.encapContentInfo.eContent.version = 0x01/1000
 ```
 
 I haven't implemented negative `INTEGER`s yet.
+
+### Booleans
+
+`BOOLEAN`s are numeric data types, but they also allow case-sensitive `true` and `false`:
+
+```
+tbsCertificate.extensions.ip.critical = 0xFF
+tbsCertificate.extensions.asn.critical = true
+tbsCertificate.extensions.ski.critical = false
+```
+
+Despite access to the numeric parser, booleans are internally managed as `int`s. This means you cannot assign big integers to them; your numeric boolean inputs need to be constrained to the range [`INT_MIN`, `INT_MAX`]. (The values of `INT_MIN` and `INT_MAX` depend on your system.)
+
+That said, DER defines a very limited boolean range. `false` needs to be encoded as 0, and `true` needs to be encoded as 0xFF. `libasn1fort` currently does not provide a means to encode dirty BER, so for now, any nonzero value you enter will be snapped back to 0xFF.
 
 ### Object Identifiers (OIDs)
 
@@ -300,6 +317,71 @@ tbsCertificate.subject = [ { commonName=potato } ]
 tbsCertificate.subject = potato
 ```
 
+### Extensions
+
+By default, your certificates get the following extension lists:
+
+```
+# TAs
+tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, asn ]
+
+# Regular CAs
+tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
+
+# End-Entities
+TODO
+```
+
+The presently implemented extensions are
+
+| Initials | Extension                    | Reference |
+|----------|------------------------------|-----------|
+| bc       | Basic Constraints            | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.9), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.1) |
+| ski      | Subject Key Identifier       | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.2) |
+| aki      | Authority Key Identifier     | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.1), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.3) |
+| ku       | Key Usage                    | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.3), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.4) |
+| crldp    | CRL Distribution Points      | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.6) |
+| aia      | Authority Information Access | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.7) |
+| sia      | Subject Information Access   | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.8) |
+| cp       | Certificate Policies         | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.4), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.9) |
+| ip       | IP Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.10) |
+| asn      | AS Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-3), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.11) |
+
+Every extension gets an `extnID` OID, a `critical` boolean and a type-dependent `extnValue`, all editable through subfields:
+
+```
+tbsCertificate.extensions.ip.extnID = 1.3.6.1.5.5.7.1.28
+tbsCertificate.extensions.ip.critical = 0xff
+tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24, 2001:db8::/96 ]
+tbsCertificate.extensions.asn.extnID = 1.3.6.1.5.5.7.1.29
+tbsCertificate.extensions.asn.critical = 0xff
+tbsCertificate.extensions.asn.extnValue.extnValue = [ 0x1234, 0x5678 ]
+```
+
+If you want a different extension list, override it. Assignments are handled sequentially:
+
+```
+[ta.cer]
+
+# Override the OID of the default 6th extension
+tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
+
+# Drop the default extensions, create a new list
+# (The 1.2.3.4.5 OID dies as well)
+tbsCertificate.extensions = [ ip, asn ]
+
+# Override the OID of the first extension
+tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
+```
+
+You can also refer to extensions by zero-based index, which might be useful if you declare multiple of the same type:
+
+```
+tbsCertificate.extensions = [ ip, asn, ip, bc, ip, asn ]
+# Overrides the OID of the third ip extension
+tbsCertificate.extensions.4.extnID = 1.2.3.4.5
+```
+
 ### IP Resources
 
 ```
@@ -318,7 +400,31 @@ Add Github issues:
 - I commented the RRDP code to force myself to upload the prototype today
 - The key pair generation is taking too long; maybe provide a means to weaken the RNG
 - May want to purge all the memory leaks
-- Implement extensions
+- Still unimplemented fields
+	- Certificates
+		- issuerUniqueID
+		- subjectUniqueID
+	- CRLs
+		- revokedCertificates
+	- Certificate/CRL extensions
+		- AKI authorityCertIssuer
+		- CRLDP extnValue
+		- AIA extnValue
+		- SIA extnValue
+		- CP extnValue
+	- Manifests
+		- fileList
+	- Manifests, ROAs
+		- signedAttrs
+		- unsignedAttrs
+		- digestAlgorithms
+		- crls
+- Fields whose values are autocomputed even if overridden in RD
+	- Certificates
+		- Signature
+	- CRLs
+		- Signature
+	- Several EE certificate extensions
 - Document
 	- Program arguments
 	- '#' comments in RD

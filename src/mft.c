@@ -6,7 +6,7 @@
 #include "libcrypto.h"
 #include "oid.h"
 
-static const struct field mft_metadata[] = {
+static const struct field_template mft_metadata[] = {
 	{
 		"content.encapContentInfo.eContent.version",
 		&ft_int,
@@ -28,15 +28,13 @@ static const struct field mft_metadata[] = {
 		"content.encapContentInfo.eContent.fileHashAlg",
 		&ft_oid,
 		offsetof(struct signed_object, obj.mft.fileHashAlg)
-	}, /* {
-		"content.encapContentInfo.eContent.ipAddrBlocks",
+	}, /* { TODO not implemented yet
+		"content.encapContentInfo.eContent.fileList",
 		NULL,
 		offsetof(Manifest_t, fileList)
 	}, */
 	{ 0 }
 };
-
-static struct field *mft_fields;
 
 struct signed_object *
 mft_new(char const *filename, struct rpki_certificate *parent)
@@ -45,8 +43,9 @@ mft_new(char const *filename, struct rpki_certificate *parent)
 	Manifest_t *mft;
 
 	so = signed_object_new(filename, parent, NID_id_ct_rpkiManifest);
-	mft = &so->obj.mft;
+	fields_compile(mft_metadata, NULL, so, &so->fields);
 
+	mft = &so->obj.mft;
 	mft->version = intmax2INTEGER(0);
 	init_INTEGER(&mft->manifestNumber, 1);
 	init_gtime_now(&mft->thisUpdate);
@@ -68,20 +67,10 @@ mft_generate_paths(struct signed_object *so, char const *filename)
 	so->parent->rpp.rpkiManifest = so->uri;
 }
 
-static void
-ensure_compiled(void)
-{
-	if (!mft_fields) {
-		fields_compile(so_metadata, &mft_fields);
-		fields_compile(mft_metadata, &mft_fields);
-	}
-}
-
 void
 mft_apply_keyvals(struct signed_object *so, struct keyvals *kvs)
 {
-	ensure_compiled();
-	fields_apply_keyvals(mft_fields, so, kvs);
+	fields_apply_keyvals(so->fields, so, kvs);
 }
 
 void
@@ -94,6 +83,8 @@ mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
 	unsigned int hlen;
 	char *path;
 	struct rpki_tree_node *node, *tmp;
+
+	// TODO autocomputed even if overridden
 
 	pr_debug("- Creating fileList");
 	mft = &so->obj.mft;
@@ -144,6 +135,5 @@ mft_print(struct signed_object *so)
 	printf("- URI : %s\n", so->uri);
 	printf("- Path: %s\n", so->path);
 
-	ensure_compiled();
-	fields_print(mft_fields, so);
+	fields_print(so->fields);
 }

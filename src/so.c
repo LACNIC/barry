@@ -10,7 +10,7 @@
 #include "libcrypto.h"
 #include "oid.h"
 
-const struct field signer_info_metadata[] = {
+const struct field_template signer_info_metadata[] = {
 	{
 		"version",
 		&ft_int,
@@ -34,7 +34,7 @@ const struct field signer_info_metadata[] = {
 		false,
 		algorithm_metadata
 	},
-	/* { "signedAttrs" }, */
+	/* { "signedAttrs" }, TODO not implemented yet */
 	{
 		"signatureAlgorithm",
 		NULL,
@@ -46,11 +46,11 @@ const struct field signer_info_metadata[] = {
 		&ft_8str,
 		offsetof(SignerInfo_t, signature)
 	},
-	/* { "unsignedAttrs" }, */
+	/* { "unsignedAttrs" }, TODO not implemented yet */
 	{ 0 }
 };
 
-const struct field so_metadata[] = {
+const struct field_template so_metadata[] = {
 	{
 		"contentType",
 		&ft_oid,
@@ -59,7 +59,7 @@ const struct field so_metadata[] = {
 		"content.version",
 		&ft_int,
 		offsetof(struct signed_object, sd.version)
-	}, /* {
+	}, /* { TODO I don't recall why this is commented
 		"content.digestAlgorithms[0]",
 		NULL,
 		offsetof(struct signed_object, sd.digestAlgorithms),
@@ -72,15 +72,16 @@ const struct field so_metadata[] = {
 	},
 	/* Type-specific fields here */
 	{
-		"content.certificates[0]",
+		"content.certificates.0",
 		NULL,
 		offsetof(struct signed_object, ee),
 		0,
 		cer_metadata,
 	},
+	// TODO not implemented yet
 	/* { "content.crls[0].crl", NULL, offsetof(struct signed_object, crl), crl_metadata }, */
 	{
-		"content.signerInfos[0]",
+		"content.signerInfos.0",
 		NULL,
 		offsetof(struct signed_object, si),
 		false,
@@ -121,7 +122,7 @@ finish_signer_info(SignerInfo_t *si, struct rpki_certificate *ee,
 	if (si->sid.present == SignerIdentifier_PR_NOTHING) {
 		pr_debug("- Copying the EE SKI to the SignerInfo");
 		si->sid.present = SignerIdentifier_PR_subjectKeyIdentifier;
-		si->sid.choice.subjectKeyIdentifier = ee->ski;
+		finish_ski(&si->sid.choice.subjectKeyIdentifier, ee->spki);
 	}
 
 	attr = si->signedAttrs->list.array[1];
@@ -147,17 +148,20 @@ finish_signed_data(struct signed_object *so, asn_TYPE_descriptor_t *td)
 	SignedData_t *sd = &so->sd;
 
 	/* Needs the SO _t */
+	// TODO autocomputed even if overridden
 	pr_debug("- Encoding the eContent");
 	sd->encapContentInfo.eContent = pzalloc(sizeof(OCTET_STRING_t));
 	der_encode_8str(td, &so->obj, sd->encapContentInfo.eContent);
 	/* eContent (DER) ready */
 
 	/* Needs the EE _t */
+	// TODO autocomputed even if overridden
 	pr_debug("- Encoding the EE");
 	der_encode_any(&asn_DEF_Certificate, &so->ee.obj,
 	    sd->certificates->list.array[0]);
 
 	/* Needs the EE and eContent (DER) */
+	// TODO autocomputed even if overridden
 	finish_signer_info(&so->si, &so->ee, so->sd.encapContentInfo.eContent);
 }
 
@@ -166,6 +170,7 @@ finish_content_info(struct signed_object *so, asn_TYPE_descriptor_t *td)
 {
 	finish_signed_data(so, td);
 	pr_debug("- Encoding the SignedData into the ContentInfo");
+	// TODO autocomputed even if overridden
 	der_encode_any(&asn_DEF_SignedData, &so->sd, &so->ci.content);
 }
 
@@ -235,10 +240,11 @@ signed_object_new(char const *filename, struct rpki_certificate *parent,
 
 	so = pzalloc(sizeof(struct signed_object));
 
+	so->parent = parent;
+	fields_compile(so_metadata, NULL, so, &so->fields);
 	init_content_info(&so->ci);
 	init_signed_data(so, nid);
-	so->parent = parent;
-	cer_init(&so->ee, filename, parent);
+	cer_init(&so->ee, &so->fields, filename, parent, CT_EE, "content.certificates.0");
 	init_signer_info(&so->si, nid);
 
 	return so;

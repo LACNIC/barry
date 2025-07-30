@@ -10,8 +10,6 @@
 #include "cer.h"
 #include "field.h"
 
-extern const struct field so_metadata[];
-
 enum so_type {
 	SO_MFT,
 	SO_ROA,
@@ -22,16 +20,17 @@ struct signed_object {
 	char *uri;
 	char *path;
 
+	struct rpki_certificate *parent;
+	struct field *fields; /* Hash table */
+
 	ContentInfo_t ci;
 	SignedData_t sd;
-	struct rpki_certificate *parent;
-	struct rpki_certificate ee;
-	SignerInfo_t si;
-
 	union {
 		Manifest_t mft;
 		RouteOriginAttestation_t roa;
 	} obj;
+	struct rpki_certificate ee;
+	SignerInfo_t si;
 };
 
 struct signed_object *signed_object_new(char const *, struct rpki_certificate *,

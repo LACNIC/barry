@@ -5,14 +5,15 @@
 
 #include "cer.h"
 
-extern const struct field crl_metadata[];
-
 struct rpki_crl {
 	char *uri;
 	char *path;
 
-	CertificateList_t obj;
 	struct rpki_certificate *parent;
+	struct field *fields; /* Hash table */
+
+	CertificateList_t obj;
+	struct extensions exts;
 };
 
 struct rpki_crl *crl_new(struct rpki_certificate *);

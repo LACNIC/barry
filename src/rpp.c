@@ -56,13 +56,10 @@ rpp_new(void)
 {
 #define NAME_SIZE 64
 	char name[NAME_SIZE];
-	int written;
 	struct rpp result;
 
 	result.id = rpp_counter++;
-	written = snprintf(name, NAME_SIZE, "rpp%X", result.id);
-	if (written < 0 || NAME_SIZE <= written)
-		panic("snprintf(1): %d", written);
+	psnprintf(name, NAME_SIZE, "rpp%X", result.id);
 	pr_debug("- RPP name: %s", name);
 
 	result.caRepository = join_paths(rsync_uri, name);
@@ -70,22 +67,16 @@ rpp_new(void)
 	result.path = join_paths(rsync_path, name);
 	pr_debug("- RPP path: %s", result.path);
 
-	written = snprintf(name, NAME_SIZE, "%X.mft", result.id);
-	if (written < 0 || NAME_SIZE <= written)
-		panic("snprintf(2): %d", written);
+	psnprintf(name, NAME_SIZE, "%X.mft", result.id);
 	result.rpkiManifest = join_paths(result.caRepository, name);
 	pr_debug("- RPP rpkiManifest: %s", result.path);
 
-	written = snprintf(name, NAME_SIZE, "%X.crl", result.id);
-	if (written < 0 || NAME_SIZE <= written)
-		panic("snprintf(3): %d", written);
+	psnprintf(name, NAME_SIZE, "%X.crl", result.id);
 	result.crldp = join_paths(result.caRepository, name);
 	pr_debug("- RPP CRL: %s", result.path);
 
 	/*
-	written = snprintf(name, NAME_SIZE, "%X.xml", result.id);
-	if (written < 0 || NAME_SIZE <= written)
-		panic("snprintf(4): %d", written);
+	psnprintf(name, NAME_SIZE, "%X.xml", result.id);
 	result.rpkiNotify = join_paths(rrdp_uri, name);
 	*/
 	pr_debug("- RPP rpkiNotify: %s", result.rpkiNotify);

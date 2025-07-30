@@ -5,7 +5,7 @@
 #include "libcrypto.h"
 #include "oid.h"
 
-static const struct field roa_metadata[] = {
+static const struct field_template roa_metadata[] = {
 	{
 		"content.encapContentInfo.eContent.version",
 		&ft_int,
@@ -23,8 +23,6 @@ static const struct field roa_metadata[] = {
 	{ 0 }
 };
 
-static struct field *roa_fields;
-
 struct signed_object *
 roa_new(char const *filename, struct rpki_certificate *parent)
 {
@@ -38,6 +36,8 @@ roa_new(char const *filename, struct rpki_certificate *parent)
 	ROAIPAddress_t *ria;
 
 	so = signed_object_new(filename, parent, NID_id_ct_routeOriginAuthz);
+	fields_compile(roa_metadata, NULL, so, &so->fields);
+
 	roa = &so->obj.roa;
 
 	roa->version = intmax2INTEGER(0);
@@ -66,20 +66,10 @@ roa_generate_paths(struct signed_object *so, char const *filename)
 	pr_debug("- path: %s", so->path);
 }
 
-static void
-ensure_compiled(void)
-{
-	if (!roa_fields) {
-		fields_compile(so_metadata, &roa_fields);
-		fields_compile(roa_metadata, &roa_fields);
-	}
-}
-
 void
 roa_apply_keyvals(struct signed_object *so, struct keyvals *kvs)
 {
-	ensure_compiled();
-	fields_apply_keyvals(roa_fields, so, kvs);
+	fields_apply_keyvals(so->fields, so, kvs);
 }
 
 void
@@ -101,6 +91,5 @@ roa_print(struct signed_object *so)
 	printf("- URI : %s\n", so->uri);
 	printf("- Path: %s\n", so->path);
 
-	ensure_compiled();
-	fields_print(roa_fields, so);
+	fields_print(so->fields);
 }

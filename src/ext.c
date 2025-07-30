@@ -4,29 +4,166 @@
 #include "libcrypto.h"
 #include "oid.h"
 
-void
-init_ext(Extension_t *ext, asn_TYPE_descriptor_t *td, int nid, bool critical, void *obj)
+struct ext_list_node *
+add_new_extension(struct extensions *exts, enum ext_type type,
+    const asn_TYPE_descriptor_t *td)
+{
+	struct ext_list_node *ext;
+
+	pr_trace("Adding extension: %s", td->name);
+	ext = pzalloc(sizeof(struct ext_list_node));
+	ext->type = type;
+	ext->td = td;
+	STAILQ_INSERT_TAIL(&exts->list, ext, hook);
+
+	return ext;
+}
+
+static void
+init_ext(Extension_t *ext, int nid, bool critical,
+    struct field *fields, char const *ctx, char const *name, size_t extn)
 {
 	init_oid(&ext->extnID, nid);
 	ext->critical = critical ? 0xFF : 0;
-	der_encode_8str(td, obj, &ext->extnValue);
+
+	fields_add_ext(fields, ctx, name, extn, "extnID", &ft_oid, &ext->extnID, 0);
+	fields_add_ext(fields, ctx, name, extn, "critical", &ft_bool, &ext->critical, 0);
 }
 
 void
-init_bc(BasicConstraints_t *bc)
+exts_add_bc(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
 {
-	bc->cA = 0xFF;
-	bc->pathLenConstraint = NULL;
+	struct ext_list_node *ext;
+
+	ext = add_new_extension(exts, EXT_BC, &asn_DEF_BasicConstraints);
+	ext->v.bc.cA = 0xFF;
+
+	init_ext(exts->array.list.array[extn], NID_basic_constraints, true, fields, ctx, "bc", extn);
+	fields_add_ext(fields, ctx, "bc", extn, "extnValue.cA", &ft_bool, &ext->v.bc.cA, 0);
+	fields_add_ext(fields, ctx, "bc", extn, "extnValue.pathLenConstraint", &ft_int, &ext->v.bc.pathLenConstraint, sizeof(INTEGER_t));
 }
 
 void
-init_ski(SubjectKeyIdentifier_t *ski, SubjectPublicKeyInfo_t *spki)
+exts_add_ski(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	struct ext_list_node *ext;
+
+	ext = add_new_extension(exts, EXT_SKI, &asn_DEF_SubjectKeyIdentifier);
+
+	init_ext(exts->array.list.array[extn], NID_subject_key_identifier, false, fields, ctx, "ski", extn);
+	fields_add_ext(fields, ctx, "ski", extn, "extnValue", &ft_8str, &ext->v.ski, 0);
+}
+
+void
+exts_add_aki(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	struct ext_list_node *ext;
+
+	ext = add_new_extension(exts, EXT_AKI, &asn_DEF_AuthorityKeyIdentifier);
+
+	init_ext(exts->array.list.array[extn], NID_authority_key_identifier, false, fields, ctx, "aki", extn);
+	fields_add_ext(fields,
+	    ctx, "aki", extn, "extnValue.keyIdentifier",
+	    &ft_8str, &ext->v.aki.keyIdentifier, sizeof(KeyIdentifier_t));
+//	TODO not implemented yet
+//	fields_add_ext(fields,
+//	    ctx, "aki", extn, "extnValue.authorityCertIssuer", );
+	fields_add_ext(fields,
+	    ctx, "aki", extn, "extnValue.authorityCertSerialNumber",
+	    &ft_int, &ext->v.aki.authorityCertSerialNumber,
+	    sizeof(CertificateSerialNumber_t));
+}
+
+void
+exts_add_ku(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	struct ext_list_node *ext;
+
+	ext = add_new_extension(exts, EXT_KU, &asn_DEF_KeyUsage);
+
+	init_ext(exts->array.list.array[extn], NID_key_usage, true, fields, ctx, "ku", extn);
+	fields_add_ext(fields, ctx, "ku", extn, "extnValue", &ft_bitstr, &ext->v.ku, 0);
+}
+
+void
+exts_add_crldp(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	add_new_extension(exts, EXT_CRLDP, &asn_DEF_CRLDistributionPoints);
+
+	init_ext(exts->array.list.array[extn], NID_crl_distribution_points, false, fields, ctx, "crldp", extn);
+//	fields_add_ext(fields, ctx, "crldp", extn, "extnValue", &, &ext->v.crldp, 0); TODO not implemented yet
+}
+
+void
+exts_add_aia(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	add_new_extension(exts, EXT_AIA, &asn_DEF_AuthorityInfoAccessSyntax);
+
+	init_ext(exts->array.list.array[extn], NID_info_access, false, fields, ctx, "aia", extn);
+//	fields_add_ext(fields, ctx, "aia", extn, "extnValue", &, &ext->v.aia, 0); TODO not implemented yet
+}
+
+void
+exts_add_sia(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	add_new_extension(exts, EXT_SIA, &asn_DEF_SubjectInfoAccessSyntax);
+
+	init_ext(exts->array.list.array[extn], NID_sinfo_access, false, fields, ctx, "sia", extn);
+//	fields_add_ext(fields, ctx, "sia", extn, "extnValue", &, &ext->v.sia, 0); TODO not implemented yet
+}
+
+void
+exts_add_cp(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	add_new_extension(exts, EXT_CP, &asn_DEF_CertificatePolicies);
+
+	init_ext(exts->array.list.array[extn], NID_certificate_policies, true, fields, ctx, "cp", extn);
+//	fields_add_ext(fields, ctx, "cp", extn, "extnValue", &, &ext->v.cp, 0); TODO not implemented yet
+}
+
+void
+exts_add_ip(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	struct ext_list_node *ext;
+
+	ext = add_new_extension(exts, EXT_IP, &asn_DEF_IPAddrBlocks);
+
+	init_ext(exts->array.list.array[extn], NID_sbgp_ipAddrBlockv2, true, fields, ctx, "ip", extn);
+	fields_add_ext(fields, ctx, "ip", extn, "extnValue", &ft_ip_cer, &ext->v.ip, 0);
+}
+
+void
+exts_add_asn(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	struct ext_list_node *ext;
+
+	ext = add_new_extension(exts, EXT_ASN, &asn_DEF_ASIdentifiers);
+
+	init_ext(exts->array.list.array[extn], NID_sbgp_autonomousSysNumv2, true, fields, ctx, "asn", extn);
+	fields_add_ext(fields, ctx, "asn", extn, "extnValue.asnum", &ft_asn_cer, &ext->v.asn.asnum, sizeof(ASIdentifierChoice_t));
+	fields_add_ext(fields, ctx, "asn", extn, "extnValue.rdi", &ft_asn_cer, &ext->v.asn.rdi, sizeof(ASIdentifierChoice_t));
+}
+
+void
+exts_add_crln(struct extensions *exts, size_t extn, struct field *fields, char const *ctx)
+{
+	struct ext_list_node *ext;
+
+	ext = add_new_extension(exts, EXT_CRLN, &asn_DEF_CRLNumber);
+	init_INTEGER(&ext->v.crln, 1);
+
+	init_ext(exts->array.list.array[extn], NID_crl_number, false, fields, ctx, "crln", extn);
+	fields_add_ext(fields, ctx, "crln", extn, "extnValue", &ft_int, &ext->v.crln, 0);
+}
+
+void
+finish_ski(SubjectKeyIdentifier_t *ski, SubjectPublicKeyInfo_t *spki)
 {
 	hash_sha1(spki->subjectPublicKey.buf, spki->subjectPublicKey.size, ski);
 }
 
 void
-init_aki(AuthorityKeyIdentifier_t *aki, SubjectPublicKeyInfo_t *spki)
+finish_aki(AuthorityKeyIdentifier_t *aki, SubjectPublicKeyInfo_t *spki)
 {
 	aki->keyIdentifier = pzalloc(sizeof(*aki->keyIdentifier));
 	hash_sha1(spki->subjectPublicKey.buf, spki->subjectPublicKey.size,
@@ -34,32 +171,33 @@ init_aki(AuthorityKeyIdentifier_t *aki, SubjectPublicKeyInfo_t *spki)
 }
 
 void
-init_ku_ca(KeyUsage_t *ku)
+finish_ku(KeyUsage_t *ku, enum cer_type type)
 {
 	ku->buf = pmalloc(1);
-	ku->buf[0] = 6;
 	ku->size = 1;
-	ku->bits_unused = 1;
+
+	switch (type) {
+	case CT_TA:
+	case CT_CA:
+		ku->buf[0] = 0x06;
+		ku->bits_unused = 1;
+		break;
+	case CT_EE:
+		ku->buf[0] = 0x80;
+		ku->bits_unused = 7;
+		break;
+	}
 }
 
-void
-init_ek_ee(KeyUsage_t *ku)
-{
-	ku->buf = pmalloc(1);
-	ku->buf[0] = 0x80;
-	ku->size = 1;
-	ku->bits_unused = 7;
-}
-
-void
-init_gn_uri(GeneralName_t *gn, char const *url)
+static void
+finish_gn_uri(GeneralName_t *gn, char const *url)
 {
 	gn->present = GeneralName_PR_uniformResourceIdentifier;
 	init_8str(&gn->choice.uniformResourceIdentifier, url);
 }
 
 void
-init_crldp(CRLDistributionPoints_t *crldp, char const *url)
+finish_crldp(CRLDistributionPoints_t *crldp, char const *url)
 {
 	DistributionPointName_t *dpn;
 
@@ -68,25 +206,25 @@ init_crldp(CRLDistributionPoints_t *crldp, char const *url)
 	crldp->list.array[0]->distributionPoint = dpn;
 	dpn->present = DistributionPointName_PR_fullName;
 	INIT_ASN1_ARRAY(&dpn->choice.fullName.list, 1, GeneralName_t);
-	init_gn_uri(dpn->choice.fullName.list.array[0], url);
+	finish_gn_uri(dpn->choice.fullName.list.array[0], url);
 }
 
-void
-init_ad(AccessDescription_t *ad, int nid, char const *value)
+static void
+finish_ad(AccessDescription_t *ad, int nid, char const *value)
 {
 	init_oid(&ad->accessMethod, nid);
-	init_gn_uri(&ad->accessLocation, value);
+	finish_gn_uri(&ad->accessLocation, value);
 }
 
 void
-init_aia(AuthorityInfoAccessSyntax_t *aia, char const *url)
+finish_aia(AuthorityInfoAccessSyntax_t *aia, char const *url)
 {
 	INIT_ASN1_ARRAY(&aia->list, 1, AccessDescription_t);
-	init_ad(aia->list.array[0], NID_ad_ca_issuers, url);
+	finish_ad(aia->list.array[0], NID_ad_ca_issuers, url);
 }
 
 void
-init_sia_ca(SubjectInfoAccessSyntax_t *sia, char const *repo, char const *mft,
+finish_sia_ca(SubjectInfoAccessSyntax_t *sia, char const *repo, char const *mft,
     char const *notif)
 {
 	unsigned int ads;
@@ -96,29 +234,29 @@ init_sia_ca(SubjectInfoAccessSyntax_t *sia, char const *repo, char const *mft,
 
 	ads = 0;
 	if (repo)
-		init_ad(sia->list.array[ads++], NID_caRepository, repo);
+		finish_ad(sia->list.array[ads++], NID_caRepository, repo);
 	if (mft)
-		init_ad(sia->list.array[ads++], NID_rpkiManifest, mft);
+		finish_ad(sia->list.array[ads++], NID_rpkiManifest, mft);
 	if (notif)
-		init_ad(sia->list.array[ads++], NID_rpkiNotify, notif);
+		finish_ad(sia->list.array[ads++], NID_rpkiNotify, notif);
 }
 
 void
-init_sia_ee(SubjectInfoAccessSyntax_t *sia, char const *so)
+finish_sia_ee(SubjectInfoAccessSyntax_t *sia, char const *so)
 {
 	INIT_ASN1_ARRAY(&sia->list, 1, AccessDescription_t);
-	init_ad(sia->list.array[0], NID_signedObject, so);
+	finish_ad(sia->list.array[0], NID_signedObject, so);
 }
 
 void
-init_cp(CertificatePolicies_t *cp)
+finish_cp(CertificatePolicies_t *cp)
 {
 	INIT_ASN1_ARRAY(&cp->list, 1, PolicyInformation_t);
 	init_oid(&cp->list.array[0]->policyIdentifier, NID_ipAddr_asNumberv2);
 }
 
 void
-init_ip(IPAddrBlocks_t *ip)
+finish_ip(IPAddrBlocks_t *ip)
 {
 	IPAddressFamily_t *iaf;
 	IPAddressOrRange_t *iar;
@@ -144,7 +282,7 @@ init_ip(IPAddrBlocks_t *ip)
 }
 
 void
-init_asn(ASIdentifiers_t *asn)
+finish_asn(ASIdentifiers_t *asn)
 {
 	ASIdOrRange_t *air;
 

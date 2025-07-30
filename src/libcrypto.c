@@ -93,8 +93,7 @@ next_key(void)
 
 	pathlen = strlen(keys_path) + 16;
 	path = pzalloc(pathlen);
-	if (snprintf(path, pathlen, "%s/%u.pem", keys_path, k++) >= pathlen)
-		panic("Too many keys!");
+	psnprintf(path, pathlen, "%s/%u.pem", keys_path, k++);
 
 	return path;
 }

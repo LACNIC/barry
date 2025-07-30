@@ -1,5 +1,7 @@
 #include "alloc.h"
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "print.h"
@@ -37,4 +39,18 @@ pstrdup(char const *s)
 		enomem;
 
 	return result;
+}
+
+void
+psnprintf(char *buf, size_t size, char const *tpl, ...)
+{
+	va_list ap;
+	int chars;
+
+	va_start(ap, tpl);
+	chars = vsnprintf(buf, size, tpl, ap);
+	va_end(ap);
+
+	if (chars < 0 || size <= chars)
+		panic("vsnprintf(): %d", chars);
 }

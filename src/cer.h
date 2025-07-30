@@ -10,28 +10,28 @@
 #include "rpki_tree.h"
 #include "rpp.h"
 
-extern const struct field cer_metadata[];
+extern const struct field_template cer_metadata[];
 
 struct rpki_certificate {
 	char *uri;
 	char *path;
 	struct rpp rpp;
 
-	/* Internal use; leave NULL */
+	struct rpki_certificate *parent;
+	struct field *fields; /* Hash table */
+
 	char const *subject;
 	EVP_PKEY *keys;
-	SubjectKeyIdentifier_t ski;
 	SubjectPublicKeyInfo_t *spki;
 
 	Certificate_t obj;
-	IPAddrBlocks_t ip;
-	ASIdentifiers_t asn;
-
-	struct rpki_certificate *parent;
+	struct extensions exts;
 };
 
-struct rpki_certificate *cer_new(char const *, struct rpki_certificate *);
-void cer_init(struct rpki_certificate *, char const *, struct rpki_certificate *);
+struct rpki_certificate *cer_new(char const *,
+    struct rpki_certificate *, enum cer_type);
+void cer_init(struct rpki_certificate *, struct field **, char const *,
+    struct rpki_certificate *, enum cer_type, char const *);
 void cer_generate_paths(struct rpki_certificate *, char const *);
 void cer_apply_keyvals(struct rpki_certificate *, struct keyvals *);
 void cer_finish_ta(struct rpki_certificate *);

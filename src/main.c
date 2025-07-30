@@ -267,8 +267,10 @@ init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 
 	switch (infer_type(node)) {
 	case FT_TA:
+		node->obj = cer_new(node->name, get_parent(node), CT_TA);
+		break;
 	case FT_CER:
-		node->obj = cer_new(node->name, get_parent(node));
+		node->obj = cer_new(node->name, get_parent(node), CT_CA);
 		break;
 	case FT_CRL:
 		node->obj = crl_new(get_parent(node));
