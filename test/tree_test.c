@@ -1,6 +1,8 @@
 #include "../src/rpki_tree.c"
 
 #include <check.h>
+#include <stdarg.h>
+#include <unistd.h>
 
 #define RDFD 0
 #define WRFD 1
@@ -220,6 +222,218 @@ START_TEST(check_accept_value)
 }
 END_TEST
 
+static void
+init_ctx(struct rd_parse_context *ctx, char const *name, char const *content)
+{
+	int fds[2];
+	size_t content_len;
+
+	ck_assert_int_eq(0, pipe(fds));
+
+	content_len = strlen(content);
+	ck_assert_uint_eq(content_len, write(fds[1], content, content_len));
+	close(fds[1]);
+
+	memset(ctx, 0, sizeof(*ctx));
+	ctx->fd = fds[0];
+	ctx->path = name;
+	ctx->line = 1;
+}
+
+static void
+ck_gnode(struct rd_parse_context *ctx, char const *name)
+{
+	size_t namelen;
+	struct rpki_tree_node *node;
+
+	namelen = strlen(name);
+	HASH_FIND(ghook, ctx->result.nodes, name, namelen, node);
+	ck_assert_ptr_ne(NULL, node);
+	ck_assert_str_eq(name, node->name);
+}
+
+static void
+ck_child(struct rpki_tree_node *parent, char const *name)
+{
+	size_t namelen;
+	struct rpki_tree_node *child;
+
+	ck_assert_ptr_ne(NULL, parent);
+
+	namelen = strlen(name);
+	HASH_FIND(phook, parent->children, name, namelen, child);
+	ck_assert_ptr_ne(NULL, child);
+	ck_assert_str_eq(name, child->name);
+}
+
+static void
+ck_global(struct rd_parse_context *ctx, ...)
+{
+	va_list ap;
+	char const *name;
+	unsigned int n = 0;
+
+	va_start(ap, ctx);
+	while (va_arg(ap, char const *) != NULL)
+		n++;
+	va_end(ap);
+
+	ck_assert_uint_eq(n, HASH_CNT(ghook, ctx->result.nodes));
+	va_start(ap, ctx);
+	while ((name = va_arg(ap, char const *)) != NULL)
+		ck_gnode(ctx, name);
+	va_end(ap);
+}
+
+static void
+ck_root(struct rd_parse_context *ctx, char const *name)
+{
+	ck_assert_ptr_ne(NULL, ctx->result.root);
+	ck_assert_str_eq(name, ctx->result.root->name);
+}
+
+static void
+ck_children(struct rpki_tree_node *parent, ...)
+{
+	va_list ap;
+	char const *child_name;
+	unsigned int n = 0;
+
+	va_start(ap, parent);
+	while (va_arg(ap, char const *) != NULL)
+		n++;
+	va_end(ap);
+
+	if (n == 0) {
+		ck_assert_ptr_eq(NULL, parent->children);
+		return;
+	}
+
+	ck_assert_uint_eq(n, HASH_CNT(phook, parent->children));
+	va_start(ap, parent);
+	while ((child_name = va_arg(ap, char const *)) != NULL)
+		ck_child(parent, child_name);
+	va_end(ap);
+}
+
+static struct rpki_tree_node *
+find_descendant(struct rd_parse_context *ctx, ...)
+{
+	struct rpki_tree_node *node, *tmp;
+	va_list ap;
+	char const *name;
+
+	node = ctx->result.root;
+
+	va_start(ap, ctx);
+	while ((name = va_arg(ap, char const *)) != NULL) {
+		HASH_FIND(phook, node->children, name, strlen(name), tmp);
+		ck_assert_ptr_ne(NULL, tmp);
+		node = tmp;
+	}
+	va_end(ap);
+
+	return node;
+}
+
+START_TEST(check_read_tree)
+{
+	struct rd_parse_context ctx;
+	struct rpki_tree_node *node;
+
+	/* -------------- */
+
+	init_ctx(&ctx, "Just the TA", "test.ta");
+	read_tree(&ctx);
+
+	ck_global(&ctx, "test.ta", NULL);
+	ck_root(&ctx, "test.ta");
+
+	/* -------------- */
+
+	init_ctx(&ctx, "Minimal tree",
+		"test.ta\n"
+		"	child.cer");
+	read_tree(&ctx);
+
+	ck_global(&ctx, "test.ta", "child.cer", NULL);
+	ck_root(&ctx, "test.ta");
+	ck_children(ctx.result.root, "child.cer", NULL);
+
+	/* -------------- */
+
+	init_ctx(&ctx, "Same, but newline at end",
+		"test.ta\n"
+		"	child.cer\n");
+	read_tree(&ctx);
+
+	ck_global(&ctx, "test.ta", "child.cer", NULL);
+	ck_root(&ctx, "test.ta");
+	ck_children(ctx.result.root, "child.cer", NULL);
+
+	/* -------------- */
+
+	init_ctx(&ctx, "Comments and empty lines",
+		"# Lorem ipsum dolor sit amet.\n"
+		"root.achoo # Donec sollicitudin ipsum eget sodales\n"
+		"\n"
+		"	# Fusce pretium ultricies egestas. Sed.\n"
+		"	ca1.cer\n"
+		"\n"
+		"	\"roa.roa\"\n"
+		"		\n"
+		"		# Etiam egestas condimentum sollicitudin. \n"
+		"	# Donec lacinia et lectus eu mollis.   \n"
+		"	\n"
+		"	mft.mft # Cras dignissim at velit vitae");
+	read_tree(&ctx);
+
+	ck_global(&ctx, "root.achoo", "ca1.cer", "roa.roa", "mft.mft", NULL);
+	ck_root(&ctx, "root.achoo");
+	ck_children(ctx.result.root, "ca1.cer", "roa.roa", "mft.mft", NULL);
+
+	/* -------------- */
+
+	init_ctx(&ctx, "More floors and indentation shenanigans",
+		"root\n"
+		"  1\n"
+		"	11\n"
+		"	       111\n"
+		"	       112\n"
+		"	12\n"
+		"	\n"
+		"\n"
+		"	   121\n"
+		"	   122\n"
+		"  2\n"
+		"  3\n");
+	read_tree(&ctx);
+
+	ck_global(&ctx, "root", "1", "11", "111", "112", "12", "121", "112", "2", "3", NULL);
+	ck_root(&ctx, "root");
+	ck_children(ctx.result.root, "1", "2", "3", NULL);
+
+	node = find_descendant(&ctx, "1", NULL);
+	ck_children(node, "11", "12", NULL);
+	node = find_descendant(&ctx, "1", "11", NULL);
+	ck_children(node, "111", "112", NULL);
+	node = find_descendant(&ctx, "1", "11", "111", NULL);
+	ck_children(node, NULL);
+	node = find_descendant(&ctx, "1", "11", "112", NULL);
+	ck_children(node, NULL);
+	node = find_descendant(&ctx, "1", "12", NULL);
+	ck_children(node, "121", "122", NULL);
+	node = find_descendant(&ctx, "1", "12", "121", NULL);
+	ck_children(node, NULL);
+	node = find_descendant(&ctx, "1", "12", "122", NULL);
+	ck_children(node, NULL);
+	node = find_descendant(&ctx, "2", NULL);
+	ck_children(node, NULL);
+	node = find_descendant(&ctx, "3", NULL);
+	ck_children(node, NULL);
+}
+END_TEST
+
 static Suite *
 address_load_suite(void)
 {
@@ -228,6 +442,7 @@ address_load_suite(void)
 
 	parser = tcase_create("Parser");
 	tcase_add_test(parser, check_accept_value);
+	tcase_add_test(parser, check_read_tree);
 
 	suite = suite_create("fields");
 	suite_add_tcase(suite, parser);

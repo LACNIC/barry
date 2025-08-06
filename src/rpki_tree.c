@@ -127,18 +127,23 @@ tokenize(struct rd_parse_context *ctx, bool (*chr_matches)(char))
 			if (!chr_matches(ctx->buf[i])) {
 				dstr_append(&result, ctx->buf + ctx->offset,
 				    i - ctx->offset);
-				dstr_finish(&result);
-				ctx->offset = i;
-				return result.buf;
+				goto commit;
 			}
 		}
 
 		dstr_append(&result, ctx->buf + ctx->offset, i - ctx->offset);
 
-		// TODO If ID is EOF, this triggers
-		if (!refresh_reader(ctx))
-			BADCFG(ctx, "Unterminated token at the end of file");
+		if (!refresh_reader(ctx)) {
+			if (result.buf == NULL)
+				return NULL;
+			goto commit;
+		}
 	} while (true);
+
+commit:
+	dstr_finish(&result);
+	ctx->offset = i;
+	return result.buf;
 }
 
 static unsigned char *
@@ -210,6 +215,7 @@ static enum token_type
 next_token(struct rd_parse_context *ctx, struct token *tkn)
 {
 	unsigned char *_chr, chr;
+	char *token;
 
 	do {
 		_chr = next_char(ctx);
@@ -219,8 +225,11 @@ next_token(struct rd_parse_context *ctx, struct token *tkn)
 
 		if (is_alphanumeric(chr)) {
 			ctx->offset--;
-			return init_token(tkn, TKNT_STR,
-			    tokenize(ctx, is_unquoted_string_chr));
+
+			token = tokenize(ctx, is_unquoted_string_chr);
+			return token
+			    ? init_token(tkn, TKNT_STR, token)
+			    : init_token(tkn, TKNT_EOF, "EOF");
 		}
 
 		switch (chr) {
