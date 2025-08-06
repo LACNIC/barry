@@ -341,7 +341,7 @@ START_TEST(check_read_tree)
 	struct rd_parse_context ctx;
 	struct rpki_tree_node *node;
 
-	/* -------------- */
+	/******************/
 
 	init_ctx(&ctx, "Just the TA", "test.ta");
 	read_tree(&ctx);
@@ -349,7 +349,7 @@ START_TEST(check_read_tree)
 	ck_global(&ctx, "test.ta", NULL);
 	ck_root(&ctx, "test.ta");
 
-	/* -------------- */
+	/******************/
 
 	init_ctx(&ctx, "Minimal tree",
 		"test.ta\n"
@@ -360,9 +360,9 @@ START_TEST(check_read_tree)
 	ck_root(&ctx, "test.ta");
 	ck_children(ctx.result.root, "child.cer", NULL);
 
-	/* -------------- */
+	/******************/
 
-	init_ctx(&ctx, "Same, but newline at end",
+	init_ctx(&ctx, "Same, but newline at the end",
 		"test.ta\n"
 		"	child.cer\n");
 	read_tree(&ctx);
@@ -371,7 +371,7 @@ START_TEST(check_read_tree)
 	ck_root(&ctx, "test.ta");
 	ck_children(ctx.result.root, "child.cer", NULL);
 
-	/* -------------- */
+	/******************/
 
 	init_ctx(&ctx, "Comments and empty lines",
 		"# Lorem ipsum dolor sit amet.\n"
@@ -392,7 +392,7 @@ START_TEST(check_read_tree)
 	ck_root(&ctx, "root.achoo");
 	ck_children(ctx.result.root, "ca1.cer", "roa.roa", "mft.mft", NULL);
 
-	/* -------------- */
+	/******************/
 
 	init_ctx(&ctx, "More floors and indentation shenanigans",
 		"root\n"
@@ -409,7 +409,8 @@ START_TEST(check_read_tree)
 		"  3\n");
 	read_tree(&ctx);
 
-	ck_global(&ctx, "root", "1", "11", "111", "112", "12", "121", "112", "2", "3", NULL);
+	ck_global(&ctx, "root", "1", "11", "111", "112", "12", "121", "112",
+	    "2", "3", NULL);
 	ck_root(&ctx, "root");
 	ck_children(ctx.result.root, "1", "2", "3", NULL);
 
@@ -434,6 +435,180 @@ START_TEST(check_read_tree)
 }
 END_TEST
 
+START_TEST(check_read_keyvals)
+{
+	struct rd_parse_context ctx;
+	struct rpki_tree_node *node;
+	struct keyval *kv;
+	struct kv_node *setnode;
+	struct keyval *mapnode;
+
+	/******************/
+
+	init_ctx(&ctx, "Single integer tweak",
+		"ta.cer\n"
+		"[ta.cer]\n"
+		"potato = 1\n");
+	read_tree(&ctx);
+	read_keyvals(&ctx);
+
+	node = ctx.result.root;
+	ck_assert_ptr_ne(NULL, node);
+	kv = STAILQ_FIRST(&node->props);
+	ck_keyval_str("potato", "1", kv);
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_ptr_eq(NULL, kv);
+
+	/******************/
+
+	init_ctx(&ctx, "Multiple files",
+		"ta.cer\n"
+		"	ca.cer\n"
+		"\n"
+		"[ta.cer]\n"
+		"potato = 12345\n"
+		"\n"
+		"[ca.cer]\n"
+		"tomato = aoeui\n");
+	read_tree(&ctx);
+	read_keyvals(&ctx);
+
+	node = ctx.result.root;
+	ck_assert_ptr_ne(NULL, node);
+	kv = STAILQ_FIRST(&node->props);
+	ck_keyval_str("potato", "12345", kv);
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_ptr_eq(NULL, kv);
+
+	node = find_descendant(&ctx, "ca.cer", NULL);
+	kv = STAILQ_FIRST(&node->props);
+	ck_keyval_str("tomato", "aoeui", kv);
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_ptr_eq(NULL, kv);
+
+	/******************/
+
+	init_ctx(&ctx, "Multiple props",
+		"ta.cer\n"
+		"[ta.cer]\n"
+		"potato = 12345\n"
+		"tomato = aoeui");
+	read_tree(&ctx);
+	read_keyvals(&ctx);
+
+	node = ctx.result.root;
+	ck_assert_ptr_ne(NULL, node);
+	kv = STAILQ_FIRST(&node->props);
+	ck_keyval_str("potato", "12345", kv);
+	kv = STAILQ_NEXT(kv, hook);
+	ck_keyval_str("tomato", "aoeui", kv);
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_ptr_eq(NULL, kv);
+
+	/******************/
+
+	init_ctx(&ctx, "Other data types",
+		"ta.cer\n"
+		"[ta.cer]\n"
+		"a.b.c = [ 12345, \"23456\" ]\n"
+		"\"a.b.d\" = { \"aoeui\" = \"333\", dhtns = 444 }");
+	read_tree(&ctx);
+	read_keyvals(&ctx);
+
+	node = ctx.result.root;
+	ck_assert_ptr_ne(NULL, node);
+
+	kv = STAILQ_FIRST(&node->props);
+	ck_assert_str_eq("a.b.c", kv->key);
+	ck_assert_int_eq(VALT_SET, kv->value.type);
+
+		setnode = STAILQ_FIRST(&kv->value.v.set);
+		ck_assert_uint_eq(VALT_STR, setnode->value.type);
+		ck_assert_str_eq("12345", setnode->value.v.str);
+
+		setnode = STAILQ_NEXT(setnode, hook);
+		ck_assert_uint_eq(VALT_STR, setnode->value.type);
+		ck_assert_str_eq("23456", setnode->value.v.str);
+
+		setnode = STAILQ_NEXT(setnode, hook);
+		ck_assert_ptr_eq(NULL, setnode);
+
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_str_eq("a.b.d", kv->key);
+	ck_assert_int_eq(VALT_MAP, kv->value.type);
+
+		mapnode = STAILQ_FIRST(&kv->value.v.map);
+		ck_assert_str_eq("aoeui", mapnode->key);
+		ck_assert_uint_eq(VALT_STR, mapnode->value.type);
+		ck_assert_str_eq("333", mapnode->value.v.str);
+
+		mapnode = STAILQ_NEXT(mapnode, hook);
+		ck_assert_str_eq("dhtns", mapnode->key);
+		ck_assert_uint_eq(VALT_STR, mapnode->value.type);
+		ck_assert_str_eq("444", mapnode->value.v.str);
+
+		mapnode = STAILQ_NEXT(mapnode, hook);
+		ck_assert_ptr_eq(NULL, mapnode);
+
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_ptr_eq(NULL, kv);
+
+	/******************/
+
+	init_ctx(&ctx, "Whitespace, comments",
+		"ta.cer\n"
+		"		# Integer eget dui sit amet.\n"
+		"[ta.cer]       # Donec a urna turpis\n"
+		"  # Nulla ut tellus nec augue malesuada aliquet in vel eros\n"
+		"a\n" "=\n" "\"aa bb cc\n" "dd ee ff\"\n"
+		"b\n" "=\n" "[\n" "12345\n" ",\n" "23456\n" "] "
+		"c\n" "=\n" "{\n" "aoeui\n" "=\n" "333\n" ",\n" "dhtns\n" "=\n" "444\n" "}\n");
+	read_tree(&ctx);
+	read_keyvals(&ctx);
+
+	node = ctx.result.root;
+	ck_assert_ptr_ne(NULL, node);
+
+	kv = STAILQ_FIRST(&node->props);
+	ck_keyval_str("a", "aa bb cc\ndd ee ff", kv);
+
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_str_eq("b", kv->key);
+	ck_assert_int_eq(VALT_SET, kv->value.type);
+
+		setnode = STAILQ_FIRST(&kv->value.v.set);
+		ck_assert_uint_eq(VALT_STR, setnode->value.type);
+		ck_assert_str_eq("12345", setnode->value.v.str);
+
+		setnode = STAILQ_NEXT(setnode, hook);
+		ck_assert_uint_eq(VALT_STR, setnode->value.type);
+		ck_assert_str_eq("23456", setnode->value.v.str);
+
+		setnode = STAILQ_NEXT(setnode, hook);
+		ck_assert_ptr_eq(NULL, setnode);
+
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_str_eq("c", kv->key);
+	ck_assert_int_eq(VALT_MAP, kv->value.type);
+
+		mapnode = STAILQ_FIRST(&kv->value.v.map);
+		ck_assert_str_eq("aoeui", mapnode->key);
+		ck_assert_uint_eq(VALT_STR, mapnode->value.type);
+		ck_assert_str_eq("333", mapnode->value.v.str);
+
+		mapnode = STAILQ_NEXT(mapnode, hook);
+		ck_assert_str_eq("dhtns", mapnode->key);
+		ck_assert_uint_eq(VALT_STR, mapnode->value.type);
+		ck_assert_str_eq("444", mapnode->value.v.str);
+
+		mapnode = STAILQ_NEXT(mapnode, hook);
+		ck_assert_ptr_eq(NULL, mapnode);
+
+	kv = STAILQ_NEXT(kv, hook);
+	ck_assert_ptr_eq(NULL, kv);
+}
+END_TEST
+
 static Suite *
 address_load_suite(void)
 {
@@ -443,6 +618,7 @@ address_load_suite(void)
 	parser = tcase_create("Parser");
 	tcase_add_test(parser, check_accept_value);
 	tcase_add_test(parser, check_read_tree);
+	tcase_add_test(parser, check_read_keyvals);
 
 	suite = suite_create("fields");
 	suite_add_tcase(suite, parser);
