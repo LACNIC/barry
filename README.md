@@ -163,7 +163,7 @@ ta.cer
 content.encapContentInfo.eContent.version = 2
 ```
 
-Basically, you can override fields from the objects by appending an "attributes" section to the RD. Enclose the name of the file in brackets (as a header), then override needed values one line at a time. You can do this for all the declared files in the tree. The keys of the fields are dot-stringified versions of their official names from the [RFC ASN.1 definitions](TODO), though there are additional keys we'll discuss later.
+Basically, you can override fields from the objects by appending an "attributes" section to the RD. Enclose the name of the file in brackets (as a header), then override needed values one line at a time. You can do this for all the declared files in the tree. The keys of the fields are dot-stringified versions of their official names from the [RFC ASN.1 definitions](https://github.com/NICMx/libasn1fort/tree/main/asn1), though there are additional keys we'll discuss later.
 
 Processing that file should result in a repository that might be rejected by a current validator:
 

@@ -7,6 +7,7 @@ Time_t default_later;
 GeneralizedTime_t default_gnow;
 GeneralizedTime_t default_glater;
 
+char const *keys_path = NULL;
 unsigned int verbosity = 0;
 
 #define ck_hexstr(input, bytes, unused) do {				\
@@ -277,13 +278,13 @@ START_TEST(check_parse_int_dec)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "123";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 1);
 	ck_assert_int_eq(num.buf[0], 0x7B);
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "1234567890";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 4);
 	ck_assert_int_eq(num.buf[0], 0x49);
 	ck_assert_int_eq(num.buf[1], 0x96);
@@ -315,35 +316,35 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "4660";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x1234";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0b0001001000110100";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&os, 0, sizeof(os));
 	kv.v.str = "4660";
-	ck_assert_pstr_eq(NULL, parse_8str(&kv, &os));
+	ck_assert_pstr_eq(NULL, parse_8str(NULL, NULL, &kv, &os));
 	ck_assert_int_eq(os.size, 2);
 	ck_assert_int_eq(os.buf[0], 0x12);
 	ck_assert_int_eq(os.buf[1], 0x34);
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0x1234";
-	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, NULL, &kv, &bs));
 	ck_assert_int_eq(bs.size, 2);
 	ck_assert_int_eq(bs.buf[0], 0x12);
 	ck_assert_int_eq(bs.buf[1], 0x34);
@@ -351,7 +352,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0b0001001000110100";
-	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(NULL, NULL, &kv, &any));
 	ck_assert_int_eq(any.size, 2);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -363,7 +364,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0x123456";
-	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(NULL, NULL, &kv, &any));
 	ck_assert_int_eq(any.size, 3);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -371,7 +372,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0b000100100011010001010110";
-	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(NULL, NULL, &kv, &any));
 	ck_assert_int_eq(any.size, 3);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -385,7 +386,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x00000001";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 4);
 	ck_assert_int_eq(num.buf[0], 0x00);
 	ck_assert_int_eq(num.buf[1], 0x00);
@@ -400,7 +401,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0x00000001";
-	ck_assert_pstr_eq(NULL, parse_any(&kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(NULL, NULL, &kv, &any));
 	ck_assert_int_eq(any.size, 4);
 	ck_assert_int_eq(any.buf[0], 0x00);
 	ck_assert_int_eq(any.buf[1], 0x00);
@@ -423,21 +424,21 @@ START_TEST(check_tutorial_examples)
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0b111110";
-	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, NULL, &kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0xF8/6";
-	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, NULL, &kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0b11111/6";
-	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, NULL, &kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
@@ -450,14 +451,14 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x1234";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x001234";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x00);
 	ck_assert_int_eq(num.buf[1], 0x12);
@@ -465,7 +466,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x1234/24";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
@@ -473,7 +474,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x123400";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
@@ -486,7 +487,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0x1000000000000000000000000000000000";
-	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, NULL, &kv, &bs));
 	ck_assert_int_eq(bs.size, 17);
 	ck_assert_int_eq(bs.buf[0], 0x10);
 	for (i = 1; i < 17; i++)
@@ -495,7 +496,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0x10/136";
-	ck_assert_pstr_eq(NULL, parse_bitstr(&kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, NULL, &kv, &bs));
 	ck_assert_int_eq(bs.size, 17);
 	ck_assert_int_eq(bs.buf[0], 0x10);
 	for (i = 1; i < 17; i++)
@@ -510,7 +511,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x01/1000";
-	ck_assert_pstr_eq(NULL, parse_int(&kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(NULL, NULL, &kv, &num));
 	ck_assert_int_eq(num.size, 125);
 	ck_assert_int_eq(num.buf[0], 0x01);
 	for (i = 1; i < 125; i++)
@@ -527,7 +528,7 @@ START_TEST(check_parse_oid)
 
 	memset(&oid, 0, sizeof(oid));
 	kv.v.str = "1.2.840.113549.1.7.2";
-	parse_oid(&kv, &oid);
+	parse_oid(NULL, NULL, &kv, &oid);
 	ck_assert_int_eq(oid.size, 9);
 	ck_assert_int_eq(oid.buf[0], 0x2A);
 	ck_assert_int_eq(oid.buf[1], 0x86);
@@ -543,7 +544,7 @@ END_TEST
 
 static void
 ck_ht(struct field *ht, char const *key, struct field_type const *type,
-    size_t offset)
+    void *address)
 {
 	size_t keylen;
 	struct field *node;
@@ -554,7 +555,7 @@ ck_ht(struct field *ht, char const *key, struct field_type const *type,
 	ck_assert_ptr_ne(NULL, node);
 	ck_assert_str_eq(key, node->key);
 	ck_assert_str_eq(type->name, node->type->name);
-	ck_assert_uint_eq(offset, node->offset);
+	ck_assert_ptr_eq(address, node->address);
 }
 
 static void
@@ -569,68 +570,70 @@ ck_ht_null(struct field *ht, char const *key)
 	ck_assert_ptr_eq(NULL, node);
 }
 
+static char dummy[256];
+
 START_TEST(check_fields_compile)
 {
-	const struct field PLAIN[] = {
+	const struct field_template PLAIN[] = {
 		{ "a", &ft_int, 0, 0, NULL },
 		{ "b.c", &ft_oid, 4, 0, NULL },
 		{ "b.d", &ft_any, 32, 0, NULL },
 		{ 0 }
 	};
-	const struct field ADDEND[] = {
+	const struct field_template ADDEND[] = {
 		{ "e.f", &ft_bitstr, 64, 0, NULL },
 		{ "g", &ft_name, 70, 0, NULL },
 		{ 0 }
 	};
-	const struct field CONTAINER[] = {
+	const struct field_template CONTAINER[] = {
 		{ "h", NULL, 84, 0, PLAIN },
 		{ "i.j", &ft_oid, 128, 0, ADDEND },
 		{ 0 }
 	};
 	struct field *ht = NULL;
 
-	fields_compile(PLAIN, &ht);
-	ck_ht(ht, "a", &ft_int, 0);
-	ck_ht(ht, "b.c", &ft_oid, 4);
-	ck_ht(ht, "b.d", &ft_any, 32);
+	fields_compile(PLAIN, NULL, dummy, &ht);
+	ck_ht(ht, "a", &ft_int, dummy);
+	ck_ht(ht, "b.c", &ft_oid, dummy + 4);
+	ck_ht(ht, "b.d", &ft_any, dummy + 32);
 
-	fields_compile(ADDEND, &ht);
-	ck_ht(ht, "a", &ft_int, 0);
-	ck_ht(ht, "b.c", &ft_oid, 4);
-	ck_ht(ht, "b.d", &ft_any, 32);
-	ck_ht(ht, "e.f", &ft_bitstr, 64);
-	ck_ht(ht, "g", &ft_name, 70);
+	fields_compile(ADDEND, NULL, dummy, &ht);
+	ck_ht(ht, "a", &ft_int, dummy);
+	ck_ht(ht, "b.c", &ft_oid, dummy + 4);
+	ck_ht(ht, "b.d", &ft_any, dummy + 32);
+	ck_ht(ht, "e.f", &ft_bitstr, dummy + 64);
+	ck_ht(ht, "g", &ft_name, dummy + 70);
 
-	fields_compile(CONTAINER, &ht);
-	ck_ht(ht, "a", &ft_int, 0);
-	ck_ht(ht, "b.c", &ft_oid, 4);
-	ck_ht(ht, "b.d", &ft_any, 32);
-	ck_ht(ht, "e.f", &ft_bitstr, 64);
-	ck_ht(ht, "g", &ft_name, 70);
+	fields_compile(CONTAINER, NULL, dummy, &ht);
+	ck_ht(ht, "a", &ft_int, dummy);
+	ck_ht(ht, "b.c", &ft_oid, dummy + 4);
+	ck_ht(ht, "b.d", &ft_any, dummy + 32);
+	ck_ht(ht, "e.f", &ft_bitstr, dummy + 64);
+	ck_ht(ht, "g", &ft_name, dummy + 70);
 	ck_ht_null(ht, "h");
-	ck_ht(ht, "h.a", &ft_int, 84);
-	ck_ht(ht, "h.b.c", &ft_oid, 88);
-	ck_ht(ht, "h.b.d", &ft_any, 116);
-	ck_ht(ht, "i.j", &ft_oid, 128);
-	ck_ht(ht, "i.j.e.f", &ft_bitstr, 192);
-	ck_ht(ht, "i.j.g", &ft_name, 198);
+	ck_ht(ht, "h.a", &ft_int, dummy + 84);
+	ck_ht(ht, "h.b.c", &ft_oid, dummy + 88);
+	ck_ht(ht, "h.b.d", &ft_any, dummy + 116);
+	ck_ht(ht, "i.j", &ft_oid, dummy + 128);
+	ck_ht(ht, "i.j.e.f", &ft_bitstr, dummy + 192);
+	ck_ht(ht, "i.j.g", &ft_name, dummy + 198);
 }
 END_TEST
 
 START_TEST(check_fields_compile2)
 {
-	const struct field CHILD[] = {
+	const struct field_template CHILD[] = {
 		{ "g", &ft_int, 0 },
 		{ "h", &ft_oid, 1 },
 		{ 0 }
 	};
-	const struct field PARENT[] = {
+	const struct field_template PARENT[] = {
 		{ "d", &ft_bitstr, 0, 0, CHILD },
 		{ "e", &ft_name, 4, 0, CHILD },
 		{ "f", &ft_time, 16, 0, CHILD },
 		{ 0 }
 	};
-	const struct field GRANDPARENT[] = {
+	const struct field_template GRANDPARENT[] = {
 		{ "a", &ft_int, 0, 0, PARENT },
 		{ "b", &ft_oid, 32, 0, PARENT },
 		{ "c", &ft_any, 96, 0, PARENT },
@@ -638,40 +641,40 @@ START_TEST(check_fields_compile2)
 	};
 	struct field *ht = NULL;
 
-	fields_compile(GRANDPARENT, &ht);
+	fields_compile(GRANDPARENT, NULL, &dummy, &ht);
 
-	ck_ht(ht, "a", &ft_int, 0);
-	ck_ht(ht, "a.d", &ft_bitstr, 0);
-	ck_ht(ht, "a.d.g", &ft_int, 0);
-	ck_ht(ht, "a.d.h", &ft_oid, 1);
-	ck_ht(ht, "a.e", &ft_name, 4);
-	ck_ht(ht, "a.e.g", &ft_int, 4);
-	ck_ht(ht, "a.e.h", &ft_oid, 5);
-	ck_ht(ht, "a.f", &ft_time, 16);
-	ck_ht(ht, "a.f.g", &ft_int, 16);
-	ck_ht(ht, "a.f.h", &ft_oid, 17);
+	ck_ht(ht, "a", &ft_int, dummy);
+	ck_ht(ht, "a.d", &ft_bitstr, dummy);
+	ck_ht(ht, "a.d.g", &ft_int, dummy);
+	ck_ht(ht, "a.d.h", &ft_oid, dummy + 1);
+	ck_ht(ht, "a.e", &ft_name, dummy + 4);
+	ck_ht(ht, "a.e.g", &ft_int, dummy + 4);
+	ck_ht(ht, "a.e.h", &ft_oid, dummy + 5);
+	ck_ht(ht, "a.f", &ft_time, dummy + 16);
+	ck_ht(ht, "a.f.g", &ft_int, dummy + 16);
+	ck_ht(ht, "a.f.h", &ft_oid, dummy + 17);
 
-	ck_ht(ht, "b", &ft_oid, 32);
-	ck_ht(ht, "b.d", &ft_bitstr, 32);
-	ck_ht(ht, "b.d.g", &ft_int, 32);
-	ck_ht(ht, "b.d.h", &ft_oid, 33);
-	ck_ht(ht, "b.e", &ft_name, 36);
-	ck_ht(ht, "b.e.g", &ft_int, 36);
-	ck_ht(ht, "b.e.h", &ft_oid, 37);
-	ck_ht(ht, "b.f", &ft_time, 48);
-	ck_ht(ht, "b.f.g", &ft_int, 48);
-	ck_ht(ht, "b.f.h", &ft_oid, 49);
+	ck_ht(ht, "b", &ft_oid, dummy + 32);
+	ck_ht(ht, "b.d", &ft_bitstr, dummy + 32);
+	ck_ht(ht, "b.d.g", &ft_int, dummy + 32);
+	ck_ht(ht, "b.d.h", &ft_oid, dummy + 33);
+	ck_ht(ht, "b.e", &ft_name, dummy + 36);
+	ck_ht(ht, "b.e.g", &ft_int, dummy + 36);
+	ck_ht(ht, "b.e.h", &ft_oid, dummy + 37);
+	ck_ht(ht, "b.f", &ft_time, dummy + 48);
+	ck_ht(ht, "b.f.g", &ft_int, dummy + 48);
+	ck_ht(ht, "b.f.h", &ft_oid, dummy + 49);
 
-	ck_ht(ht, "c", &ft_any, 96);
-	ck_ht(ht, "c.d", &ft_bitstr, 96);
-	ck_ht(ht, "c.d.g", &ft_int, 96);
-	ck_ht(ht, "c.d.h", &ft_oid, 97);
-	ck_ht(ht, "c.e", &ft_name, 100);
-	ck_ht(ht, "c.e.g", &ft_int, 100);
-	ck_ht(ht, "c.e.h", &ft_oid, 101);
-	ck_ht(ht, "c.f", &ft_time, 112);
-	ck_ht(ht, "c.f.g", &ft_int, 112);
-	ck_ht(ht, "c.f.h", &ft_oid, 113);
+	ck_ht(ht, "c", &ft_any, dummy + 96);
+	ck_ht(ht, "c.d", &ft_bitstr, dummy + 96);
+	ck_ht(ht, "c.d.g", &ft_int, dummy + 96);
+	ck_ht(ht, "c.d.h", &ft_oid, dummy + 97);
+	ck_ht(ht, "c.e", &ft_name, dummy + 100);
+	ck_ht(ht, "c.e.g", &ft_int, dummy + 100);
+	ck_ht(ht, "c.e.h", &ft_oid, dummy + 101);
+	ck_ht(ht, "c.f", &ft_time, dummy + 112);
+	ck_ht(ht, "c.f.g", &ft_int, dummy + 112);
+	ck_ht(ht, "c.f.h", &ft_oid, dummy + 113);
 }
 END_TEST
 
@@ -765,13 +768,13 @@ START_TEST(check_parse_ip)
 	A_SEQUENCE_OF(struct ROAIPAddressFamily) output;
 
 	init_kv_set(&input, NULL);
-	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(NULL, NULL, &input, &output));
 	ck_assert_int_eq(0, output.count);
 
 	/* ========= */
 
 	init_kv_set(&input, "192.0.2.0/24", "2001:db8::/32", NULL);
-	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(NULL, NULL, &input, &output));
 	ck_assert_int_eq(2, output.count);
 
 	/* IPv4 */
@@ -787,7 +790,7 @@ START_TEST(check_parse_ip)
 	/* ========= */
 
 	init_kv_set(&input, "192.0.2.0/24", NULL);
-	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(NULL, NULL, &input, &output));
 	ck_assert_int_eq(1, output.count);
 
 	ck_af(&output.array[0]->addressFamily, 1);
@@ -797,7 +800,7 @@ START_TEST(check_parse_ip)
 	/* ========= */
 
 	init_kv_set(&input, "2001:db8::/32", NULL);
-	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(NULL, NULL, &input, &output));
 	ck_assert_int_eq(1, output.count);
 
 	ck_af(&output.array[0]->addressFamily, 2);
@@ -809,7 +812,7 @@ START_TEST(check_parse_ip)
 	init_kv_set(&input,
 	    "192.0.2.0/24", "203.0.113.224/29", "198.51.100.0/130",
 	    "2001:db8::/32", "::/0", "2001:db8::ffff/150", NULL);
-	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(NULL, NULL, &input, &output));
 	ck_assert_int_eq(2, output.count);
 
 	/* IPv4 */
@@ -835,18 +838,18 @@ START_TEST(check_parse_ip)
 	/* ========= */
 
 	init_kv_set(&input, "192.0.2.0/4", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(NULL, NULL, &input, &output));
 	init_kv_set(&input, "192.0.2.255/31", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(NULL, NULL, &input, &output));
 	init_kv_set(&input, "192.0.2.255/32", NULL);
-	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(NULL, NULL, &input, &output));
 
 	init_kv_set(&input, "2001:db8::/2", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(NULL, NULL, &input, &output));
 	init_kv_set(&input, "2001:db8::ff/127", NULL);
-	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(PREF_TRUNC, parse_ips_roa(NULL, NULL, &input, &output));
 	init_kv_set(&input, "2001:db8::ff/128", NULL);
-	ck_assert_pstr_eq(NULL, parse_ips_roa(&input, &output));
+	ck_assert_pstr_eq(NULL, parse_ips_roa(NULL, NULL, &input, &output));
 }
 END_TEST
 

@@ -316,6 +316,7 @@ accept_value(struct rd_parse_context *ctx, struct token *peek)
 
 			next_token(ctx, &tkn);
 		} while (true);
+		break;
 
 	case TKNT_MAP_START:
 		result.type = VALT_MAP;

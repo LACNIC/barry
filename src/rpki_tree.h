@@ -30,7 +30,7 @@ struct rpki_tree_node {
 };
 
 struct rpki_tree {
-	/* Array; all nodes, listed without hierarchy */
+	/* Linked hash table; all nodes, listed without hierarchy */
 	struct rpki_tree_node *nodes;
 	/* Nodes in tree form */
 	struct rpki_tree_node *root;
