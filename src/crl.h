@@ -6,19 +6,14 @@
 #include "cer.h"
 
 struct rpki_crl {
-	char *uri;
-	char *path;
-
-	struct rpki_certificate *parent;
-	struct field *fields; /* Hash table */
+	struct rpki_object *meta;
 
 	CertificateList_t obj;
 	struct extensions exts;
 };
 
-struct rpki_crl *crl_new(struct rpki_certificate *);
-void crl_generate_paths(struct rpki_crl *, char const *);
-void crl_apply_keyvals(struct rpki_crl *, struct keyvals *);
+struct rpki_crl *crl_new(struct rpki_object *);
+void crl_generate_paths(struct rpki_crl *);
 void crl_finish(struct rpki_crl *);
 void crl_write(struct rpki_crl *);
 void crl_print(struct rpki_crl *);

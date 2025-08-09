@@ -82,7 +82,7 @@ tal_write(struct rpki_certificate *ta, char const *path)
 	if (fd < 0)
 		panic("open(%s): %s", path, strerror(errno));
 
-	if (write(fd, ta->uri, strlen(ta->uri)) < 0)
+	if (write(fd, ta->meta->uri, strlen(ta->meta->uri)) < 0)
 		panic("write(1)");
 	if (write(fd, "\n\n", strlen("\n\n")) < 0)
 		panic("write(2)");

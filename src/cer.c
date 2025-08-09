@@ -10,309 +10,250 @@
 #include "oid.h"
 #include "print.h"
 
-const struct field_template cer_metadata[] = {
-	{
-		"tbsCertificate.version",
-		&ft_int,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.version),
-		sizeof(Version_t),
-	}, {
-		"tbsCertificate.serialNumber",
-		&ft_int,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.serialNumber),
-	}, {
-		"tbsCertificate.signature",
-		NULL,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.signature),
-		0,
-		algorithm_metadata,
-	}, {
-		"tbsCertificate.issuer",
-		&ft_name,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.issuer),
-	}, {
-		"tbsCertificate.validity.notBefore",
-		&ft_time,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.validity.notBefore),
-	}, {
-		"tbsCertificate.validity.notAfter",
-		&ft_time,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.validity.notAfter),
-	}, {
-		"tbsCertificate.subject",
-		&ft_name,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.subject),
-	}, {
-		"tbsCertificate.subjectPublicKeyInfo.algorithm",
-		NULL,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.subjectPublicKeyInfo.algorithm),
-		0,
-		algorithm_metadata,
-	}, {
-		"tbsCertificate.subjectPublicKeyInfo.subjectPublicKey",
-		&ft_bitstr,
-		offsetof(struct rpki_certificate, obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey),
-	},
-	/* { "tbsCertificate.issuerUniqueID" }, */
-	/* { "tbsCertificate.subjectUniqueID" }, */
-	{
-		"tbsCertificate.extensions",
-		&ft_exts,
-		offsetof(struct rpki_certificate, exts),
-	}, {
-		"signatureAlgorithm",
-		NULL,
-		offsetof(struct rpki_certificate, obj.signatureAlgorithm),
-		0,
-		algorithm_metadata,
-	}, {
-		"signature",
-		&ft_bitstr,
-		offsetof(struct rpki_certificate, obj.signature),
-	},
-	{ 0 }
-};
-
-static char const *EXT_CTX = "tbsCertificate.extensions";
-
 static void
-init_extensions_ta(struct rpki_certificate *ta)
+init_extensions_ta(struct rpki_certificate *ta, struct field *extf)
 {
 	size_t n;
 
 	pr_debug("- Initializing TA extensions");
 
-	INIT_ASN1_ARRAY(&ta->exts.array.list, 7, Extension_t);
-	STAILQ_INIT(&ta->exts.list);
+	STAILQ_INIT(&ta->exts);
 
 	n = 0;
-	exts_add_bc(&ta->exts, n++, ta->fields, EXT_CTX);
-	exts_add_ski(&ta->exts, n++, ta->fields, EXT_CTX);
-	exts_add_ku(&ta->exts, n++, ta->fields, EXT_CTX);
-	exts_add_sia(&ta->exts, n++, ta->fields, EXT_CTX);
-	exts_add_cp(&ta->exts, n++, ta->fields, EXT_CTX);
-	exts_add_ip(&ta->exts, n++, ta->fields, EXT_CTX);
-	exts_add_asn(&ta->exts, n++, ta->fields, EXT_CTX);
+	exts_add_bc(&ta->exts, n++, extf);
+	exts_add_ski(&ta->exts, n++, extf);
+	exts_add_ku(&ta->exts, n++, extf);
+	exts_add_sia(&ta->exts, n++, extf);
+	exts_add_cp(&ta->exts, n++, extf);
+	exts_add_ip(&ta->exts, n++, extf);
+	exts_add_asn(&ta->exts, n++, extf);
 }
 
 static void
-init_extensions_ca(struct rpki_certificate *ca)
+init_extensions_ca(struct rpki_certificate *ca, struct field *extf)
 {
 	size_t n;
 
 	pr_debug("- Initializing CA extensions");
 
-	INIT_ASN1_ARRAY(&ca->exts.array.list, 10, Extension_t);
-	STAILQ_INIT(&ca->exts.list);
+	STAILQ_INIT(&ca->exts);
 
 	n = 0;
-	exts_add_bc(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_ski(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_aki(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_ku(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_crldp(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_aia(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_sia(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_cp(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_ip(&ca->exts, n++, ca->fields, EXT_CTX);
-	exts_add_asn(&ca->exts, n++, ca->fields, EXT_CTX);
+	exts_add_bc(&ca->exts, n++, extf);
+	exts_add_ski(&ca->exts, n++, extf);
+	exts_add_aki(&ca->exts, n++, extf);
+	exts_add_ku(&ca->exts, n++, extf);
+	exts_add_crldp(&ca->exts, n++, extf);
+	exts_add_aia(&ca->exts, n++, extf);
+	exts_add_sia(&ca->exts, n++, extf);
+	exts_add_cp(&ca->exts, n++, extf);
+	exts_add_ip(&ca->exts, n++, extf);
+	exts_add_asn(&ca->exts, n++, extf);
 }
 
 static void
-init_extensions_ee(struct rpki_certificate *ee, struct field *fields,
-    char const *ctx)
+init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 {
-	char key[FIELD_MAXLEN];
 	size_t n;
 
 	pr_debug("- Initializing EE extensions");
 
-	INIT_ASN1_ARRAY(&ee->exts.array.list, 9, Extension_t);
-	STAILQ_INIT(&ee->exts.list);
-	psnprintf(key, FIELD_MAXLEN, "%s.%s", ctx, EXT_CTX);
+	STAILQ_INIT(&ee->exts);
 
 	n = 0;
-	exts_add_ski(&ee->exts, n++, fields, key);
-	exts_add_aki(&ee->exts, n++, fields, key);
-	exts_add_ku(&ee->exts, n++, fields, key);
-	exts_add_crldp(&ee->exts, n++, fields, key);
-	exts_add_aia(&ee->exts, n++, fields, key);
-	exts_add_sia(&ee->exts, n++, fields, key);
-	exts_add_cp(&ee->exts, n++, fields, key);
-	exts_add_ip(&ee->exts, n++, fields, key);
-	exts_add_asn(&ee->exts, n++, fields, key);
+	exts_add_ski(&ee->exts, n++, extf);
+	exts_add_aki(&ee->exts, n++, extf);
+	exts_add_ku(&ee->exts, n++, extf);
+	exts_add_crldp(&ee->exts, n++, extf);
+	exts_add_aia(&ee->exts, n++, extf);
+	exts_add_sia(&ee->exts, n++, extf);
+	exts_add_cp(&ee->exts, n++, extf);
+	exts_add_ip(&ee->exts, n++, extf);
+	exts_add_asn(&ee->exts, n++, extf);
 }
 
 struct rpki_certificate *
-cer_new(char const *filename, struct rpki_certificate *parent,
-    enum cer_type type)
+cer_new(struct rpki_object *meta, enum cer_type type)
 {
 	struct rpki_certificate *cer;
 
 	cer = pzalloc(sizeof(struct rpki_certificate));
-	cer_init(cer, &cer->fields, filename, parent, type, NULL);
+	cer_init(cer, meta, type);
 
 	return cer;
 }
 
 void
-cer_init(struct rpki_certificate *cer,
-    struct field **fields,
-    char const *filename,
-    struct rpki_certificate *parent, enum cer_type type,
-    char const *ctx)
+cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
+    enum cer_type type)
 {
 	TBSCertificate_t *tbs;
+	struct field *tbsf;
+	struct field *extf;
 
-	cer->parent = parent;
-	fields_compile(cer_metadata, ctx, cer, fields);
-	cer->subject = filename;
+	cer->meta = meta;
+	cer->subject = meta->name; // XXX remove subject?
 	cer->keys = keys_new();
 	cer->spki = pubkey2asn1(cer->keys);
 
 	tbs = &cer->obj.tbsCertificate;
+	tbsf = field_add_static(meta->fields, "tbsCertificate");
+
 	tbs->version = intmax2INTEGER(2);
+	field_add(tbsf, "version", &ft_int, &tbs->version, sizeof(Version_t));
+
 	init_INTEGER(&tbs->serialNumber, 0);
+	field_add(tbsf, "serialNumber", &ft_int, &tbs->serialNumber, 0);
+
 	init_oid(&tbs->signature.algorithm, NID_sha256WithRSAEncryption);
 	tbs->signature.parameters = create_null();
+	field_add_algorithm(tbsf, "signature", &tbs->signature);
+
 	/* issuer: Postpone (needs parent's subject) */
+	field_add(tbsf, "issuer", &ft_name, &tbs->issuer, 0);
+
 	init_time_now(&tbs->validity.notBefore);
+	field_add(tbsf, "validity.notBefore", &ft_time, &tbs->validity.notBefore, 0);
+
 	init_time_later(&tbs->validity.notAfter);
-	init_name(&tbs->subject, filename);
+	field_add(tbsf, "validity.notAfter", &ft_time, &tbs->validity.notAfter, 0);
+
+	init_name(&tbs->subject, meta->name);
+	field_add(tbsf, "subject", &ft_name, &tbs->subject, 0);
+
 	tbs->subjectPublicKeyInfo = *cer->spki;
+	field_add_spki(tbsf, "subjectPublicKeyInfo", &tbs->subjectPublicKeyInfo);
+
 	/* tbs->issuerUniqueID: TODO not implemented yet */
 	/* tbs->subjectUniqueID: TODO not implemented yet */
-	cer->obj.tbsCertificate.extensions = &cer->exts.array;
+
+	tbs->extensions = NULL;
+	extf = field_add(tbsf, "extensions", &ft_exts, &cer->exts, 0);
+	switch (type) {
+	case CT_TA:	init_extensions_ta(cer, extf);		break;
+	case CT_CA:	init_extensions_ca(cer, extf);		break;
+	case CT_EE:	init_extensions_ee(cer, extf);		break;
+	}
+
 	init_oid(&cer->obj.signatureAlgorithm.algorithm, NID_sha256WithRSAEncryption);
 	cer->obj.signatureAlgorithm.parameters = create_null();
+	field_add_algorithm(meta->fields, "signatureAlgorithm", &cer->obj.signatureAlgorithm);
+
 	/* cer->signature: Postpone (needs all other fields ready) */
-
-	switch (type) {
-	case CT_TA:	init_extensions_ta(cer);		break;
-	case CT_CA:	init_extensions_ca(cer);		break;
-	case CT_EE:	init_extensions_ee(cer, *fields, ctx);	break;
-	}
-}
-
-void
-cer_generate_paths(struct rpki_certificate *cer, char const *filename)
-{
-	cer->uri = generate_uri(cer->parent, filename);
-	pr_debug("- uri: %s", cer->uri);
-
-	cer->path = generate_path(cer->parent, filename);
-	pr_debug("- path: %s", cer->path);
-
-	cer->rpp = rpp_new();
-}
-
-void
-cer_apply_keyvals(struct rpki_certificate *cer, struct keyvals *kvs)
-{
-	fields_apply_keyvals(cer->fields, cer, kvs);
-}
-
-static bool
-is_field_set(struct rpki_certificate *cer, char const *name,
-    unsigned int extn, char const *suffix)
-{
-	return fields_ext_set(cer->fields, EXT_CTX, name, extn, suffix);
+	field_add(meta->fields, "signature", &ft_bitstr, &tbs->signature, 0);
 }
 
 static void
 finish_extensions(struct rpki_certificate *cer, enum cer_type type,
     char const *so_uri)
 {
+	struct field *fields;
 	struct ext_list_node *ext;
 	unsigned int extn;
 
+	fields = cer->meta->fields;
 	extn = 0;
-	STAILQ_FOREACH(ext, &cer->exts.list, hook) {
+
+	STAILQ_FOREACH(ext, &cer->exts, hook) {
+
 		switch (ext->type) {
 		case EXT_BC:
-		case EXT_CRLN:
+			pr_trace("Finishing BC");
 			break;
 
 		case EXT_SKI:
-			if (!is_field_set(cer, "ski", extn, "extnValue")) {
+			pr_trace("Finishing SKI");
+			if (!ext_field_set(fields, "ski", extn, "extnValue")) {
 				switch (type) {
 				case CT_TA:
 					/* TODO ? */
-					finish_ski(&ext->v.ski, &cer->obj.tbsCertificate.subjectPublicKeyInfo);
+					ext_finish_ski(&ext->v.ski, &cer->obj.tbsCertificate.subjectPublicKeyInfo);
 					break;
 				case CT_CA:
 				case CT_EE:
-					finish_ski(&ext->v.ski, cer->spki);
+					ext_finish_ski(&ext->v.ski, cer->spki);
 					break;
 				}
 			}
 			break;
 
 		case EXT_AKI:
-			if (!is_field_set(cer, "aki", extn, "extnValue.keyIdentifier")) {
-				if (!cer->parent)
+			pr_trace("Finishing AKI");
+			if (!ext_field_set(fields, "aki", extn, "extnValue.keyIdentifier")) {
+				if (!cer->meta->parent)
 					panic("Certificate needs a default AKI, but lacks a parent");
-				finish_aki(&ext->v.aki, cer->parent->spki);
+				ext_finish_aki(&ext->v.aki, cer->meta->parent->spki);
 			}
 			break;
 
 		case EXT_KU:
-			if (!is_field_set(cer, "ku", extn, "extnValue"))
-				finish_ku(&ext->v.ku, type);
+			pr_trace("Finishing KU");
+			if (!ext_field_set(fields, "ku", extn, "extnValue"))
+				ext_finish_ku(&ext->v.ku, type);
 			break;
 
 		case EXT_CRLDP:
-			if (!is_field_set(cer, "crldp", extn, "extnValue")) {
-				if (!cer->parent)
+			pr_trace("Finishing CRLDP");
+			if (!ext_field_set(fields, "crldp", extn, "extnValue")) {
+				if (!cer->meta->parent)
 					panic("Certificate needs a default CRLDP, but lacks a parent");
-				finish_crldp(&ext->v.crldp, cer->parent->rpp.crldp);
+				ext_finish_crldp(&ext->v.crldp,
+				    cer->meta->parent->rpp.crldp);
 			}
 			break;
 
 		case EXT_AIA:
-			if (!is_field_set(cer, "aia", extn, "extnValue"))
-				finish_aia(&ext->v.aia, cer->parent->uri);
+			pr_trace("Finishing AIA");
+			if (!ext_field_set(fields, "aia", extn, "extnValue"))
+				ext_finish_aia(&ext->v.aia,
+				    cer->meta->parent->meta->uri);
 			break;
 
 		case EXT_SIA:
-			if (!is_field_set(cer, "sia", extn, "extnValue")) {
+			pr_trace("Finishing SIA");
+			if (!ext_field_set(fields, "sia", extn, "extnValue")) {
 				switch (type) {
 				case CT_TA:
 				case CT_CA:
-					finish_sia_ca(&ext->v.sia,
+					ext_finish_sia_ca(&ext->v.sia,
 					    cer->rpp.caRepository,
 					    cer->rpp.rpkiManifest,
 					    cer->rpp.rpkiNotify);
 					break;
 				case CT_EE:
-					finish_sia_ee(&ext->v.sia, so_uri);
+					ext_finish_sia_ee(&ext->v.sia, so_uri);
 					break;
 				}
 			}
 			break;
 
 		case EXT_CP:
-			if (!is_field_set(cer, "cp", extn, "extnValue"))
-				finish_cp(&ext->v.cp);
+			pr_trace("Finishing CP");
+			if (!ext_field_set(fields, "cp", extn, "extnValue"))
+				ext_finish_cp(&ext->v.cp);
 			break;
 
 		case EXT_IP:
-			if (!is_field_set(cer, "ip", extn, "extnValue"))
-				finish_ip(&ext->v.ip);
+			pr_trace("Finishing IP");
+			if (!ext_field_set(fields, "ip", extn, "extnValue"))
+				ext_finish_ip(&ext->v.ip);
 			break;
 
 		case EXT_ASN:
-			if (!is_field_set(cer, "asn", extn, "extnValue.asnum"))
-				finish_asn(&ext->v.asn);
+			pr_trace("Finishing ASN");
+			if (!ext_field_set(fields, "asn", extn, "extnValue.asnum"))
+				ext_finish_asn(&ext->v.asn);
+			break;
+
+		case EXT_CRLN:
+			pr_trace("Finishing CRLN");
 			break;
 		}
 
 		extn++;
 	}
 
-	extn = 0;
-	STAILQ_FOREACH(ext, &cer->exts.list, hook)
-		der_encode_8str(ext->td, &ext->v, &cer->exts.array.list.array[extn++]->extnValue);
+	ext_compile(&cer->exts, &cer->obj.tbsCertificate.extensions);
 }
 
 static void
@@ -337,6 +278,12 @@ update_signature(Certificate_t *cer, EVP_PKEY *privkey)
 }
 
 void
+cer_generate_paths(struct rpki_certificate *cer)
+{
+	cer->rpp = rpp_new();
+}
+
+void
 cer_finish_ta(struct rpki_certificate *ta)
 {
 	if (ta->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
@@ -350,35 +297,34 @@ cer_finish_ta(struct rpki_certificate *ta)
 void
 cer_finish_ca(struct rpki_certificate *ca)
 {
-	if (ca->parent == NULL)
+	if (ca->meta->parent == NULL)
 		panic("CA '%s' has no parent.", ca->subject);
-
 	if (ca->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ca->obj.tbsCertificate.issuer, ca->parent->subject);
+		init_name(&ca->obj.tbsCertificate.issuer, ca->meta->parent->subject);
 	}
 	finish_extensions(ca, CT_CA, NULL);
-	update_signature(&ca->obj, ca->parent->keys);
+	update_signature(&ca->obj, ca->meta->parent->keys);
 }
 
 void
 cer_finish_ee(struct rpki_certificate *ee, char const *so_uri)
 {
-	if (ee->parent == NULL)
+	if (ee->meta->parent == NULL)
 		panic("EE '%s' has no parent.", ee->subject);
 
 	if (ee->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ee->obj.tbsCertificate.issuer, ee->parent->subject);
+		init_name(&ee->obj.tbsCertificate.issuer, ee->meta->parent->subject);
 	}
 	finish_extensions(ee, CT_EE, so_uri);
-	update_signature(&ee->obj, ee->parent->keys);
+	update_signature(&ee->obj, ee->meta->parent->keys);
 }
 
 void
 cer_write(struct rpki_certificate *cer)
 {
-	asn1_write(cer->path, &asn_DEF_Certificate, &cer->obj);
+	asn1_write(cer->meta->path, &asn_DEF_Certificate, &cer->obj);
 	exec_mkdir(cer->rpp.path);
 }
 
@@ -386,14 +332,10 @@ void
 cer_print(struct rpki_certificate *cer)
 {
 	printf("- Type: Certificate\n");
-	printf("- URI : %s\n", cer->uri);
-	printf("- Path: %s\n", cer->path);
 	printf("- RPP:\n");
 	printf("\t- caRepository: %s\n", cer->rpp.caRepository);
 	printf("\t- rpkiManifest: %s\n", cer->rpp.rpkiManifest);
 	printf("\t- crldp       : %s\n", cer->rpp.crldp);
 	printf("\t- rpkiNotify  : %s\n", cer->rpp.rpkiNotify);
 	printf("\t- Path        : %s\n", cer->rpp.path);
-
-	fields_print(cer->fields);
 }

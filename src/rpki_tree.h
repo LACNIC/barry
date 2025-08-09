@@ -2,7 +2,10 @@
 #define SRC_RPKI_TREE_H_
 
 #include <stdbool.h>
+
+#include "field.h"
 #include "keyval.h"
+#include "rpki_object.h"
 #include "uthash.h"
 
 enum file_type {
@@ -16,17 +19,24 @@ enum file_type {
 };
 
 struct rpki_tree_node {
-	char *name;
+	struct rpki_object meta;
+
 	enum file_type type;
-	unsigned int indent;
-	struct keyvals props;
 	void *obj;
 
-	struct rpki_tree_node *parent;
-	struct rpki_tree_node *children; /* Hash table */
+	/* Overrides by the user */
+	struct keyvals props;
 
-	UT_hash_handle phook; /* Parent hash table hook */
-	UT_hash_handle ghook; /* Global hash table hook */
+	/* For tree building */
+	unsigned int indent;
+	struct rpki_tree_node *parent;
+	/* Hash table */
+	struct rpki_tree_node *children;
+
+	/* Parent hash table hook */
+	UT_hash_handle phook;
+	/* Global hash table hook */
+	UT_hash_handle ghook;
 };
 
 struct rpki_tree {

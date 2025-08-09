@@ -205,8 +205,7 @@ parse_bitstr_bin(char const *src, BIT_STRING_t *dst)
 }
 
 static error_msg
-parse_bitstr(struct field *fields, char const *ctx,
-    struct kv_value *src, void *dst)
+parse_bitstr(struct field *fields, struct kv_value *src, void *dst)
 {
 	if (src->type != VALT_STR)
 		return NEED_STRING;
@@ -303,8 +302,7 @@ parse_numeric_primitive(struct kv_value *src, uint8_t **buf, size_t *size)
 }
 
 static error_msg
-parse_bool(struct field *fields, char const *ctx,
-    struct kv_value *src, void *oid)
+parse_bool(struct field *fields, struct kv_value *src, void *oid)
 {
 	BOOLEAN_t *boolean = oid;
 	INTEGER_t integer;
@@ -350,8 +348,7 @@ __parse_int(struct kv_value *src, INTEGER_t *dst)
 }
 
 static error_msg
-parse_int(struct field *fields, char const *ctx,
-    struct kv_value *src, void *dst)
+parse_int(struct field *fields, struct kv_value *src, void *dst)
 {
 	return __parse_int(src, dst);
 }
@@ -420,8 +417,7 @@ parse_oid_str(char const *src, OBJECT_IDENTIFIER_t *oid)
 }
 
 static error_msg
-parse_oid(struct field *fields, char const *ctx,
-    struct kv_value *src, void *oid)
+parse_oid(struct field *fields, struct kv_value *src, void *oid)
 {
 	return (src->type == VALT_STR)
 	    ? parse_oid_str(src->v.str, oid)
@@ -462,8 +458,7 @@ print_oid(void *val)
 }
 
 static error_msg
-parse_8str(struct field *fields, char const *ctx,
-    struct kv_value *src, void *dst)
+parse_8str(struct field *fields, struct kv_value *src, void *dst)
 {
 	OCTET_STRING_t *result = dst;
 	size_t size;
@@ -528,8 +523,7 @@ print_8str(void *val)
 }
 
 static error_msg
-parse_any(struct field *fields, char const *ctx,
-    struct kv_value *src, void *dst)
+parse_any(struct field *fields, struct kv_value *src, void *dst)
 {
 	ANY_t *any = dst;
 	size_t size;
@@ -550,8 +544,7 @@ print_any(void *val)
 }
 
 static error_msg
-parse_name(struct field *fields, char const *ctx,
-    struct kv_value *src, void *dst)
+parse_name(struct field *fields, struct kv_value *src, void *dst)
 {
 	struct kv_value array1;
 	struct kv_node node1;
@@ -660,8 +653,7 @@ print_name(void *val)
 }
 
 static error_msg
-parse_time(struct field *fields, char const *ctx,
-    struct kv_value *src, void *dst)
+parse_time(struct field *fields, struct kv_value *src, void *dst)
 {
 	if (src->type != VALT_STR)
 		return NEED_STRING;
@@ -722,8 +714,7 @@ print_time(void *val)
 }
 
 static error_msg
-parse_gtime(struct field *fields, char const *ctx,
-    struct kv_value *src, void *dst)
+parse_gtime(struct field *fields, struct kv_value *src, void *dst)
 {
 	if (src->type != VALT_STR)
 		return NEED_STRING;
@@ -739,8 +730,7 @@ node_is_str(struct kv_node *node, char const *name)
 }
 
 static error_msg
-parse_exts(struct field *fields, char const *ctx,
-    struct kv_value *src_exts, void *_dst_exts)
+parse_exts(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
 {
 	struct extensions *dst_exts;
 	struct kv_node *src_ext;
@@ -749,15 +739,14 @@ parse_exts(struct field *fields, char const *ctx,
 	if (src_exts->type != VALT_SET)
 		return NEED_SET;
 
-	fields_remove(fields, ctx);
+	fields->children = NULL;
 
 	e = 0;
 	STAILQ_FOREACH(src_ext, &src_exts->v.set, hook)
 		e++;
 
 	dst_exts = _dst_exts;
-	INIT_ASN1_ARRAY(&dst_exts->array.list, e, Extension_t);
-	STAILQ_INIT(&dst_exts->list);
+	STAILQ_INIT(dst_exts);
 
 	e = 0;
 	STAILQ_FOREACH(src_ext, &src_exts->v.set, hook) {
@@ -765,27 +754,27 @@ parse_exts(struct field *fields, char const *ctx,
 			return NEED_STRING;
 
 		if (node_is_str(src_ext, "bc"))
-			exts_add_bc(dst_exts, e, fields, ctx);
+			exts_add_bc(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "ski"))
-			exts_add_ski(dst_exts, e, fields, ctx);
+			exts_add_ski(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "aki"))
-			exts_add_aki(dst_exts, e, fields, ctx);
+			exts_add_aki(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "ku"))
-			exts_add_ku(dst_exts, e, fields, ctx);
+			exts_add_ku(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "crldp"))
-			exts_add_crldp(dst_exts, e, fields, ctx);
+			exts_add_crldp(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "aia"))
-			exts_add_aia(dst_exts, e, fields, ctx);
+			exts_add_aia(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "sia"))
-			exts_add_sia(dst_exts, e, fields, ctx);
+			exts_add_sia(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "cp"))
-			exts_add_cp(dst_exts, e, fields, ctx);
+			exts_add_cp(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "ip"))
-			exts_add_ip(dst_exts, e, fields, ctx);
+			exts_add_ip(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "asn"))
-			exts_add_asn(dst_exts, e, fields, ctx);
+			exts_add_asn(dst_exts, e, fields);
 		else if (node_is_str(src_ext, "crln"))
-			exts_add_crln(dst_exts, e, fields, ctx);
+			exts_add_crln(dst_exts, e, fields);
 		else
 			return "Unknown extension type";
 
@@ -802,7 +791,7 @@ print_exts(void *_exts)
 	struct ext_list_node *ext;
 
 	printf("[ ");
-	STAILQ_FOREACH(ext, &exts->list, hook) {
+	STAILQ_FOREACH(ext, exts, hook) {
 		switch (ext->type) {
 		case EXT_BC:	printf("bc");		break;
 		case EXT_SKI:	printf("ski");		break;
@@ -994,8 +983,7 @@ convert_ips(struct ROAIPAddressFamily *family, int id,
 }
 
 static error_msg
-parse_ips_roa(struct field *fields, char const *ctx,
-    struct kv_value *src, void *arg)
+parse_ips_roa(struct field *fields, struct kv_value *src, void *arg)
 {
 	struct RouteOriginAttestation__ipAddrBlocks *dst = arg;
 	struct parsed_ips ips;
@@ -1123,8 +1111,7 @@ convert_ips_cer(struct IPAddressFamily *family, int id,
 }
 
 static error_msg
-parse_ips_cer(struct field *fields, char const *ctx,
-    struct kv_value *src, void *arg)
+parse_ips_cer(struct field *fields, struct kv_value *src, void *arg)
 {
 	IPAddrBlocks_t *dst = arg;
 	struct parsed_ips ips;
@@ -1239,8 +1226,7 @@ parse_asns_set(struct kv_value *src, ASIdentifierChoice_t *aic)
 }
 
 static error_msg
-parse_asns(struct field *fields, char const *ctx,
-    struct kv_value *src, void *arg)
+parse_asns(struct field *fields, struct kv_value *src, void *arg)
 {
 	switch (src->type) {
 	case VALT_STR:
@@ -1300,8 +1286,7 @@ print_asns(void *arg)
 }
 
 static error_msg
-parse_revoked_list(struct field *fields, char const *ctx,
-    struct kv_value *src, void *arg)
+parse_revoked_list(struct field *fields, struct kv_value *src, void *arg)
 {
 	struct TBSCertList__revokedCertificates *rcs;
 	struct kv_node *node;
@@ -1375,168 +1360,109 @@ const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_ce
 const struct field_type ft_asn_cer = { "AS Resources", parse_asns, print_asns };
 const struct field_type ft_revoked = { "Revoked Certificates", parse_revoked_list, print_revokeds };
 
-const struct field_template algorithm_metadata[] = {
-	{
-		"algorithm",
-		&ft_oid,
-		offsetof(AlgorithmIdentifier_t, algorithm)
-	}, {
-		"parameters",
-		&ft_any,
-		offsetof(AlgorithmIdentifier_t, parameters),
-		sizeof(ANY_t)
-	},
-	{ 0 }
-};
-
-static void
-add_ht_field(struct field **ht, char *key, void *obj,
-    struct field_template const *tpl)
-{
-	struct field *value;
-	size_t keylen;
-
-	value = pzalloc(sizeof(struct field));
-	value->key = pstrdup(key);
-	value->type = tpl->type;
-	value->address = ((unsigned char *)obj) + tpl->offset;
-	value->size = tpl->size;
-
-	keylen = strlen(value->key);
-	HASH_ADD_KEYPTR(hh, *ht, value->key, keylen, value);
-}
-
-static void
-__compile_fields(char *key, size_t key_offset, void *obj,
-    struct field_template const *tpl, struct field **result)
-{
-	struct field_template const *cursor;
-	size_t tmpoffset;
-
-	for (cursor = tpl; cursor->key; cursor++) {
-		strcpy(key + key_offset, cursor->key);
-
-		if (cursor->type)
-			add_ht_field(result, key, obj, cursor);
-		if (cursor->children) {
-			tmpoffset = key_offset + strlen(cursor->key);
-			key[tmpoffset] = '.';
-			__compile_fields(key, tmpoffset + 1,
-			    ((unsigned char *)obj) + cursor->offset,
-			    cursor->children, result);
-		}
-	}
-}
-
-void
-fields_compile(struct field_template const *tpl, char const *ctx,
-    void *obj, struct field **result)
-{
-	char key[FIELD_MAXLEN];
-	size_t offset;
-
-	if (ctx != NULL) {
-		strcpy(key, ctx);
-		offset = strlen(key);
-		key[offset] = '.';
-		offset++;
-	} else {
-		offset = 0;
-	}
-
-	__compile_fields(key, offset, obj, tpl, result);
-}
-
-void
-fields_add(struct field *compiled, char const *key,
-    struct field_type const *type, void *addr, size_t size, bool invisible)
+struct field *
+__field_add(struct field *parent, char const *name)
 {
 	struct field *new;
-	size_t keylen;
+	size_t namelen;
 
 	new = pzalloc(sizeof(struct field));
-	new->key = pstrdup(key);
-	new->type = type;
-	new->address = addr;
-	new->size = size;
-	new->invisible = invisible;
+	new->key = name;
 
-	keylen = strlen(key);
-	HASH_ADD_KEYPTR(hh, compiled, new->key, keylen, new);
-}
+	namelen = strlen(name);
+	HASH_ADD_KEYPTR(hh, parent->children, name, namelen, new);
 
-void
-fields_add_ext(struct field *compiled,
-    char const *ctx, char const *name, size_t extn, char const *suffix,
-    struct field_type const *type, void *addr, size_t size)
-{
-	char key[FIELD_MAXLEN];
-
-	/* String */
-
-	if (suffix)
-		psnprintf(key, FIELD_MAXLEN, "%s.%s.%s", ctx, name, suffix);
-	else
-		psnprintf(key, FIELD_MAXLEN, "%s.%s", ctx, name);
-	fields_add(compiled, key, type, addr, size, false);
-
-	/* Index */
-
-	if (suffix)
-		psnprintf(key, FIELD_MAXLEN, "%s.%zu.%s", ctx, extn, suffix);
-	else
-		psnprintf(key, FIELD_MAXLEN, "%s.%zu", ctx, extn);
-	fields_add(compiled, key, type, addr, size, true);
-}
-
-/* Removes from @fields all the entries whose key start with @pfx, then '.' */
-void
-fields_remove(struct field *fields, char const *pfx)
-{
-	struct field *fld, *tmp;
-	size_t plen;
-
-	plen = strlen(pfx);
-	HASH_ITER(hh, fields, fld, tmp)
-		if (strncmp(fld->key, pfx, plen) == 0 && fld->key[plen] == '.')
-			HASH_DEL(fields, fld);
+	return new;
 }
 
 struct field *
-fields_find(struct field *ht, char const *key)
+field_add_static(struct field *parent, char const *name)
 {
+	return __field_add(parent, name);
+}
+
+struct field *
+field_add_static_n(struct field *parent, size_t n)
+{
+	char buf[20];
+	int written;
 	struct field *result;
-	size_t keylen;
 
-	keylen = strlen(key);
-	HASH_FIND(hh, ht, key, keylen, result);
+	written = snprintf(buf, 20, "%zu", n);
+	if (written < 0 || written >= 20)
+		panic("snprintf(%zu): %d", n, written);
 
+	result = field_add_static(parent, pstrdup(buf));
+	result->invisible = true;
 	return result;
 }
 
-bool
-fields_ext_set(struct field *fields,
-    char const *pfx,
-    char const *name, unsigned int extn,
-    char const *suffix)
+struct field *
+field_add(struct field *parent, char const *name,
+    struct field_type const *type, void *address, size_t size)
 {
-	char key[FIELD_MAXLEN];
-	struct field *field;
+	struct field *new;
 
-	if (suffix)
-		psnprintf(key, FIELD_MAXLEN, "%s.%s.%s", pfx, name, suffix);
-	else
-		psnprintf(key, FIELD_MAXLEN, "%s.%s", pfx, name);
-	field = fields_find(fields, key);
-	if (field && field->overridden)
-		return true;
+	new = __field_add(parent, name);
+	new->type = type;
+	new->address = address;
+	new->size = size;
 
-	if (suffix)
-		psnprintf(key, FIELD_MAXLEN, "%s.%u.%s", pfx, extn, suffix);
-	else
-		psnprintf(key, FIELD_MAXLEN, "%s.%u", pfx, extn);
-	field = fields_find(fields, key);
-	return field && field->overridden;
+	return new;
+}
+
+struct field *
+field_add_algorithm(struct field *parent, char const *name,
+    AlgorithmIdentifier_t *value)
+{
+	struct field *new;
+
+	new = field_add_static(parent, name);
+	field_add(new, "algorithm", &ft_oid, &value->algorithm, 0);
+	field_add(new, "parameters", &ft_any, &value->parameters,
+	    sizeof(ANY_t));
+
+	return new;
+}
+
+struct field *
+field_add_spki(struct field *parent, char const *name,
+    SubjectPublicKeyInfo_t *value)
+{
+	struct field *new;
+
+	new = field_add_static(parent, name);
+	field_add_algorithm(new, "algorithm", &value->algorithm);
+	field_add(new, "subjectPublicKey", &ft_bitstr, &value->subjectPublicKey, 0);
+
+	return new;
+}
+
+struct field *
+fields_find(struct field *root, char const *key)
+{
+	struct field *parent, *child;
+	char const *dot;
+	size_t keylen;
+
+	parent = root;
+
+	do {
+		dot = strchr(key, '.');
+		if (!dot) {
+			keylen = strlen(key);
+			HASH_FIND(hh, parent->children, key, keylen, child);
+			return child;
+		}
+
+		keylen = dot - key;
+		HASH_FIND(hh, parent->children, key, keylen, child);
+		if (child == NULL)
+			return NULL;
+
+		key = dot + 1;
+		parent = child;
+	} while (true);
 }
 
 static bool
@@ -1564,9 +1490,9 @@ fields_apply_keyvals(struct field *ht, void *target, struct keyvals *kvs)
 		if (is_pointer(field)) {
 			if (*value == NULL)
 				*value = pzalloc(field->size);
-			error = field->type->parser(ht, kv->key, &kv->value, *value);
+			error = field->type->parser(field, &kv->value, *value);
 		} else {
-			error = field->type->parser(ht, kv->key, &kv->value, value);
+			error = field->type->parser(field, &kv->value, value);
 		}
 		if (error)
 			panic("%s", error);
@@ -1575,19 +1501,19 @@ fields_apply_keyvals(struct field *ht, void *target, struct keyvals *kvs)
 	}
 }
 
-void
-fields_print(struct field const *metadata)
+static void
+__fields_print(struct field const *field, char *key, size_t key_offset)
 {
-	struct field const *field, *tmp;
+	struct field *child, *tmp;
 	unsigned char **value;
 
-	printf("\n```\n");
+	if (field->invisible)
+		return;
 
-	HASH_ITER(hh, metadata, field, tmp) {
-		if (!field->type || !field->type->print || field->invisible)
-			continue;
+	strcpy(key + key_offset, field->key);
 
-		printf("%s = ", field->key);
+	if (field->type && field->type->print) {
+		printf("%s = ", key);
 
 		value = field->address;
 		if (is_pointer(field)) {
@@ -1601,5 +1527,20 @@ fields_print(struct field const *metadata)
 		printf("\n");
 	}
 
+	key_offset += strlen(field->key);
+	key[key_offset] = '.';
+	HASH_ITER(hh, field->children, child, tmp)
+		__fields_print(child, key, key_offset + 1);
+}
+
+void
+fields_print(struct field const *root)
+{
+	struct field const *child, *tmp;
+	char key[FIELD_MAXLEN];
+
+	printf("```\n");
+	HASH_ITER(hh, root->children, child, tmp)
+		__fields_print(child, key, 0);
 	printf("```\n");
 }

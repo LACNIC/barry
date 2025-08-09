@@ -249,7 +249,7 @@ ck_gnode(struct rd_parse_context *ctx, char const *name)
 	namelen = strlen(name);
 	HASH_FIND(ghook, ctx->result.nodes, name, namelen, node);
 	ck_assert_ptr_ne(NULL, node);
-	ck_assert_str_eq(name, node->name);
+	ck_assert_str_eq(name, node->meta.name);
 }
 
 static void
@@ -263,7 +263,7 @@ ck_child(struct rpki_tree_node *parent, char const *name)
 	namelen = strlen(name);
 	HASH_FIND(phook, parent->children, name, namelen, child);
 	ck_assert_ptr_ne(NULL, child);
-	ck_assert_str_eq(name, child->name);
+	ck_assert_str_eq(name, child->meta.name);
 }
 
 static void
@@ -289,7 +289,7 @@ static void
 ck_root(struct rd_parse_context *ctx, char const *name)
 {
 	ck_assert_ptr_ne(NULL, ctx->result.root);
-	ck_assert_str_eq(name, ctx->result.root->name);
+	ck_assert_str_eq(name, ctx->result.root->meta.name);
 }
 
 static void

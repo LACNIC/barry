@@ -55,23 +55,23 @@ find_node(struct rd_parse_context *ctx, char const *name)
 static void
 __add_node(struct rpki_tree *tree, struct rpki_tree_node *node)
 {
-	size_t keylen = strlen(node->name);
-	HASH_ADD_KEYPTR(ghook, tree->nodes, node->name, keylen, node);
+	size_t keylen = strlen(node->meta.name);
+	HASH_ADD_KEYPTR(ghook, tree->nodes, node->meta.name, keylen, node);
 }
 
 static void
 add_node(struct rd_parse_context *ctx, struct rpki_tree_node *node)
 {
-	if (find_node(ctx, node->name) != NULL)
-		panic("There is more than one node named '%s'.", node->name);
+	if (find_node(ctx, node->meta.name) != NULL)
+		panic("There is more than one node named '%s'.", node->meta.name);
 	__add_node(&ctx->result, node);
 }
 
 static void
 add_child(struct rpki_tree_node *parent, struct rpki_tree_node *child)
 {
-	size_t keylen = strlen(child->name);
-	HASH_ADD_KEYPTR(phook, parent->children, child->name, keylen, child);
+	size_t keylen = strlen(child->meta.name);
+	HASH_ADD_KEYPTR(phook, parent->children, child->meta.name, keylen, child);
 	child->parent = parent;
 }
 
@@ -456,7 +456,8 @@ read_tree(struct rd_parse_context *ctx)
 		switch (next_token(ctx, &tkn)) {
 		case TKNT_STR:
 			current = pzalloc(sizeof(struct rpki_tree_node));
-			current->name = tkn.str;
+			current->meta.name = tkn.str;
+			current->meta.fields = pzalloc(sizeof(struct field));
 			current->indent = indent;
 			STAILQ_INIT(&current->props);
 
@@ -473,7 +474,7 @@ read_tree(struct rd_parse_context *ctx)
 sibling:			if (last->parent == NULL)
 					BADCFG(ctx,
 					    "'%s' is disconnected from the tree.",
-					    current->name);
+					    current->meta.name);
 				add_child(last->parent, current);
 				last = current;
 
@@ -483,7 +484,7 @@ sibling:			if (last->parent == NULL)
 						goto sibling;
 				BADCFG(ctx, "Node '%s' seems misaligned; "
 				    "please review its indentation.",
-				    current->name);
+				    current->meta.name);
 			}
 			break;
 
@@ -567,7 +568,7 @@ print_node(struct rpki_tree_node *node, unsigned int indent)
 
 	for (i = 0; i < indent; i++)
 		printf("\t");
-	printf("%s\n", node->name);
+	printf("%s\n", node->meta.name);
 
 	indent++;
 	HASH_ITER(phook, node->children, child, tmp)

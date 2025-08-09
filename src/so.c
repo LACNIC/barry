@@ -10,92 +10,6 @@
 #include "libcrypto.h"
 #include "oid.h"
 
-const struct field_template signer_info_metadata[] = {
-	{
-		"version",
-		&ft_int,
-		offsetof(SignerInfo_t, version)
-	}, {
-		"sid.issuerAndSerialNumber.issuer",
-		&ft_name,
-		offsetof(SignerInfo_t, sid.choice.issuerAndSerialNumber.issuer)
-	}, {
-		"sid.issuerAndSerialNumber.serialNumber",
-		&ft_int,
-		offsetof(SignerInfo_t, sid.choice.issuerAndSerialNumber.serialNumber)
-	}, {
-		"sid.subjectKeyIdentifier",
-		&ft_8str,
-		offsetof(SignerInfo_t, sid.choice.subjectKeyIdentifier)
-	}, {
-		"digestAlgorithm",
-		NULL,
-		offsetof(SignerInfo_t, digestAlgorithm),
-		false,
-		algorithm_metadata
-	},
-	/* { "signedAttrs" }, TODO not implemented yet */
-	{
-		"signatureAlgorithm",
-		NULL,
-		offsetof(SignerInfo_t, signatureAlgorithm),
-		false,
-		algorithm_metadata
-	}, {
-		"signature",
-		&ft_8str,
-		offsetof(SignerInfo_t, signature)
-	},
-	/* { "unsignedAttrs" }, TODO not implemented yet */
-	{ 0 }
-};
-
-const struct field_template so_metadata[] = {
-	{
-		"contentType",
-		&ft_oid,
-		offsetof(struct signed_object, ci.contentType)
-	}, {
-		"content.version",
-		&ft_int,
-		offsetof(struct signed_object, sd.version)
-	}, /* { TODO I don't recall why this is commented
-		"content.digestAlgorithms[0]",
-		NULL,
-		offsetof(struct signed_object, sd.digestAlgorithms),
-		false,
-		algorithm_metadata
-	}, */ {
-		"content.encapContentInfo.eContentType",
-		&ft_oid,
-		offsetof(struct signed_object, sd.encapContentInfo.eContentType)
-	},
-	/* Type-specific fields here */
-	{
-		"content.certificates.0",
-		NULL,
-		offsetof(struct signed_object, ee),
-		0,
-		cer_metadata,
-	},
-	// TODO not implemented yet
-	/* { "content.crls[0].crl", NULL, offsetof(struct signed_object, crl), crl_metadata }, */
-	{
-		"content.signerInfos.0",
-		NULL,
-		offsetof(struct signed_object, si),
-		false,
-		signer_info_metadata
-	},
-	{ 0 }
-};
-
-static void
-init_content_info(ContentInfo_t *ci)
-{
-	init_oid(&ci->contentType, NID_pkcs7_signed);
-}
-
 static void
 sign_so(SignatureValue_t *signature, EVP_PKEY *privkey, SignedAttributes_t *attrs)
 {
@@ -122,7 +36,7 @@ finish_signer_info(SignerInfo_t *si, struct rpki_certificate *ee,
 	if (si->sid.present == SignerIdentifier_PR_NOTHING) {
 		pr_debug("- Copying the EE SKI to the SignerInfo");
 		si->sid.present = SignerIdentifier_PR_subjectKeyIdentifier;
-		finish_ski(&si->sid.choice.subjectKeyIdentifier, ee->spki);
+		ext_finish_ski(&si->sid.choice.subjectKeyIdentifier, ee->spki);
 	}
 
 	attr = si->signedAttrs->list.array[1];
@@ -175,18 +89,25 @@ finish_content_info(struct signed_object *so, asn_TYPE_descriptor_t *td)
 }
 
 static void
-init_signer_info(SignerInfo_t *si, /* struct entity *ee, OCTET_STRING_t *eContent,
-    EVP_PKEY *sign_key, */ int nid)
+init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 {
 	CMSAttribute_t *attr;
 	OBJECT_IDENTIFIER_t ct;
 	Time_t st = { 0 };
 
 	init_INTEGER(&si->version, 3);
+	field_add(sif, "version", &ft_int, &si->version, 0);
+
+	/* TODO sid not implemented yet */
+//	"sid.issuerAndSerialNumber.", &ft_name, sid.choice.issuerAndSerialNumber.issuer
+//	"sid.issuerAndSerialNumber.serialNumber", &ft_int, sid.choice.issuerAndSerialNumber.serialNumber
+//	"sid.subjectKeyIdentifier", &ft_8str, sid.choice.subjectKeyIdentifier
 
 	/* ski postponed */
 
 	init_oid(&si->digestAlgorithm.algorithm, NID_sha256);
+	/* TODO what happened to params? */
+	field_add_algorithm(sif, "digestAlgorithm", &si->digestAlgorithm);
 
 	si->signedAttrs = pzalloc(sizeof(SignedAttributes_t));
 	INIT_ASN1_ARRAY(&si->signedAttrs->list, 3, CMSAttribute_t);
@@ -205,47 +126,64 @@ init_signer_info(SignerInfo_t *si, /* struct entity *ee, OCTET_STRING_t *eConten
 	init_time_now(&st);
 	der_encode_any(&asn_DEF_Time, &st, attr->attrValues.list.array[0]);
 
+	/* TODO signedAttrs field not implemented yet */
+
 	init_oid(&si->signatureAlgorithm.algorithm, NID_rsaEncryption);
+	/* TODO what happened to params? */
+	field_add_algorithm(sif, "signatureAlgorithm", &si->signatureAlgorithm);
+
+	field_add(sif, "signature", &ft_8str, &si->signature, 0);
+
+	/* TODO unsignedAttrs not implemented yet */
 }
 
-static void
-init_signed_data(struct signed_object *so, int nid)
+struct signed_object *
+signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 {
-	SignedData_t *sd = &so->sd;
+	struct signed_object *so;
+	SignedData_t *sd;
+	struct field *sdf;
 	DigestAlgorithmIdentifier_t *dai;
+	struct field *ecif;
+	struct field *cerf;
+	struct field *sif;
+
+	so = pzalloc(sizeof(struct signed_object));
+	so->meta = meta;
+	sd = &so->sd;
+
+	init_oid(&so->ci.contentType, NID_pkcs7_signed);
+	field_add(meta->fields, "contentType", &ft_oid, &so->ci.contentType, 0);
+	sdf = field_add_static(meta->fields, "content");
 
 	init_INTEGER(&sd->version, 3);
+	field_add(sdf, "version", &ft_int, &sd->version, 0);
 
 	INIT_ASN1_ARRAY(&sd->digestAlgorithms.list, 1, DigestAlgorithmIdentifier_t);
 	dai = (DigestAlgorithmIdentifier_t *)sd->digestAlgorithms.list.array[0];
 	init_oid(&dai->algorithm, NID_sha256);
+	/* TODO digestAlgorithms field; needs new type */
 
 	init_oid(&sd->encapContentInfo.eContentType, nid);
 	/* eContent postponed */
+	ecif = field_add_static(sdf, "encapContentInfo");
+	field_add(ecif, "eContentType", &ft_oid, &sd->encapContentInfo.eContentType, 0);
+	*eContent = field_add_static(ecif, "eContent");
 
 	sd->certificates = pzalloc(sizeof(struct CertificateSet));
 	INIT_ASN1_ARRAY(&sd->certificates->list, 1, ANY_t);
+	cerf = field_add_static(field_add_static(sdf, "certificates"), "0");
+	so->ee_meta.name = meta->name;
+	so->ee_meta.parent = meta->parent;
+	so->ee_meta.fields = cerf;
+	cer_init(&so->ee, &so->ee_meta, CT_EE);
 
-	/* crls not implemented yet */
+	/* TODO crls not implemented yet */
 
 	INIT_ASN1_ARRAY(&sd->signerInfos.list, 1, SignerInfo_t);
 	sd->signerInfos.list.array[0] = &so->si;
-}
-
-struct signed_object *
-signed_object_new(char const *filename, struct rpki_certificate *parent,
-    int nid)
-{
-	struct signed_object *so;
-
-	so = pzalloc(sizeof(struct signed_object));
-
-	so->parent = parent;
-	fields_compile(so_metadata, NULL, so, &so->fields);
-	init_content_info(&so->ci);
-	init_signed_data(so, nid);
-	cer_init(&so->ee, &so->fields, filename, parent, CT_EE, "content.certificates.0");
-	init_signer_info(&so->si, nid);
+	sif = field_add_static(field_add_static(sdf, "signerInfos"), "0");
+	init_signer_info(&so->si, nid, sif);
 
 	return so;
 }
@@ -253,6 +191,6 @@ signed_object_new(char const *filename, struct rpki_certificate *parent,
 void
 signed_object_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 {
-	cer_finish_ee(&so->ee, so->uri);
+	cer_finish_ee(&so->ee, so->meta->uri);
 	finish_content_info(so, td);
 }

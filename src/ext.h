@@ -43,6 +43,9 @@ enum ext_type {
 };
 
 struct ext_list_node {
+	OBJECT_IDENTIFIER_t extnID;
+	BOOLEAN_t critical;
+
 	enum ext_type type;
 	const asn_TYPE_descriptor_t *td;
 	union {
@@ -62,35 +65,34 @@ struct ext_list_node {
 	STAILQ_ENTRY(ext_list_node) hook;
 };
 
-STAILQ_HEAD(ext_list, ext_list_node);
+STAILQ_HEAD(extensions, ext_list_node);
 
-struct extensions {
-	Extensions_t array;
-	struct ext_list list;
-};
+void exts_add_bc(struct extensions *, size_t, struct field *);
+void exts_add_ski(struct extensions *, size_t, struct field *);
+void exts_add_aki(struct extensions *, size_t, struct field *);
+void exts_add_ku(struct extensions *, size_t, struct field *);
+void exts_add_crldp(struct extensions *, size_t, struct field *);
+void exts_add_aia(struct extensions *, size_t, struct field *);
+void exts_add_sia(struct extensions *, size_t, struct field *);
+void exts_add_cp(struct extensions *, size_t, struct field *);
+void exts_add_ip(struct extensions *, size_t, struct field *);
+void exts_add_asn(struct extensions *, size_t, struct field *);
+void exts_add_crln(struct extensions *, size_t, struct field *);
 
-void exts_add_bc(struct extensions *, size_t, struct field *, char const *);
-void exts_add_ski(struct extensions *, size_t, struct field *, char const *);
-void exts_add_aki(struct extensions *, size_t, struct field *, char const *);
-void exts_add_ku(struct extensions *, size_t, struct field *, char const *);
-void exts_add_crldp(struct extensions *, size_t, struct field *, char const *);
-void exts_add_aia(struct extensions *, size_t, struct field *, char const *);
-void exts_add_sia(struct extensions *, size_t, struct field *, char const *);
-void exts_add_cp(struct extensions *, size_t, struct field *, char const *);
-void exts_add_ip(struct extensions *, size_t, struct field *, char const *);
-void exts_add_asn(struct extensions *, size_t, struct field *, char const *);
-void exts_add_crln(struct extensions *, size_t, struct field *, char const *);
-
-void finish_ski(SubjectKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
-void finish_aki(AuthorityKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
-void finish_ku(KeyUsage_t *, enum cer_type);
-void finish_crldp(CRLDistributionPoints_t *, char const *);
-void finish_aia(AuthorityInfoAccessSyntax_t *, char const *);
-void finish_sia_ca(SubjectInfoAccessSyntax_t *, char const *, char const *,
+void ext_finish_ski(SubjectKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
+void ext_finish_aki(AuthorityKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
+void ext_finish_ku(KeyUsage_t *, enum cer_type);
+void ext_finish_crldp(CRLDistributionPoints_t *, char const *);
+void ext_finish_aia(AuthorityInfoAccessSyntax_t *, char const *);
+void ext_finish_sia_ca(SubjectInfoAccessSyntax_t *, char const *, char const *,
     char const *);
-void finish_sia_ee(SubjectInfoAccessSyntax_t *, char const *);
-void finish_cp(CertificatePolicies_t *);
-void finish_ip(IPAddrBlocks_t *);
-void finish_asn(ASIdentifiers_t *);
+void ext_finish_sia_ee(SubjectInfoAccessSyntax_t *, char const *);
+void ext_finish_cp(CertificatePolicies_t *);
+void ext_finish_ip(IPAddrBlocks_t *);
+void ext_finish_asn(ASIdentifiers_t *);
+
+bool ext_field_set(struct field *, char const *, unsigned int, char const *);
+
+void ext_compile(struct extensions *, Extensions_t **);
 
 #endif /* SRC_EXT_H_ */
