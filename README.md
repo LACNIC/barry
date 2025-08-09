@@ -309,7 +309,10 @@ Applies to both `Time`s and `GeneralizedTime`s. Notice the UTC+0 enforcement.
 `Name`s are arrays of maps:
 
 ```
-tbsCertificate.subject = [ { commonName=potato, 2.5.4.4=potatoes }, { commonName=tomato, 2.5.4.4=tomatoes } ]
+tbsCertificate.subject = [
+	{ commonName=potato, 2.5.4.4=potatoes },
+	{ commonName=tomato, 2.5.4.4=tomatoes }
+]
 ```
 
 But you can also enter a simple string, which will be assumed to be the `commonName` (OID 2.5.4.3) of a one-element map in a one-element array. The following two are equivalent:
@@ -331,7 +334,9 @@ tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, asn ]
 tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
 
 # End-Entities
-content.certificates.0.tbsCertificate.extensions = [ ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
+content.certificates.0.tbsCertificate.extensions = [
+	ski, aki, ku, crldp, aia, sia, cp, ip, asn
+]
 ```
 
 The presently implemented extensions are
@@ -389,7 +394,10 @@ tbsCertificate.extensions.4.extnID = 1.2.3.4.5
 ### IP Resources
 
 ```
-content.encapContentInfo.eContent.ipAddrBlocks = [ 192.0.2.0/24, 203.0.113.0, 2001:db8::/40-48 ]
+content.encapContentInfo.eContent.ipAddrBlocks = [
+	192.0.2.0/24,
+	203.0.113.0, 2001:db8::/40-48
+]
 ```
 
 List as many as you need. `barry` will automatically detect IP version and drop each entry to the corresponding `ROAIPAddressFamily`.
