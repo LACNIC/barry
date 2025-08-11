@@ -259,13 +259,16 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 }
 
 static void
-update_signature(Certificate_t *cer, EVP_PKEY *privkey)
+update_signature(Certificate_t *cer, struct field *fields, EVP_PKEY *privkey)
 {
 	unsigned char tbscer[4096];
 	asn_enc_rval_t rval;
 	SignatureValue_t signature;
 
-	// TODO autocomputed even if overridden
+	if (fields_overridden(fields, "signature")) {
+		pr_debug("- Skipping signature");
+		return;
+	}
 
 	pr_debug("- Signing");
 
@@ -293,7 +296,7 @@ cer_finish_ta(struct rpki_certificate *ta)
 		ta->obj.tbsCertificate.issuer = ta->obj.tbsCertificate.subject;
 	}
 	finish_extensions(ta, CT_TA, NULL);
-	update_signature(&ta->obj, ta->keys);
+	update_signature(&ta->obj, ta->meta->fields, ta->keys);
 }
 
 void
@@ -306,7 +309,7 @@ cer_finish_ca(struct rpki_certificate *ca)
 		init_name(&ca->obj.tbsCertificate.issuer, ca->meta->parent->subject);
 	}
 	finish_extensions(ca, CT_CA, NULL);
-	update_signature(&ca->obj, ca->meta->parent->keys);
+	update_signature(&ca->obj, ca->meta->fields, ca->meta->parent->keys);
 }
 
 void
@@ -320,7 +323,7 @@ cer_finish_ee(struct rpki_certificate *ee, char const *so_uri)
 		init_name(&ee->obj.tbsCertificate.issuer, ee->meta->parent->subject);
 	}
 	finish_extensions(ee, CT_EE, so_uri);
-	update_signature(&ee->obj, ee->meta->parent->keys);
+	update_signature(&ee->obj, ee->meta->fields, ee->meta->parent->keys);
 }
 
 void

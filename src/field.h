@@ -72,6 +72,7 @@ struct field *field_add_spki(struct field *, char const *,
     SubjectPublicKeyInfo_t *);
 
 struct field *fields_find(struct field *, char const *);
+bool fields_overridden(struct field *, char const *);
 
 void fields_apply_keyvals(struct field *, void *, struct keyvals *);
 void fields_print_md(struct field const *);

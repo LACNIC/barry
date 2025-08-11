@@ -432,8 +432,6 @@ Add Github issues:
 		- digestAlgorithms
 		- crls
 - Fields whose values are autocomputed even if overridden in RD
-	- Certificates
-		- Signature
 	- CRLs
 		- Signature
 	- Several EE certificate extensions

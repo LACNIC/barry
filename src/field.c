@@ -1462,6 +1462,14 @@ fields_find(struct field *root, char const *key)
 	} while (true);
 }
 
+bool
+fields_overridden(struct field *root, char const *key)
+{
+	struct field *node;
+	node = fields_find(root, key);
+	return node ? node->overridden : false;
+}
+
 static bool
 is_pointer(struct field const *field)
 {
