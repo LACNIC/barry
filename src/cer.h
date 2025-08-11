@@ -30,6 +30,7 @@ void cer_finish_ta(struct rpki_certificate *);
 void cer_finish_ca(struct rpki_certificate *);
 void cer_finish_ee(struct rpki_certificate *, char const *);
 void cer_write(struct rpki_certificate *cer);
-void cer_print(struct rpki_certificate *cer);
+void cer_print_md(struct rpki_certificate *cer);
+void cer_print_csv(struct rpki_certificate *cer);
 
 #endif /* SRC_CER_H_ */

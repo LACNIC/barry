@@ -23,6 +23,7 @@
 
 #include "alloc.h"
 #include "asn1.h"
+#include "csv.h"
 #include "ext.h"
 #include "oid.h"
 #include "print.h"
@@ -224,22 +225,22 @@ bitstr_prefix(BIT_STRING_t *str)
 }
 
 static void
-print_bitstr(void *val)
+print_bitstr(struct dynamic_string *dstr, void *val)
 {
 	BIT_STRING_t *str = val;
 	size_t i;
 
 	if (str->size == 0) {
-		printf("0");
+		dstr_append(dstr, "0");
 		return;
 	}
 
-	printf("0x");
+	dstr_append(dstr, "0x");
 	for (i = 0; i < str->size; i++)
-		printf("%02X", str->buf[i]);
+		dstr_append(dstr, "%02X", str->buf[i]);
 
 	if (str->bits_unused)
-		printf("/%d", bitstr_prefix(str));
+		dstr_append(dstr, "/%d", bitstr_prefix(str));
 }
 
 static error_msg
@@ -334,11 +335,11 @@ parse_bool(struct field *fields, struct kv_value *src, void *oid)
 }
 
 static void
-print_bool(void *val)
+print_bool(struct dynamic_string *dstr, void *val)
 {
 	BOOLEAN_t *boolean = val;
 	if (boolean != NULL)
-		printf("%s", (*boolean) ? "true" : "false");
+		dstr_append(dstr, (*boolean) ? "true" : "false");
 }
 
 static error_msg
@@ -354,32 +355,33 @@ parse_int(struct field *fields, struct kv_value *src, void *dst)
 }
 
 static void
-print_int(void *val)
+print_int(struct dynamic_string *dstr, void *val)
 {
 	INTEGER_t *num = val;
 	size_t i;
 
 	if (num->size == 0) {
-		printf("0");
+		dstr_append(dstr, "0");
 		return;
 	}
 
-	printf("0x");
+	dstr_append(dstr, "0x");
 	for (i = 0; i < num->size; i++)
-		printf("%02X", num->buf[i]);
+		dstr_append(dstr, "%02X", num->buf[i]);
 }
 
 static int
 just_print(const void *buf, size_t size, void *arg)
 {
-	printf("%.*s", (int)size, (char *)buf);
+	struct dynamic_string *dstr = arg;
+	dstr_append(dstr, "%.*s", (int)size, (char *)buf);
 	return 0;
 }
 
 static void
-print_int_dec(void *val)
+print_int_dec(struct dynamic_string *dstr, void *val)
 {
-	INTEGER_print(&asn_DEF_INTEGER, val, 0, just_print, NULL);
+	INTEGER_print(&asn_DEF_INTEGER, val, 0, just_print, dstr);
 }
 
 static error_msg
@@ -440,21 +442,23 @@ stringify_oid(const void *buffer, size_t size, void *arg)
 }
 
 static void
-print_oid(void *val)
+print_oid(struct dynamic_string *dstr, void *val)
 {
-	struct dynamic_string str = { 0 };
+	struct dynamic_string tmp = { 0 };
 	char const *name;
 
 	/* Convert OID to string */
 	OBJECT_IDENTIFIER_print(&asn_DEF_OBJECT_IDENTIFIER, val, 0,
-	    stringify_oid, &str);
-	dstr_finish(&str);
+	    stringify_oid, &tmp);
+	dstr_finish(&tmp);
 
-	printf("%s", str.buf);
+	dstr_append(dstr, "%s", tmp.buf);
 
-	name = oid2str(str.buf);
+	name = oid2str(tmp.buf);
 	if (name)
-		printf(" (%s)", name);
+		dstr_append(dstr, " (%s)", name);
+
+	free(tmp.buf);
 }
 
 static error_msg
@@ -478,48 +482,41 @@ is_printable(uint8_t chr)
 }
 
 static void
-print_printable(uint8_t *buf, size_t size)
-{
-	printf("\"%.*s\"", (int)size, (char *)buf);
-}
-
-static void
-print_not_printable(uint8_t *buf, size_t size)
+print_not_printable(struct dynamic_string *dstr, uint8_t *buf, size_t size)
 {
 	size_t i;
 
-	printf("0x");
+	dstr_append(dstr, "0x");
 	for (i = 0; i < size; i++)
-		printf("%02X", buf[i]);
+		dstr_append(dstr, "%02X", buf[i]);
 }
 
 static void
-print_maybe_string(uint8_t *buf, size_t size)
+print_maybe_string(struct dynamic_string *dstr, uint8_t *buf, size_t size)
 {
 	size_t i;
 
 	if (size == 0)
 		return;
 
+	print_not_printable(dstr, buf, size);
+
+	/* Also attempt a string interpretation */
 	if (size >= 2 && (buf[0] == 0x0C || buf[0] == 0x13 || buf[0] == 0x16)) {
 		for (i = 2; i < size; i++)
-			if (!is_printable(buf[i])) {
-				print_not_printable(buf, size);
+			if (!is_printable(buf[i]))
 				return;
-			}
-
-		print_printable(buf + 2, size - 2);
-		return;
+		dstr_append(dstr, " (\"%.*s\")",
+		    (int)(size - 2),
+		    (char *)(buf + 2));
 	}
-
-	print_not_printable(buf, size);
 }
 
 static void
-print_8str(void *val)
+print_8str(struct dynamic_string *dstr, void *val)
 {
 	OCTET_STRING_t *str = val;
-	print_maybe_string(str->buf, str->size);
+	print_maybe_string(dstr, str->buf, str->size);
 }
 
 static error_msg
@@ -537,10 +534,10 @@ parse_any(struct field *fields, struct kv_value *src, void *dst)
 }
 
 static void
-print_any(void *val)
+print_any(struct dynamic_string *dstr, void *val)
 {
 	ANY_t *any = val;
-	print_maybe_string(any->buf, any->size);
+	print_maybe_string(dstr, any->buf, any->size);
 }
 
 static error_msg
@@ -620,7 +617,7 @@ parse_name(struct field *fields, struct kv_value *src, void *dst)
 }
 
 static void
-print_name(void *val)
+print_name(struct dynamic_string *dstr, void *val)
 {
 	Name_t *name = val;
 	struct RelativeDistinguishedName *rdn;
@@ -629,25 +626,25 @@ print_name(void *val)
 
 	switch (name->present) {
 	case Name_PR_NOTHING:
-		printf("<Undefined>");
+		dstr_append(dstr, "<Undefined>");
 		break;
 
 	case Name_PR_rdnSequence:
-		printf("[ ");
+		dstr_append(dstr, "[ ");
 		for (r = 0; r < name->choice.rdnSequence.list.count; r++) {
 			rdn = name->choice.rdnSequence.list.array[r];
-			printf("{ ");
+			dstr_append(dstr, "{ ");
 			for (t = 0; t < rdn->list.count; t++) {
 				tv = rdn->list.array[t];
-				printf("\"");
-				print_oid(&tv->type);
-				printf("\":");
-				print_any(&tv->value);
-				printf(" ");
+				dstr_append(dstr, "\"");
+				print_oid(dstr, &tv->type);
+				dstr_append(dstr, "\":");
+				print_any(dstr, &tv->value);
+				dstr_append(dstr, " ");
 			}
-			printf("} ");
+			dstr_append(dstr, "} ");
 		}
-		printf("]");
+		dstr_append(dstr, "]");
 		break;
 	}
 }
@@ -663,53 +660,53 @@ parse_time(struct field *fields, struct kv_value *src, void *dst)
 }
 
 static void
-print_utcTime(void *arg)
+print_utcTime(struct dynamic_string *dstr, void *arg)
 {
 	time_t time;
 	struct tm tm;
 
 	time = asn_UT2time(arg, &tm, 1);
 	if (time == -1) {
-		printf("<Unparseable>");
+		dstr_append(dstr, "<Unparseable>");
 		return;
 	}
 
-	printf("%04d-%02d-%02dT%02d:%02d:%02dZ",
+	dstr_append(dstr, "%04d-%02d-%02dT%02d:%02d:%02dZ",
 	    tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 	    tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
 static void
-print_gtime(void *arg)
+print_gtime(struct dynamic_string *dstr, void *arg)
 {
 	time_t time;
 	struct tm tm;
 
 	time = asn_GT2time(arg, &tm, 1);
 	if (time == -1) {
-		printf("<Unparseable>");
+		dstr_append(dstr, "<Unparseable>");
 		return;
 	}
 
-	printf("%04d-%02d-%02dT%02d:%02d:%02dZ",
+	dstr_append(dstr, "%04d-%02d-%02dT%02d:%02d:%02dZ",
 	    tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 	    tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
 static void
-print_time(void *val)
+print_time(struct dynamic_string *dstr, void *val)
 {
 	Time_t *time = val;
 
 	switch (time->present) {
 	case Time_PR_utcTime:
-		print_utcTime(&time->choice.utcTime);
+		print_utcTime(dstr, &time->choice.utcTime);
 		break;
 	case Time_PR_generalTime:
-		print_gtime(&time->choice.generalTime);
+		print_gtime(dstr, &time->choice.generalTime);
 		break;
 	default:
-		printf("<Printer not available for this data type>");
+		dstr_append(dstr, "<Printer not available for this data type>");
 	}
 }
 
@@ -785,32 +782,35 @@ parse_exts(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
 }
 
 static void
-print_exts(void *_exts)
+print_exts(struct dynamic_string *dstr, void *_exts)
 {
 	struct extensions *exts = _exts;
 	struct ext_list_node *ext;
+	char const *name;
 
-	printf("[ ");
+	dstr_append(dstr, "[ ");
 	STAILQ_FOREACH(ext, exts, hook) {
+		name = NULL;
 		switch (ext->type) {
-		case EXT_BC:	printf("bc");		break;
-		case EXT_SKI:	printf("ski");		break;
-		case EXT_AKI:	printf("aki");		break;
-		case EXT_KU:	printf("ku");		break;
-//		case EXT_EKU:	printf("eku");		break;
-		case EXT_CRLDP:	printf("crldp");	break;
-		case EXT_AIA:	printf("aia");		break;
-		case EXT_SIA:	printf("sia");		break;
-		case EXT_CP:	printf("cp");		break;
-		case EXT_IP:	printf("ip");		break;
-		case EXT_ASN:	printf("asn");		break;
-		case EXT_CRLN:	printf("crln");		break;
+		case EXT_BC:	name = "bc";		break;
+		case EXT_SKI:	name = "ski";		break;
+		case EXT_AKI:	name = "aki";		break;
+		case EXT_KU:	name = "ku";		break;
+//		case EXT_EKU:	name = "eku";		break;
+		case EXT_CRLDP:	name = "crldp";		break;
+		case EXT_AIA:	name = "aia";		break;
+		case EXT_SIA:	name = "sia";		break;
+		case EXT_CP:	name = "cp";		break;
+		case EXT_IP:	name = "ip";		break;
+		case EXT_ASN:	name = "asn";		break;
+		case EXT_CRLN:	name = "crln";		break;
 		}
+		dstr_append(dstr, "%s", name);
 
 		if (STAILQ_NEXT(ext, hook) != NULL)
-			printf(", ");
+			dstr_append(dstr, ", ");
 	}
-	printf(" ]");
+	dstr_append(dstr, " ]");
 }
 
 struct ip_list_node {
@@ -1016,79 +1016,79 @@ is_v6(OCTET_STRING_t *af)
 }
 
 static void
-print_pref4(IPAddress_t *addr)
+print_pref4(struct dynamic_string *dstr, IPAddress_t *addr)
 {
 	struct in_addr addr4 = { 0 };
 	char str[INET_ADDRSTRLEN];
 
 	memcpy(&addr4, addr->buf, addr->size);
 	if (inet_ntop(AF_INET, &addr4, str, INET_ADDRSTRLEN) != NULL)
-		printf("%s/%d", str, bitstr_prefix(addr));
+		dstr_append(dstr, "%s/%d", str, bitstr_prefix(addr));
 	else
-		print_bitstr(addr);
+		print_bitstr(dstr, addr);
 }
 
 static void
-print_pref6(IPAddress_t *addr)
+print_pref6(struct dynamic_string *dstr, IPAddress_t *addr)
 {
 	struct in6_addr addr6 = { 0 };
 	char str[INET6_ADDRSTRLEN];
 
 	memcpy(&addr6, addr->buf, addr->size);
 	if (inet_ntop(AF_INET6, &addr6, str, INET6_ADDRSTRLEN) != NULL)
-		printf("%s/%d", str, bitstr_prefix(addr));
+		dstr_append(dstr, "%s/%d", str, bitstr_prefix(addr));
 	else
-		print_bitstr(addr);
+		print_bitstr(dstr, addr);
 }
 
 static void
-print_pref_unknown(IPAddress_t *addr)
+print_pref_unknown(struct dynamic_string *dstr, IPAddress_t *addr)
 {
-	print_bitstr(addr);
+	print_bitstr(dstr, addr);
 }
 
 static void
-print_array_separator(int index, int count)
+print_array_separator(struct dynamic_string *dstr, int index, int count)
 {
 	if (index != count - 1)
-		printf(",");
-	printf(" ");
+		dstr_append(dstr, ",");
+	dstr_append(dstr, " ");
 }
 
 static void
-print_roa_ips(void *arg)
+print_roa_ips(struct dynamic_string *dstr, void *arg)
 {
 	struct RouteOriginAttestation__ipAddrBlocks *iabs = arg;
 	struct ROAIPAddressFamily *riaf;
 	struct ROAIPAddress *ria;
 	int i, r;
 
-	printf("[ ");
+	dstr_append(dstr, "[ ");
 	for (i = 0; i < iabs->list.count; i++) {
 		riaf = iabs->list.array[i];
-		printf("[ ");
+		dstr_append(dstr, "[ ");
 
 		for (r = 0; r < riaf->addresses.list.count; r++) {
 			ria = riaf->addresses.list.array[r];
 			if (is_v4(&riaf->addressFamily) && ria->address.size <= 4)
-				print_pref4(&ria->address);
+				print_pref4(dstr, &ria->address);
 			else if (is_v6(&riaf->addressFamily) && ria->address.size <= 16)
-				print_pref6(&ria->address);
+				print_pref6(dstr, &ria->address);
 			else
-				print_pref_unknown(&ria->address);
+				print_pref_unknown(dstr, &ria->address);
 
 			if (ria->maxLength != NULL) {
-				printf("-");
-				print_int_dec(ria->maxLength);
+				dstr_append(dstr, "-");
+				print_int_dec(dstr, ria->maxLength);
 			}
 
-			print_array_separator(r, riaf->addresses.list.count);
+			print_array_separator(dstr, r, riaf->addresses.list.count);
 		}
 
-		printf("]");
-		print_array_separator(i, iabs->list.count);
+		dstr_append(dstr, "]");
+		print_array_separator(dstr, i, iabs->list.count);
 	}
-	printf("]");
+	dstr_append(dstr, "]");
 }
 
 static void
@@ -1132,16 +1132,16 @@ parse_ips_cer(struct field *fields, struct kv_value *src, void *arg)
 }
 
 static void
-print_cer_ips(void *arg)
+print_cer_ips(struct dynamic_string *dstr, void *arg)
 {
 	IPAddrBlocks_t *blocks = arg;
 	IPAddressFamily_t *fam;
 	IPAddressOrRange_t *aor;
 	int b, a;
 
-	void (*print_pref)(IPAddress_t *);
+	void (*print_pref)(struct dynamic_string *, IPAddress_t *);
 
-	printf("[ ");
+	dstr_append(dstr, "[ ");
 	for (b = 0; b < blocks->list.count; b++) {
 		fam = blocks->list.array[b];
 
@@ -1158,11 +1158,11 @@ print_cer_ips(void *arg)
 			break;
 
 		case IPAddressChoice_PR_inherit:
-			printf("inherit");
+			dstr_append(dstr, "inherit");
 			break;
 
 		case IPAddressChoice_PR_addressesOrRanges:
-			printf("[ ");
+			dstr_append(dstr, "[ ");
 			for (a = 0; a < fam->ipAddressChoice.choice.addressesOrRanges.list.count; a++) {
 				aor = fam->ipAddressChoice.choice.addressesOrRanges.list.array[a];
 				switch (aor->present) {
@@ -1170,22 +1170,23 @@ print_cer_ips(void *arg)
 					panic("IPAddressOrRange_PR_NOTHING");
 					break;
 				case IPAddressOrRange_PR_addressPrefix:
-					print_pref(&aor->choice.addressPrefix);
+					print_pref(dstr, &aor->choice.addressPrefix);
 					break;
 				case IPAddressOrRange_PR_addressRange:
-					printf("<Still unimplemented>");
+					// TODO not implemented yet
+					dstr_append(dstr, "<Still unimplemented>");
 					break;
 				}
 
-				print_array_separator(a, fam->ipAddressChoice.choice.addressesOrRanges.list.count);
+				print_array_separator(dstr, a, fam->ipAddressChoice.choice.addressesOrRanges.list.count);
 			}
-			printf("]");
+			dstr_append(dstr, "]");
 			break;
 		}
 
-		print_array_separator(b, blocks->list.count);
+		print_array_separator(dstr, b, blocks->list.count);
 	}
-	printf("]");
+	dstr_append(dstr, "]");
 }
 
 static error_msg
@@ -1241,16 +1242,14 @@ parse_asns(struct field *fields, struct kv_value *src, void *arg)
 }
 
 static void
-print_asns(void *arg)
+print_asns(struct dynamic_string *dstr, void *arg)
 {
 	ASIdentifierChoice_t *aic = arg;
 	ASIdOrRange_t *aor;
 	int a;
 
-	if (!aic) {
-		printf("NULL");
+	if (!aic)
 		return;
-	}
 
 	switch (aic->present) {
 	case ASIdentifierChoice_PR_NOTHING:
@@ -1258,11 +1257,11 @@ print_asns(void *arg)
 		break;
 
 	case ASIdentifierChoice_PR_inherit:
-		printf("inherit");
+		dstr_append(dstr, "inherit");
 		break;
 
 	case ASIdentifierChoice_PR_asIdsOrRanges:
-		printf("[ ");
+		dstr_append(dstr, "[ ");
 		for (a = 0; a < aic->choice.asIdsOrRanges.list.count; a++) {
 			aor = aic->choice.asIdsOrRanges.list.array[a];
 			switch (aor->present) {
@@ -1270,17 +1269,17 @@ print_asns(void *arg)
 				panic("ASIdOrRange_PR_NOTHING");
 				break;
 			case ASIdOrRange_PR_id:
-				print_int(&aor->choice.id);
+				print_int(dstr, &aor->choice.id);
 				break;
 			case ASIdOrRange_PR_range:
-				print_int(&aor->choice.range.min);
-				printf("-");
-				print_int(&aor->choice.range.max);
+				print_int(dstr, &aor->choice.range.min);
+				dstr_append(dstr, "-");
+				print_int(dstr, &aor->choice.range.max);
 				break;
 			}
-			print_array_separator(a, aic->choice.asIdsOrRanges.list.count);
+			print_array_separator(dstr, a, aic->choice.asIdsOrRanges.list.count);
 		}
-		printf("]");
+		dstr_append(dstr, "]");
 		break;
 	}
 }
@@ -1323,26 +1322,24 @@ parse_revoked_list(struct field *fields, struct kv_value *src, void *arg)
 }
 
 static void
-print_revokeds(void *arg)
+print_revokeds(struct dynamic_string *dstr, void *arg)
 {
 	struct TBSCertList__revokedCertificates *rcs;
 	struct TBSCertList__revokedCertificates__Member *rc;
 	int i;
 
 	rcs = *((struct TBSCertList__revokedCertificates **)arg);
-	if (!rcs) {
-		printf("NULL");
+	if (!rcs)
 		return;
-	}
 
-	printf("[ ");
+	dstr_append(dstr, "[ ");
 	for (i = 0; i < rcs->list.count; i++) {
 		rc = rcs->list.array[i];
-		print_int(&rc->userCertificate);
+		print_int(dstr, &rc->userCertificate);
 
-		print_array_separator(i, rcs->list.count);
+		print_array_separator(dstr, i, rcs->list.count);
 	}
-	printf("]");
+	dstr_append(dstr, "]");
 }
 
 const struct field_type ft_bool = { "BOOLEAN", parse_bool, print_bool };
@@ -1505,7 +1502,8 @@ static void
 __fields_print(struct field const *field, char *key, size_t key_offset)
 {
 	struct field *child, *tmp;
-	unsigned char **value;
+	unsigned char **address;
+	struct dynamic_string dstr = { 0 };
 
 	if (field->invisible)
 		return;
@@ -1513,18 +1511,16 @@ __fields_print(struct field const *field, char *key, size_t key_offset)
 	strcpy(key + key_offset, field->key);
 
 	if (field->type && field->type->print) {
-		printf("%s = ", key);
-
-		value = field->address;
+		address = field->address;
 		if (is_pointer(field)) {
-			if (*value == NULL)
-				printf("NULL");
-			else
-				field->type->print(*value);
+			if (*address != NULL)
+				field->type->print(&dstr, *address);
 		} else {
-			field->type->print(value);
+			field->type->print(&dstr, address);
 		}
-		printf("\n");
+
+		printf("%s = %s\n", key, dstr_finish(&dstr));
+		dstr_cleanup(&dstr);
 	}
 
 	key_offset += strlen(field->key);
@@ -1534,7 +1530,7 @@ __fields_print(struct field const *field, char *key, size_t key_offset)
 }
 
 void
-fields_print(struct field const *root)
+fields_print_md(struct field const *root)
 {
 	struct field const *child, *tmp;
 	char key[FIELD_MAXLEN];
@@ -1543,4 +1539,48 @@ fields_print(struct field const *root)
 	HASH_ITER(hh, root->children, child, tmp)
 		__fields_print(child, key, 0);
 	printf("```\n");
+}
+
+static void
+__fields_print_csv(char const *name, struct field const *field,
+    char *key, size_t key_offset)
+{
+	struct field *child, *tmp;
+	unsigned char **address;
+	struct dynamic_string dstr = { 0 };
+
+	if (field->invisible)
+		return;
+	strcpy(key + key_offset, field->key);
+
+	if (field->type && field->type->print) {
+		address = field->address;
+		if (is_pointer(field)) {
+			if (*address != NULL)
+				field->type->print(&dstr, *address);
+		} else {
+			field->type->print(&dstr, address);
+		}
+
+		csv_print(name, ',');
+		csv_print(key, ',');
+		csv_print(dstr_finish(&dstr), '\n');
+
+		dstr_cleanup(&dstr);
+	}
+
+	key_offset += strlen(field->key);
+	key[key_offset] = '.';
+	HASH_ITER(hh, field->children, child, tmp)
+		__fields_print_csv(name, child, key, key_offset + 1);
+}
+
+void
+fields_print_csv(struct field const *fields, char const *name)
+{
+	struct field const *field, *tmp;
+	char key[FIELD_MAXLEN];
+
+	HASH_ITER(hh, fields->children, field, tmp)
+		__fields_print_csv(name, field, key, 0);
 }

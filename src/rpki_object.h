@@ -15,4 +15,6 @@ struct rpki_object {
 	struct field *fields;
 };
 
+void meta_print_csv(struct rpki_object *, char const *);
+
 #endif /* SRC_RPKI_OBJECT_H_ */

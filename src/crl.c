@@ -10,6 +10,7 @@
 #include "ext.h"
 #include "libcrypto.h"
 #include "oid.h"
+#include "rpki_object.h"
 
 static void
 init_extensions_crl(struct rpki_crl *crl, struct field *extf)
@@ -142,7 +143,14 @@ crl_write(struct rpki_crl *crl)
 }
 
 void
-crl_print(struct rpki_crl *crl)
+crl_print_md(struct rpki_crl *crl)
 {
 	printf("- Type: CRL\n");
+}
+
+void
+crl_print_csv(struct rpki_crl *crl)
+{
+	meta_print_csv(crl->meta, "crl");
+	fields_print_csv(crl->meta->fields, crl->meta->name);
 }

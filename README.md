@@ -188,11 +188,11 @@ With this, you can create some manner of testing mechanism by checking the prese
 
 ## Tutorial: Verbose output
 
-By default, `barry` tries to keep quiet. Add `-p` to print the objects and all of their values, `-v` if you want a general idea of what it's doing, and another `-v` for garbage tracing.
+By default, `barry` tries to keep quiet. Add `-p (markdown|csv)` to print the objects and all of their values, `-v` if you want a general idea of what it's doing, and another `-v` for garbage tracing.
 
 ```bash
 $ echo "ta.cer" > minimal.repo
-$ barry -p minimal.repo > tree.md
+$ barry -p markdown minimal.repo > tree.md
 ```
 
 [This](sample/tree.md) would be `tree.md`.

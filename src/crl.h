@@ -16,6 +16,7 @@ struct rpki_crl *crl_new(struct rpki_object *);
 void crl_generate_paths(struct rpki_crl *);
 void crl_finish(struct rpki_crl *);
 void crl_write(struct rpki_crl *);
-void crl_print(struct rpki_crl *);
+void crl_print_md(struct rpki_crl *);
+void crl_print_csv(struct rpki_crl *);
 
 #endif /* SRC_CRL_H_ */

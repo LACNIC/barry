@@ -61,7 +61,13 @@ roa_write(struct signed_object *so)
 }
 
 void
-roa_print(struct signed_object *so)
+roa_print_md(struct signed_object *so)
 {
 	printf("- Type: ROA\n");
+}
+
+void
+roa_print_csv(struct signed_object *so)
+{
+	so_print_csv(so);
 }

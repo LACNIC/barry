@@ -5,10 +5,12 @@
 
 #include "alloc.h"
 #include "asn1.h"
+#include "csv.h"
 #include "field.h"
 #include "libcrypto.h"
 #include "oid.h"
 #include "print.h"
+#include "rpki_object.h"
 
 static void
 init_extensions_ta(struct rpki_certificate *ta, struct field *extf)
@@ -329,7 +331,7 @@ cer_write(struct rpki_certificate *cer)
 }
 
 void
-cer_print(struct rpki_certificate *cer)
+cer_print_md(struct rpki_certificate *cer)
 {
 	printf("- Type: Certificate\n");
 	printf("- RPP:\n");
@@ -338,4 +340,18 @@ cer_print(struct rpki_certificate *cer)
 	printf("\t- crldp       : %s\n", cer->rpp.crldp);
 	printf("\t- rpkiNotify  : %s\n", cer->rpp.rpkiNotify);
 	printf("\t- Path        : %s\n", cer->rpp.path);
+}
+
+void
+cer_print_csv(struct rpki_certificate *cer)
+{
+	meta_print_csv(cer->meta, "cer");
+
+	csv_print3(cer->meta, "caRepository", cer->rpp.caRepository);
+	csv_print3(cer->meta, "rpkiManifest", cer->rpp.rpkiManifest);
+	csv_print3(cer->meta, "crldp", cer->rpp.crldp);
+	csv_print3(cer->meta, "rpkiNotify", cer->rpp.rpkiNotify);
+	csv_print3(cer->meta, "rpp", cer->rpp.path);
+
+	fields_print_csv(cer->meta->fields, cer->meta->name);
 }

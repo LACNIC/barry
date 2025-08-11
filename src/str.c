@@ -1,6 +1,7 @@
 #include "str.h"
 
-#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include "print.h"
 
 static size_t
@@ -20,26 +21,51 @@ next_power_of_2(size_t src)
 }
 
 void
-dstr_append(struct dynamic_string *str, unsigned char const *addend,
-    size_t addlen)
+dstr_append(struct dynamic_string *str, char const *fmt, ...)
 {
-	size_t total;
+	size_t capacity;
+	int wlen;
+	va_list ap;
 
-	total = str->len + addlen;
-	if (total > str->size) {
-		str->size = next_power_of_2(total);
-		str->buf = realloc(str->buf, str->size);
-		if (!str->buf)
-			enomem;
+	capacity = str->size - str->len;
+
+	va_start(ap, fmt);
+	wlen = vsnprintf(str->buf + str->len, capacity, fmt, ap);
+	va_end(ap);
+
+	if (wlen < 0)
+		panic("vsnprintf(1): %d", wlen);
+	if (wlen < capacity) {
+		str->len += wlen;
+		return;
 	}
 
-	memcpy(str->buf + str->len, addend, addlen);
-	str->len += addlen;
+	str->size = str->len + wlen + 1;
+	str->size = next_power_of_2(str->size);
+	str->buf = realloc(str->buf, str->size);
+	if (!str->buf)
+		enomem;
+
+	capacity = str->size - str->len;
+
+	va_start(ap, fmt);
+	wlen = vsnprintf(str->buf + str->len, capacity, fmt, ap);
+	va_end(ap);
+
+	if (wlen < 0 || capacity <= wlen)
+		panic("vsnprintf(2): %d", wlen);
+
+	str->len += wlen;
 }
 
-/* Appends the null character */
-void
+char *
 dstr_finish(struct dynamic_string *str)
 {
-	dstr_append(str, (unsigned char *)"", 1);
+	return str->buf;
+}
+
+void
+dstr_cleanup(struct dynamic_string *str)
+{
+	free(str->buf);
 }

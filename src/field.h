@@ -6,6 +6,7 @@
 #include <libasn1fort/SubjectPublicKeyInfo.h>
 
 #include "keyval.h"
+#include "str.h"
 #include "uthash.h"
 
 #define FIELD_MAXLEN 128 // XXX
@@ -14,7 +15,7 @@ struct field;
 
 typedef char const *error_msg;
 typedef error_msg (*field_parser)(struct field *, struct kv_value *, void *);
-typedef void (*print_field)(void *);
+typedef void (*print_field)(struct dynamic_string *, void *);
 
 struct field_type {
 	char const *name;
@@ -73,6 +74,7 @@ struct field *field_add_spki(struct field *, char const *,
 struct field *fields_find(struct field *, char const *);
 
 void fields_apply_keyvals(struct field *, void *, struct keyvals *);
-void fields_print(struct field const *);
+void fields_print_md(struct field const *);
+void fields_print_csv(struct field const *, char const *);
 
 #endif /* SRC_FIELD_H_ */

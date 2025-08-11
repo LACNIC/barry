@@ -1,6 +1,7 @@
 #ifndef SRC_STR_H_
 #define SRC_STR_H_
 
+#include <stdbool.h>
 #include <string.h>
 
 struct dynamic_string {
@@ -9,7 +10,8 @@ struct dynamic_string {
 	size_t size;
 };
 
-void dstr_append(struct dynamic_string *, unsigned char const *, size_t);
-void dstr_finish(struct dynamic_string *);
+void dstr_append(struct dynamic_string *, char const *, ...);
+char *dstr_finish(struct dynamic_string *);
+void dstr_cleanup(struct dynamic_string *);
 
 #endif /* SRC_STR_H_ */

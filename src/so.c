@@ -194,3 +194,17 @@ signed_object_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 	cer_finish_ee(&so->ee, so->meta->uri);
 	finish_content_info(so, td);
 }
+
+void
+so_print_csv(struct signed_object *so)
+{
+	char const *type = "unknown";
+
+	switch (so->type) {
+	case SO_MFT:	type = "mft";	break;
+	case SO_ROA:	type = "roa";	break;
+	}
+
+	meta_print_csv(so->meta, type);
+	fields_print_csv(so->meta->fields, so->meta->name);
+}

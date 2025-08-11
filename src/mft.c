@@ -82,7 +82,13 @@ mft_write(struct signed_object *so)
 }
 
 void
-mft_print(struct signed_object *so)
+mft_print_md(struct signed_object *so)
 {
 	printf("- Type: Manifest\n");
+}
+
+void
+mft_print_csv(struct signed_object *so)
+{
+	so_print_csv(so);
 }

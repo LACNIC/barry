@@ -28,6 +28,11 @@ extern unsigned int verbosity;
 	} while (0)
 #define PR_TRACE pr_trace
 
+#define pr_err(fmt, ...) do {						\
+		fprintf(stderr, C_RED "[ERR %10.10s:%4.4d] " fmt C_RST "\n",\
+		    __func__, __LINE__, ##__VA_ARGS__);			\
+	} while (0)
+
 #define panic(fmt, ...) do {						\
 		fprintf(stderr, C_RED "[ERR %s:%d] " fmt C_RST "\n",	\
 		    __func__, __LINE__, ##__VA_ARGS__);			\

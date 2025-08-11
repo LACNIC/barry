@@ -125,13 +125,16 @@ tokenize(struct rd_parse_context *ctx, bool (*chr_matches)(char))
 	do {
 		for (i = ctx->offset; i < ctx->size; i++) {
 			if (!chr_matches(ctx->buf[i])) {
-				dstr_append(&result, ctx->buf + ctx->offset,
-				    i - ctx->offset);
+				dstr_append(&result, "%.*s",
+				    (int)(i - ctx->offset),
+				    ctx->buf + ctx->offset);
 				goto commit;
 			}
 		}
 
-		dstr_append(&result, ctx->buf + ctx->offset, i - ctx->offset);
+		dstr_append(&result, "%.*s",
+		    (int)(i - ctx->offset),
+		    ctx->buf + ctx->offset);
 
 		if (!refresh_reader(ctx)) {
 			if (result.buf == NULL)

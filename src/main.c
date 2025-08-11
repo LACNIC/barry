@@ -20,17 +20,17 @@
 #include "str.h"
 #include "tal.h"
 
-char const *repo_descriptor = NULL;
+char const *repo_descriptor;
 char const *rsync_uri = "rsync://localhost:8873/rpki";
 char const *rsync_path = "rsync/";
-char const *tal_path = NULL;
+char const *tal_path;
 Time_t default_now;
 Time_t default_later;
 GeneralizedTime_t default_gnow;
 GeneralizedTime_t default_glater;
 char const *keys_path;
-bool print_objs = false;
-unsigned int verbosity = 0;
+char const *print_format;
+unsigned int verbosity;
 
 #define OPTLONG_RSYNC_URI	"rsync-uri"
 #define OPTLONG_RSYNC_PATH	"rsync-path"
@@ -97,7 +97,7 @@ parse_options(int argc, char **argv)
 		{ OPTLONG_NOW,        required_argument, 0, 'P' },
 		{ OPTLONG_LATER,      required_argument, 0, 1026 },
 		{ OPTLONG_KEYS,       required_argument, 0, 'k' },
-		{ OPTLONG_PR_OBJS,    no_argument,       0, 'p' },
+		{ OPTLONG_PR_OBJS,    required_argument, 0, 'p' },
 		{ OPTLONG_VERBOSE,    no_argument,       0, 'v' },
 		{ OPTLONG_HELP,       no_argument,       0, 'h' },
 		{ 0 }
@@ -106,7 +106,7 @@ parse_options(int argc, char **argv)
 	char *optnow = NULL;
 	char *optlater = NULL;
 
-	while ((opt = getopt_long(argc, argv, "t:P:k:pvh", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:P:k:p:vh", opts, NULL)) != -1) {
 		switch (opt) {
 		case 1024:
 			rsync_uri = optarg;
@@ -127,7 +127,7 @@ parse_options(int argc, char **argv)
 			keys_path = optarg;
 			break;
 		case 'p':
-			print_objs = true;
+			print_format = optarg;
 			break;
 		case 'v':
 			verbosity++;
@@ -159,7 +159,7 @@ parse_options(int argc, char **argv)
 	pr_debug("   --" OPTLONG_NOW "            (-P): %s", optnow);
 	pr_debug("   --" OPTLONG_LATER "              : %s", optlater);
 	pr_debug("   --" OPTLONG_KEYS "               : %s", keys_path);
-	pr_debug("   --" OPTLONG_PR_OBJS       "  (-p): %u", print_objs);
+	pr_debug("   --" OPTLONG_PR_OBJS       "  (-p): %s", print_format);
 	pr_debug("   --" OPTLONG_VERBOSE "        (-v): %u", verbosity);
 	pr_debug("");
 }
@@ -408,7 +408,7 @@ write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 }
 
 static void
-print_repository(struct rpki_tree *tree)
+print_repository_md(struct rpki_tree *tree)
 {
 	struct rpki_tree_node *node, *tmp;
 
@@ -427,26 +427,63 @@ print_repository(struct rpki_tree *tree)
 		switch (infer_type(node)) {
 		case FT_TA:
 		case FT_CER:
-			cer_print(node->obj);
+			cer_print_md(node->obj);
 			break;
 		case FT_CRL:
-			crl_print(node->obj);
+			crl_print_md(node->obj);
 			break;
 		case FT_MFT:
-			mft_print(node->obj);
+			mft_print_md(node->obj);
 			break;
 		case FT_ROA:
-			roa_print(node->obj);
+			roa_print_md(node->obj);
 			break;
 		default:
-			panic("Unknown file type: %s", node->meta.name);
+			pr_err("Unknown file type: %s", node->meta.name);
 		}
 
 		printf("\n");
-		fields_print(node->meta.fields);
+		fields_print_md(node->meta.fields);
 
 		printf("\n");
 	}
+}
+
+static void
+print_repository_csv(struct rpki_tree *tree)
+{
+	struct rpki_tree_node *node, *tmp;
+
+	HASH_ITER(ghook, tree->nodes, node, tmp) {
+		switch (infer_type(node)) {
+		case FT_TA:
+		case FT_CER:
+			cer_print_csv(node->obj);
+			break;
+		case FT_CRL:
+			crl_print_csv(node->obj);
+			break;
+		case FT_MFT:
+			mft_print_csv(node->obj);
+			break;
+		case FT_ROA:
+			roa_print_csv(node->obj);
+			break;
+		default:
+			pr_err("Unknown file type: %s", node->meta.name);
+		}
+	}
+}
+
+static void
+print_repository(struct rpki_tree *tree)
+{
+	if (strcmp("markdown", print_format) == 0)
+		print_repository_md(tree);
+	else if (strcmp("csv", print_format) == 0)
+		print_repository_csv(tree);
+	else
+		pr_err("Unknown print format: %s", print_format);
 }
 
 int
@@ -495,7 +532,7 @@ main(int argc, char **argv)
 	rpkitree_pre_order(&tree, write_mfts, NULL);
 	pr_debug("Done.\n");
 
-	if (print_objs) {
+	if (print_format) {
 		pr_debug("Printing objects...");
 		print_repository(&tree);
 		pr_debug("Done.\n");

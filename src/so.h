@@ -34,5 +34,6 @@ struct signed_object {
 struct signed_object *signed_object_new(struct rpki_object *, int,
     struct field **);
 void signed_object_finish(struct signed_object *, asn_TYPE_descriptor_t *);
+void so_print_csv(struct signed_object *);
 
 #endif /* SRC_SO_H_ */
