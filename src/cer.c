@@ -140,7 +140,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	field_add_algorithm(meta->fields, "signatureAlgorithm", &cer->obj.signatureAlgorithm);
 
 	/* cer->signature: Postpone (needs all other fields ready) */
-	field_add(meta->fields, "signature", &ft_bitstr, &tbs->signature, 0);
+	field_add(meta->fields, "signature", &ft_bitstr, &cer->obj.signature, 0);
 }
 
 static void
