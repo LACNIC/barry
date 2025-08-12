@@ -259,10 +259,8 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 }
 
 static void
-update_signature(Certificate_t *cer, struct field *fields, EVP_PKEY *privkey)
+update_signature(Certificate_t *cer, struct field *fields, EVP_PKEY *keys)
 {
-	unsigned char tbscer[4096];
-	asn_enc_rval_t rval;
 	SignatureValue_t signature;
 
 	if (fields_overridden(fields, "signature")) {
@@ -271,13 +269,8 @@ update_signature(Certificate_t *cer, struct field *fields, EVP_PKEY *privkey)
 	}
 
 	pr_debug("- Signing");
-
-	rval = der_encode_to_buffer(&asn_DEF_TBSCertificate,
-	    &cer->tbsCertificate, tbscer, sizeof(tbscer));
-	if (rval.encoded < 0)
-		panic("TBSCertificate rval.encoded: %zd", rval.encoded);
-
-	signature = do_sign(privkey, tbscer, rval.encoded);
+	signature = do_sign(&cer->tbsCertificate, &asn_DEF_TBSCertificate,
+	    keys, false);
 	cer->signature.buf = signature.buf;
 	cer->signature.size = signature.size;
 }

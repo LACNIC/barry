@@ -83,22 +83,15 @@ crl_generate_paths(struct rpki_crl *crl)
 }
 
 static void
-update_signature(CertificateList_t *crl, EVP_PKEY *privkey)
+update_signature(CertificateList_t *crl, EVP_PKEY *keys)
 {
-	unsigned char der[4096];
-	asn_enc_rval_t rval;
 	SignatureValue_t signature;
 
 	// TODO autocomputed even if overridden
 
 	pr_debug("- Signing");
-
-	rval = der_encode_to_buffer(&asn_DEF_TBSCertList,
-	    &crl->tbsCertList, der, sizeof(der));
-	if (rval.encoded < 0)
-		panic("TBSCertList rval.encoded: %zd", rval.encoded);
-
-	signature = do_sign(privkey, der, rval.encoded);
+	signature = do_sign(&crl->tbsCertList, &asn_DEF_TBSCertList,
+	    keys, false);
 	crl->signature.buf = signature.buf;
 	crl->signature.size = signature.size;
 }

@@ -11,18 +11,9 @@
 #include "oid.h"
 
 static void
-sign_so(SignatureValue_t *signature, EVP_PKEY *privkey, SignedAttributes_t *attrs)
+sign_so(SignatureValue_t *signature, EVP_PKEY *keys, SignedAttributes_t *attrs)
 {
-	unsigned char der[4096];
-	asn_enc_rval_t rval;
-
-	rval = der_encode_to_buffer(&asn_DEF_SignedAttributes, attrs,
-	    der, sizeof(der));
-	if (rval.encoded < 0)
-		panic("SignedAttributes rval.encoded: %zd", rval.encoded);
-
-	der[0] = 0x31;
-	*signature = do_sign(privkey, der, rval.encoded);
+	*signature = do_sign(attrs, &asn_DEF_SignedAttributes, keys, true);
 }
 
 /* Requires the EE ready and eContentS */
