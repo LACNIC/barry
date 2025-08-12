@@ -15,7 +15,6 @@ struct rpki_certificate {
 
 	struct rpp rpp;
 
-	char const *subject;
 	EVP_PKEY *keys;
 	SubjectPublicKeyInfo_t *spki;
 

@@ -94,7 +94,6 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	struct field *extf;
 
 	cer->meta = meta;
-	cer->subject = meta->name; // XXX remove subject?
 	cer->keys = keys_new();
 	cer->spki = pubkey2asn1(cer->keys);
 
@@ -296,10 +295,11 @@ void
 cer_finish_ca(struct rpki_certificate *ca)
 {
 	if (ca->meta->parent == NULL)
-		panic("CA '%s' has no parent.", ca->subject);
+		panic("CA '%s' has no parent.", ca->meta->name);
 	if (ca->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ca->obj.tbsCertificate.issuer, ca->meta->parent->subject);
+		init_name(&ca->obj.tbsCertificate.issuer,
+		    ca->meta->parent->meta->name);
 	}
 	finish_extensions(ca, CT_CA, NULL);
 	update_signature(ca, ca->meta->parent->keys);
@@ -309,11 +309,12 @@ void
 cer_finish_ee(struct rpki_certificate *ee, char const *so_uri)
 {
 	if (ee->meta->parent == NULL)
-		panic("EE '%s' has no parent.", ee->subject);
+		panic("EE '%s' has no parent.", ee->meta->name);
 
 	if (ee->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ee->obj.tbsCertificate.issuer, ee->meta->parent->subject);
+		init_name(&ee->obj.tbsCertificate.issuer,
+		    ee->meta->parent->meta->name);
 	}
 	finish_extensions(ee, CT_EE, so_uri);
 	update_signature(ee, ee->meta->parent->keys);

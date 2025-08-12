@@ -126,7 +126,8 @@ crl_finish(struct rpki_crl *crl)
 {
 	if (crl->obj.tbsCertList.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&crl->obj.tbsCertList.issuer, crl->meta->parent->subject);
+		init_name(&crl->obj.tbsCertList.issuer,
+		    crl->meta->parent->meta->name);
 	}
 	finish_extensions(crl);
 	update_signature(crl);
