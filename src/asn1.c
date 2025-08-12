@@ -232,24 +232,15 @@ der_encode_8str(const asn_TYPE_descriptor_t *td, void *obj, OCTET_STRING_t *os)
 	os->size = rval.encoded;
 }
 
-void *
-decode_ber(const asn_TYPE_descriptor_t *td, const void *bin, size_t binlen)
+void
+ber2asn1(const void *ber, size_t berlen,
+    const asn_TYPE_descriptor_t *td, void *asn1)
 {
-	void *result;
 	asn_dec_rval_t rval;
 
-	result = NULL;
-	rval = ber_decode(NULL, td, &result, bin, binlen);
+	rval = ber_decode(NULL, td, &asn1, ber, berlen);
 	if (rval.code != RC_OK)
 		panic("Cannot decode %s: %u", td->name, rval.code);
-
-	return result;
-}
-
-void *
-decode_ext(const asn_TYPE_descriptor_t *td, struct Extension *ext)
-{
-	return decode_ber(td, ext->extnValue.buf, ext->extnValue.size);
 }
 
 static int

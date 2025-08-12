@@ -53,8 +53,7 @@ void init_gtime_later(GeneralizedTime_t *);
 void der_encode_any(const asn_TYPE_descriptor_t *, void *, ANY_t *);
 void der_encode_8str(const asn_TYPE_descriptor_t *, void *, OCTET_STRING_t *);
 
-void *decode_ber(const asn_TYPE_descriptor_t *, const void *, size_t);
-void *decode_ext(const asn_TYPE_descriptor_t *, struct Extension *);
+void ber2asn1(const void *, size_t, const asn_TYPE_descriptor_t *, void *);
 
 void exec_mkdir(char *);
 void exec_mkdir_p(char const *, bool);

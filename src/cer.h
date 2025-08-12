@@ -16,8 +16,8 @@ struct rpki_certificate {
 	struct rpp rpp;
 
 	EVP_PKEY *keys;
-	SubjectPublicKeyInfo_t *spki;
 
+#define SPKI obj.tbsCertificate.subjectPublicKeyInfo
 	Certificate_t obj;
 	struct extensions exts;
 };

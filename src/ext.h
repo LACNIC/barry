@@ -92,6 +92,8 @@ void ext_finish_ip(IPAddrBlocks_t *);
 void ext_finish_asn(ASIdentifiers_t *);
 
 bool ext_field_set(struct field *, char const *, unsigned int, char const *);
+#define EXT_FIELD_SET(obj, ext, extn, suffix) \
+	ext_field_set(obj->meta->fields, ext, extn, "extnValue" suffix)
 
 void ext_compile(struct extensions *, Extensions_t **);
 

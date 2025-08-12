@@ -272,12 +272,14 @@ exts_add_crln(struct extensions *exts, size_t extn, struct field *parent)
 void
 ext_finish_ski(SubjectKeyIdentifier_t *ski, SubjectPublicKeyInfo_t *spki)
 {
+	pr_trace("Autocompleting SKI");
 	hash_sha1(spki->subjectPublicKey.buf, spki->subjectPublicKey.size, ski);
 }
 
 void
 ext_finish_aki(AuthorityKeyIdentifier_t *aki, SubjectPublicKeyInfo_t *spki)
 {
+	pr_trace("Autocompleting AKI");
 	aki->keyIdentifier = pzalloc(sizeof(*aki->keyIdentifier));
 	hash_sha1(spki->subjectPublicKey.buf, spki->subjectPublicKey.size,
 	    aki->keyIdentifier);
@@ -286,6 +288,8 @@ ext_finish_aki(AuthorityKeyIdentifier_t *aki, SubjectPublicKeyInfo_t *spki)
 void
 ext_finish_ku(KeyUsage_t *ku, enum cer_type type)
 {
+	pr_trace("Autocompleting KU");
+
 	ku->buf = pmalloc(1);
 	ku->size = 1;
 
@@ -314,6 +318,8 @@ ext_finish_crldp(CRLDistributionPoints_t *crldp, char const *url)
 {
 	DistributionPointName_t *dpn;
 
+	pr_trace("Autocompleting CRLDP");
+
 	INIT_ASN1_ARRAY(&crldp->list, 1, DistributionPoint_t);
 	dpn = pzalloc(sizeof(DistributionPointName_t));
 	crldp->list.array[0]->distributionPoint = dpn;
@@ -332,6 +338,7 @@ finish_ad(AccessDescription_t *ad, int nid, char const *value)
 void
 ext_finish_aia(AuthorityInfoAccessSyntax_t *aia, char const *url)
 {
+	pr_trace("Autocompleting AIA");
 	INIT_ASN1_ARRAY(&aia->list, 1, AccessDescription_t);
 	finish_ad(aia->list.array[0], NID_ad_ca_issuers, url);
 }
@@ -341,6 +348,8 @@ ext_finish_sia_ca(SubjectInfoAccessSyntax_t *sia, char const *repo,
     char const *mft, char const *notif)
 {
 	unsigned int ads;
+
+	pr_trace("Autocompleting SIA (CA variant)");
 
 	ads = (repo ? 1 : 0) + (mft ? 1 : 0) + (notif ? 1 : 0);
 	INIT_ASN1_ARRAY(&sia->list, ads, AccessDescription_t);
@@ -357,6 +366,7 @@ ext_finish_sia_ca(SubjectInfoAccessSyntax_t *sia, char const *repo,
 void
 ext_finish_sia_ee(SubjectInfoAccessSyntax_t *sia, char const *so)
 {
+	pr_trace("Autocompleting AIA (EE variant)");
 	INIT_ASN1_ARRAY(&sia->list, 1, AccessDescription_t);
 	finish_ad(sia->list.array[0], NID_signedObject, so);
 }
@@ -364,6 +374,7 @@ ext_finish_sia_ee(SubjectInfoAccessSyntax_t *sia, char const *so)
 void
 ext_finish_cp(CertificatePolicies_t *cp)
 {
+	pr_trace("Autocompleting CP");
 	INIT_ASN1_ARRAY(&cp->list, 1, PolicyInformation_t);
 	init_oid(&cp->list.array[0]->policyIdentifier, NID_ipAddr_asNumberv2);
 }
@@ -373,6 +384,8 @@ ext_finish_ip(IPAddrBlocks_t *ip)
 {
 	IPAddressFamily_t *iaf;
 	IPAddressOrRange_t *iar;
+
+	pr_trace("Autocompleting IP");
 
 	INIT_ASN1_ARRAY(&ip->list, 1, IPAddressFamily_t);
 
@@ -398,6 +411,8 @@ void
 ext_finish_asn(ASIdentifiers_t *asn)
 {
 	ASIdOrRange_t *air;
+
+	pr_trace("Autocompleting ASN");
 
 	asn->asnum = pzalloc(sizeof(ASIdentifierChoice_t));
 

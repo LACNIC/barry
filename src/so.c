@@ -21,7 +21,7 @@ finish_signer_info(SignerInfo_t *si, struct rpki_certificate *ee,
 	if (si->sid.present == SignerIdentifier_PR_NOTHING) {
 		pr_debug("- Copying the EE SKI to the SignerInfo");
 		si->sid.present = SignerIdentifier_PR_subjectKeyIdentifier;
-		ext_finish_ski(&si->sid.choice.subjectKeyIdentifier, ee->spki);
+		ext_finish_ski(&si->sid.choice.subjectKeyIdentifier, &ee->SPKI);
 	}
 
 	attr = si->signedAttrs->list.array[1];

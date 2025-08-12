@@ -100,6 +100,14 @@ update_signature(struct rpki_crl *crl)
 }
 
 static void
+finish_aki(AuthorityKeyIdentifier_t *aki, struct rpki_crl *crl)
+{
+	if (!crl->meta->parent)
+		panic("CRL needs a default AKI, but lacks a parent");
+	ext_finish_aki(aki, &crl->meta->parent->SPKI);
+}
+
+static void
 finish_extensions(struct rpki_crl *crl)
 {
 	struct ext_list_node *ext;
@@ -107,13 +115,9 @@ finish_extensions(struct rpki_crl *crl)
 
 	extn = 0;
 	STAILQ_FOREACH(ext, &crl->exts, hook) {
-		if (ext->type == EXT_AKI) {
-			if (!ext_field_set(crl->meta->fields, "aki", extn, "extnValue.keyIdentifier")) {
-				if (!crl->meta->parent)
-					panic("CRL needs a default AKI, but lacks a parent");
-				ext_finish_aki(&ext->v.aki, crl->meta->parent->spki);
-			}
-		}
+		if (ext->type == EXT_AKI)
+			if (!EXT_FIELD_SET(crl, "aki", extn, ".keyIdentifier"))
+				finish_aki(&ext->v.aki, crl);
 
 		extn++;
 	}

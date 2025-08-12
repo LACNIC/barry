@@ -95,7 +95,6 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 
 	cer->meta = meta;
 	cer->keys = keys_new();
-	cer->spki = pubkey2asn1(cer->keys);
 
 	tbs = &cer->obj.tbsCertificate;
 	tbsf = field_add_static(meta->fields, "tbsCertificate");
@@ -122,7 +121,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	init_name(&tbs->subject, meta->name);
 	field_add(tbsf, "subject", &ft_name, &tbs->subject, 0);
 
-	tbs->subjectPublicKeyInfo = *cer->spki;
+	pubkey2asn1(cer->keys, &tbs->subjectPublicKeyInfo);
 	field_add_spki(tbsf, "subjectPublicKeyInfo", &tbs->subjectPublicKeyInfo);
 
 	/* tbs->issuerUniqueID: TODO not implemented yet */
@@ -145,109 +144,105 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 }
 
 static void
+finish_aki(AuthorityKeyIdentifier_t *aki, struct rpki_certificate *cer)
+{
+	if (!cer->meta->parent)
+		panic("Certificate needs a default AKI, but lacks a parent");
+	ext_finish_aki(aki, &cer->meta->parent->SPKI);
+}
+
+static void
+finish_crldp(CRLDistributionPoints_t *crldp, struct rpki_certificate *cer)
+{
+	if (!cer->meta->parent)
+		panic("Certificate needs a default CRLDP, but lacks a parent");
+	ext_finish_crldp(crldp, cer->meta->parent->rpp.crldp);
+}
+
+static void
+finish_aia(AuthorityInfoAccessSyntax_t *aia, struct rpki_certificate *cer)
+{
+	if (!cer->meta->parent)
+		panic("Certificate needs a default AIA, but lacks a parent");
+	ext_finish_aia(aia, cer->meta->parent->meta->uri);
+}
+
+static void
+finish_sia(SubjectInfoAccessSyntax_t *sia, struct rpki_certificate *cer,
+    enum cer_type type, char const *so_uri)
+{
+	switch (type) {
+	case CT_TA:
+	case CT_CA:
+		ext_finish_sia_ca(sia,
+		    cer->rpp.caRepository,
+		    cer->rpp.rpkiManifest,
+		    cer->rpp.rpkiNotify);
+		break;
+	case CT_EE:
+		ext_finish_sia_ee(sia, so_uri);
+		break;
+	}
+}
+
+static void
 finish_extensions(struct rpki_certificate *cer, enum cer_type type,
     char const *so_uri)
 {
-	struct field *fields;
 	struct ext_list_node *ext;
 	unsigned int extn;
 
-	fields = cer->meta->fields;
 	extn = 0;
 
 	STAILQ_FOREACH(ext, &cer->exts, hook) {
-
 		switch (ext->type) {
 		case EXT_BC:
-			pr_trace("Finishing BC");
+		case EXT_CRLN:
 			break;
 
 		case EXT_SKI:
-			pr_trace("Finishing SKI");
-			if (!ext_field_set(fields, "ski", extn, "extnValue")) {
-				switch (type) {
-				case CT_TA:
-					/* TODO ? */
-					ext_finish_ski(&ext->v.ski, &cer->obj.tbsCertificate.subjectPublicKeyInfo);
-					break;
-				case CT_CA:
-				case CT_EE:
-					ext_finish_ski(&ext->v.ski, cer->spki);
-					break;
-				}
-			}
+			if (!EXT_FIELD_SET(cer, "ski", extn, ))
+				ext_finish_ski(&ext->v.ski, &cer->SPKI);
 			break;
 
 		case EXT_AKI:
-			pr_trace("Finishing AKI");
-			if (!ext_field_set(fields, "aki", extn, "extnValue.keyIdentifier")) {
-				if (!cer->meta->parent)
-					panic("Certificate needs a default AKI, but lacks a parent");
-				ext_finish_aki(&ext->v.aki, cer->meta->parent->spki);
-			}
+			if (!EXT_FIELD_SET(cer, "aki", extn, ".keyIdentifier"))
+				finish_aki(&ext->v.aki, cer);
 			break;
 
 		case EXT_KU:
-			pr_trace("Finishing KU");
-			if (!ext_field_set(fields, "ku", extn, "extnValue"))
+			if (!EXT_FIELD_SET(cer, "ku", extn, ))
 				ext_finish_ku(&ext->v.ku, type);
 			break;
 
 		case EXT_CRLDP:
-			pr_trace("Finishing CRLDP");
-			if (!ext_field_set(fields, "crldp", extn, "extnValue")) {
-				if (!cer->meta->parent)
-					panic("Certificate needs a default CRLDP, but lacks a parent");
-				ext_finish_crldp(&ext->v.crldp,
-				    cer->meta->parent->rpp.crldp);
-			}
+			if (!EXT_FIELD_SET(cer, "crldp", extn, ))
+				finish_crldp(&ext->v.crldp, cer);
 			break;
 
 		case EXT_AIA:
-			pr_trace("Finishing AIA");
-			if (!ext_field_set(fields, "aia", extn, "extnValue"))
-				ext_finish_aia(&ext->v.aia,
-				    cer->meta->parent->meta->uri);
+			if (!EXT_FIELD_SET(cer, "aia", extn, ))
+				finish_aia(&ext->v.aia, cer);
 			break;
 
 		case EXT_SIA:
-			pr_trace("Finishing SIA");
-			if (!ext_field_set(fields, "sia", extn, "extnValue")) {
-				switch (type) {
-				case CT_TA:
-				case CT_CA:
-					ext_finish_sia_ca(&ext->v.sia,
-					    cer->rpp.caRepository,
-					    cer->rpp.rpkiManifest,
-					    cer->rpp.rpkiNotify);
-					break;
-				case CT_EE:
-					ext_finish_sia_ee(&ext->v.sia, so_uri);
-					break;
-				}
-			}
+			if (!EXT_FIELD_SET(cer, "sia", extn, ))
+				finish_sia(&ext->v.sia, cer, type, so_uri);
 			break;
 
 		case EXT_CP:
-			pr_trace("Finishing CP");
-			if (!ext_field_set(fields, "cp", extn, "extnValue"))
+			if (!EXT_FIELD_SET(cer, "cp", extn, ))
 				ext_finish_cp(&ext->v.cp);
 			break;
 
 		case EXT_IP:
-			pr_trace("Finishing IP");
-			if (!ext_field_set(fields, "ip", extn, "extnValue"))
+			if (!EXT_FIELD_SET(cer, "ip", extn, ))
 				ext_finish_ip(&ext->v.ip);
 			break;
 
 		case EXT_ASN:
-			pr_trace("Finishing ASN");
-			if (!ext_field_set(fields, "asn", extn, "extnValue.asnum"))
+			if (!EXT_FIELD_SET(cer, "asn", extn, ".asnum"))
 				ext_finish_asn(&ext->v.asn);
-			break;
-
-		case EXT_CRLN:
-			pr_trace("Finishing CRLN");
 			break;
 		}
 

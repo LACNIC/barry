@@ -10,7 +10,7 @@
 void base64_into_fd(char const *, int);
 
 void pubkey2der(EVP_PKEY *, unsigned char **, size_t *);
-SubjectPublicKeyInfo_t *pubkey2asn1(EVP_PKEY *);
+void pubkey2asn1(EVP_PKEY *pubkey, SubjectPublicKeyInfo_t *asn1);
 
 EVP_PKEY *keys_new(void);
 

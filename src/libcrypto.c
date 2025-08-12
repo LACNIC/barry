@@ -56,14 +56,14 @@ base64_into_fd(char const *path, int fdout)
 }
 
 void
-pubkey2der(EVP_PKEY *pubkey, unsigned char **der, size_t *size)
+pubkey2der(EVP_PKEY *keys, unsigned char **der, size_t *size)
 {
 	OSSL_ENCODER_CTX *ctx;
 
 	*der = NULL;
 	*size = 0;
 
-	ctx = OSSL_ENCODER_CTX_new_for_pkey(pubkey, EVP_PKEY_PUBLIC_KEY,
+	ctx = OSSL_ENCODER_CTX_new_for_pkey(keys, EVP_PKEY_PUBLIC_KEY,
 	    "DER", "SubjectPublicKeyInfo", NULL);
 	if (!ctx)
 		panic("OSSL_ENCODER_CTX_new_for_pkey");
@@ -71,15 +71,14 @@ pubkey2der(EVP_PKEY *pubkey, unsigned char **der, size_t *size)
 		panic("OSSL_ENCODER_to_data");
 }
 
-SubjectPublicKeyInfo_t *
-pubkey2asn1(EVP_PKEY *pubkey)
+void
+pubkey2asn1(EVP_PKEY *pubkey, SubjectPublicKeyInfo_t *asn1)
 {
-	unsigned char *pk;
-	size_t pklen;
+	unsigned char *der;
+	size_t derlen;
 
-	pubkey2der(pubkey, &pk, &pklen);
-
-	return decode_ber(&asn_DEF_SubjectPublicKeyInfo, pk, pklen);
+	pubkey2der(pubkey, &der, &derlen);
+	ber2asn1(der, derlen, &asn_DEF_SubjectPublicKeyInfo, asn1);
 }
 
 static char *
