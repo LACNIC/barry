@@ -23,5 +23,5 @@ AM_CONDITIONAL([BACKTRACE_ENABLED], [test "x$have_backtrace" != "xno"])
 PKG_CHECK_MODULES([CHECK], [check], [usetests=yes], [usetests=no])
 AM_CONDITIONAL([USE_TESTS], [test "x$usetests" = "xyes"])
 
-AC_CONFIG_FILES([Makefile src/Makefile test/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile test/unit/Makefile])
 AC_OUTPUT
