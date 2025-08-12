@@ -10,12 +10,6 @@
 #include "libcrypto.h"
 #include "oid.h"
 
-static void
-sign_so(SignatureValue_t *signature, EVP_PKEY *keys, SignedAttributes_t *attrs)
-{
-	*signature = do_sign(attrs, &asn_DEF_SignedAttributes, keys, true);
-}
-
 /* Requires the EE ready and eContentS */
 static void
 finish_signer_info(SignerInfo_t *si, struct rpki_certificate *ee,
@@ -42,7 +36,8 @@ finish_signer_info(SignerInfo_t *si, struct rpki_certificate *ee,
 
 	if (si->signature.buf == NULL) {
 		pr_debug("- Signing");
-		sign_so(&si->signature, ee->keys, si->signedAttrs);
+		si->signature = do_sign(si->signedAttrs,
+		    &asn_DEF_SignedAttributes, ee->keys, true);
 	}
 }
 

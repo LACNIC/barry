@@ -61,6 +61,7 @@ SUCCESSES=0
 FAILS=0
 
 check_single_override root-only-signature root-only "ta.cer,signature,0x010203"
+check_single_override root-only-signature-crl root-only "0.crl,signature,0x010203"
 
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

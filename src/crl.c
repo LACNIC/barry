@@ -83,17 +83,20 @@ crl_generate_paths(struct rpki_crl *crl)
 }
 
 static void
-update_signature(CertificateList_t *crl, EVP_PKEY *keys)
+update_signature(struct rpki_crl *crl)
 {
 	SignatureValue_t signature;
 
-	// TODO autocomputed even if overridden
+	if (fields_overridden(crl->meta->fields, "signature")) {
+		pr_debug("- Skipping signature");
+		return;
+	}
 
 	pr_debug("- Signing");
-	signature = do_sign(&crl->tbsCertList, &asn_DEF_TBSCertList,
-	    keys, false);
-	crl->signature.buf = signature.buf;
-	crl->signature.size = signature.size;
+	signature = do_sign(&crl->obj.tbsCertList, &asn_DEF_TBSCertList,
+	    crl->meta->parent->keys, false);
+	crl->obj.signature.buf = signature.buf;
+	crl->obj.signature.size = signature.size;
 }
 
 static void
@@ -126,7 +129,7 @@ crl_finish(struct rpki_crl *crl)
 		init_name(&crl->obj.tbsCertList.issuer, crl->meta->parent->subject);
 	}
 	finish_extensions(crl);
-	update_signature(&crl->obj, crl->meta->parent->keys);
+	update_signature(crl);
 }
 
 void
