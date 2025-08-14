@@ -75,11 +75,12 @@ rpp_new(void)
 	result.crldp = join_paths(result.caRepository, name);
 	pr_debug("- RPP CRL: %s", result.path);
 
+	result.rpkiNotify = NULL;
 	/*
 	psnprintf(name, NAME_SIZE, "%X.xml", result.id);
 	result.rpkiNotify = join_paths(rrdp_uri, name);
-	*/
 	pr_debug("- RPP rpkiNotify: %s", result.rpkiNotify);
+	*/
 
 	return result;
 }

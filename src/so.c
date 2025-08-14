@@ -48,10 +48,11 @@ finish_signed_data(struct signed_object *so, asn_TYPE_descriptor_t *td)
 	SignedData_t *sd = &so->sd;
 
 	/* Needs the SO _t */
-	// TODO autocomputed even if overridden
-	pr_debug("- Encoding the eContent");
-	sd->encapContentInfo.eContent = pzalloc(sizeof(OCTET_STRING_t));
-	der_encode_8str(td, &so->obj, sd->encapContentInfo.eContent);
+	if (!fields_overridden(so->meta->fields, "content.encapContentInfo.eContent")) {
+		pr_debug("- Encoding the eContent");
+		sd->encapContentInfo.eContent = pzalloc(sizeof(OCTET_STRING_t));
+		der_encode_8str(td, &so->obj, sd->encapContentInfo.eContent);
+	}
 	/* eContent (DER) ready */
 
 	/* Needs the EE _t */
@@ -154,7 +155,8 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 	/* eContent postponed */
 	ecif = field_add_static(sdf, "encapContentInfo");
 	field_add(ecif, "eContentType", &ft_oid, &sd->encapContentInfo.eContentType, 0);
-	*eContent = field_add_static(ecif, "eContent");
+	*eContent = field_add(ecif, "eContent", &ft_any,
+	    &sd->encapContentInfo.eContent, sizeof(OCTET_STRING_t));
 
 	sd->certificates = pzalloc(sizeof(struct CertificateSet));
 	INIT_ASN1_ARRAY(&sd->certificates->list, 1, ANY_t);

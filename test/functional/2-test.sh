@@ -150,5 +150,8 @@ check_output_contains "filelist-tutorial-overrides-isolated" \
 check_output_contains "filelist-tutorial-overrides-full" \
 	"mft\\.mft,$FILELIST,\"{ A\\.cer=0x010203, nonexistent\\.cer=0x040506, mft\\.mft=0x112233, foobar=0x55555555555555 }\""
 
+check_output_contains "eContent" \
+	"0\\.mft,content\\.encapContentInfo\\.eContent,0xAABBCC"
+
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

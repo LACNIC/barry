@@ -116,8 +116,8 @@ find_sibling(struct rpki_tree_node *siblings, IA5String_t *name)
 	return NULL;
 }
 
-void
-mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
+static void
+finish_fileList(struct signed_object *so, struct rpki_tree_node *siblings)
 {
 	Manifest_t *mft;
 	struct field *rootf;
@@ -127,11 +127,13 @@ mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
 	unsigned char hash[EVP_MAX_MD_SIZE];
 	unsigned int hlen;
 
-	pr_debug("- Adding missing fileList hashes");
-
 	mft = &so->obj.mft;
 	rootf = fields_find(so->meta->fields,
 	    "content.encapContentInfo.eContent.fileList");
+	if (!rootf)
+		return;
+
+	pr_debug("- Adding missing fileList hashes");
 
 	for (f = 0; f < mft->fileList.list.count; f++) {
 		file = mft->fileList.list.array[f];
@@ -159,7 +161,12 @@ mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
 		memcpy(file->hash.buf, hash, hlen);
 		file->hash.size = hlen;
 	}
+}
 
+void
+mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
+{
+	finish_fileList(so, siblings);
 	signed_object_finish(so, &asn_DEF_Manifest);
 }
 

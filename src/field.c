@@ -558,6 +558,7 @@ parse_any(struct field *fields, struct kv_value *src, void *dst)
 		return error;
 
 	any->size = size;
+	fields->children = NULL;
 	return NULL;
 }
 
@@ -1667,6 +1668,8 @@ fields_apply_keyvals(struct field *ht, void *target, struct keyvals *kvs)
 		field = fields_find(ht, kv->key);
 		if (!field)
 			panic("Key '%s' is unknown.", kv->key);
+		if (!field->type || !field->type->parser)
+			panic("I don't have a parser for '%s'", kv->key);
 
 		value = field->address;
 		if (is_pointer(field)) {
