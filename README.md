@@ -402,6 +402,51 @@ content.encapContentInfo.eContent.ipAddrBlocks = [
 
 List as many as you need. `barry` will automatically detect IP version and drop each entry to the corresponding `ROAIPAddressFamily`.
 
+### fileList
+
+By default, `barry` populates manifest fileLists with the actual names and hashes of the files it creates. The following RD:
+
+```
+ta.cer
+	mft.mft
+	crl.crl
+	A.cer
+	B.cer
+```
+
+Implies (with possible hashes)
+
+```
+[mft.mft]
+content.encapContentInfo.eContent.fileList = {
+	# <File name>: <Hash>
+	crl.crl: 0x14A9B4039E1EDC10C1314C435828B418417E8B152CD173696B776EF24D9A9E41,
+	A.cer:   0x5EBFE949DAB77A1AED18BC7EDE86C0F4CC784A2227385E6F04461EE85BD7F2C9,
+	B.cer:   0x237FF39E12A09160CC2B365BB155D72A25E1CF9073CD583AADAA35E2872AD104
+}
+```
+
+(If you omitted the CRL in the tree, it will be automatically added to the `fileList` as the last entry.)
+
+Since the files are `fileList`ed in the order in which they were declared in the tree, you can then (for example) override the hash of `A.cer` and the name of `B.cer` like so:
+
+```
+# Indexing is zero-based
+content.encapContentInfo.eContent.fileList.1.hash = 0x010203
+content.encapContentInfo.eContent.fileList.2.file = potatoes
+```
+
+Or just override the entire list however you see fit:
+
+```
+content.encapContentInfo.eContent.fileList = {
+	A.cer:           0x010203,
+	nonexistent.cer: 0x040506,
+	mft.mft:         0x112233,
+	foobar:          0x55555555555555
+}
+```
+
 ## TODO
 
 Add Github issues:

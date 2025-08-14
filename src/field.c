@@ -303,10 +303,26 @@ parse_numeric_primitive(struct kv_value *src, uint8_t **buf, size_t *size)
 }
 
 static error_msg
+parse_long_int(struct kv_value *src, long int *result)
+{
+	INTEGER_t integer;
+	long int longint;
+	error_msg error;
+
+	error = parse_numeric_primitive(src, &integer.buf, &integer.size);
+	if (error)
+		return error;
+	if (asn_INTEGER2long(&integer, &longint) < 0)
+		return "Not a number";
+
+	*result = longint;
+	return NULL;
+}
+
+static error_msg
 parse_bool(struct field *fields, struct kv_value *src, void *oid)
 {
 	BOOLEAN_t *boolean = oid;
-	INTEGER_t integer;
 	long int longint;
 	error_msg error;
 
@@ -321,12 +337,9 @@ parse_bool(struct field *fields, struct kv_value *src, void *oid)
 		}
 	}
 
-	error = parse_numeric_primitive(src, &integer.buf, &integer.size);
+	error = parse_long_int(src, &longint);
 	if (error)
 		return error;
-
-	if (asn_INTEGER2long(&integer, &longint) < 0)
-		return "Not a number";
 	if (longint < INT_MIN || INT_MAX < longint)
 		return "Boolean out of range";
 
@@ -475,6 +488,25 @@ parse_8str(struct field *fields, struct kv_value *src, void *dst)
 	return NULL;
 }
 
+static error_msg
+parse_ia5str(struct field *fields, struct kv_value *src, void *dst)
+{
+	IA5String_t *ia5str = dst;
+
+	if (src->type != VALT_STR)
+		return NEED_STRING;
+
+	init_8str(ia5str, src->v.str);
+	return NULL;
+}
+
+static void
+print_ia5str(struct dynamic_string *dstr, void *val)
+{
+	IA5String_t *ia5str = val;
+	dstr_append(dstr, "%.*s", (int)ia5str->size, (char *)ia5str->buf);
+}
+
 static bool
 is_printable(uint8_t chr)
 {
@@ -502,14 +534,10 @@ print_maybe_string(struct dynamic_string *dstr, uint8_t *buf, size_t size)
 	print_not_printable(dstr, buf, size);
 
 	/* Also attempt a string interpretation */
-	if (size >= 2 && (buf[0] == 0x0C || buf[0] == 0x13 || buf[0] == 0x16)) {
-		for (i = 2; i < size; i++)
-			if (!is_printable(buf[i]))
-				return;
-		dstr_append(dstr, " (\"%.*s\")",
-		    (int)(size - 2),
-		    (char *)(buf + 2));
-	}
+	for (i = 0; i < size; i++)
+		if (!is_printable(buf[i]))
+			return;
+	dstr_append(dstr, " (\"%.*s\")", (int)size, (char *)(buf));
 }
 
 static void
@@ -638,7 +666,7 @@ print_name(struct dynamic_string *dstr, void *val)
 				tv = rdn->list.array[t];
 				dstr_append(dstr, "\"");
 				print_oid(dstr, &tv->type);
-				dstr_append(dstr, "\":");
+				dstr_append(dstr, "\"=");
 				print_any(dstr, &tv->value);
 				dstr_append(dstr, " ");
 			}
@@ -1342,10 +1370,126 @@ print_revokeds(struct dynamic_string *dstr, void *arg)
 	dstr_append(dstr, "]");
 }
 
+static void
+add_filelist_fields(struct field *parentf, struct Manifest__fileList *filelist,
+    bool name_overridden, bool hash_overridden)
+{
+	int f;
+	for (f = 0; f < filelist->list.count; f++)
+		field_add_file(parentf, f, filelist->list.array[f],
+		    name_overridden, hash_overridden);
+}
+
+static error_msg
+parse_filelist_str(struct field *rootf, struct kv_value *src,
+    struct Manifest__fileList *filelist)
+{
+	long int count;
+	error_msg error;
+
+	error = parse_long_int(src, &count);
+	if (error)
+		return error;
+	if (count < 0 || SIZE_MAX < count)
+		return "Filelist length out of range";
+
+	INIT_ASN1_ARRAY(&filelist->list, count, FileAndHash_t);
+	add_filelist_fields(rootf, filelist, false, false);
+	return NULL;
+}
+
+static error_msg
+parse_filelist_set(struct field *rootf, struct kv_value *src,
+    struct Manifest__fileList *filelist)
+{
+	struct kv_node *node;
+	size_t f;
+
+	f = 0;
+	STAILQ_FOREACH(node, &src->v.set, hook) {
+		if (node->value.type != VALT_STR)
+			return "fileList entry is not a string";
+		f++;
+	}
+
+	INIT_ASN1_ARRAY(&filelist->list, f, FileAndHash_t);
+	f = 0;
+	STAILQ_FOREACH(node, &src->v.set, hook)
+		init_8str(&filelist->list.array[f++]->file, node->value.v.str);
+
+	add_filelist_fields(rootf, filelist, true, false);
+	return NULL;
+}
+
+static error_msg
+parse_filelist_map(struct field *rootf, struct kv_value *src,
+    struct Manifest__fileList *filelist)
+{
+	struct keyval *kv;
+	FileAndHash_t *fah;
+	int f;
+
+	f = 0;
+	STAILQ_FOREACH(kv, &src->v.map, hook) {
+		if (kv->value.type != VALT_STR)
+			return "fileList entry is not a string";
+		f++;
+	}
+
+	INIT_ASN1_ARRAY(&filelist->list, f, FileAndHash_t);
+	f = 0;
+	STAILQ_FOREACH(kv, &src->v.map, hook) {
+		fah = filelist->list.array[f++];
+		init_8str(&fah->file, kv->key);
+		parse_bitstr(NULL, &kv->value, &fah->hash);
+	}
+
+	add_filelist_fields(rootf, filelist, true, true);
+	return NULL;
+}
+
+static error_msg
+parse_filelist(struct field *rootf, struct kv_value *src, void *arg)
+{
+	error_msg error = NULL;
+
+	rootf->children = NULL;
+
+	switch (src->type) {
+	case VALT_STR:	error = parse_filelist_str(rootf, src, arg);	break;
+	case VALT_SET:	error = parse_filelist_set(rootf, src, arg);	break;
+	case VALT_MAP:	error = parse_filelist_map(rootf, src, arg);	break;
+	}
+
+	return error;
+}
+
+static void
+print_filelist(struct dynamic_string *dstr, void *arg)
+{
+	struct Manifest__fileList *filelist = arg;
+	FileAndHash_t *fah;
+	int f;
+
+	dstr_append(dstr, "{ ");
+
+	for (f = 0; f < filelist->list.count; f++) {
+		fah = filelist->list.array[f];
+		print_ia5str(dstr, &fah->file);
+		dstr_append(dstr, "=");
+		print_bitstr(dstr, &fah->hash);
+
+		print_array_separator(dstr, f, filelist->list.count);
+	}
+
+	dstr_append(dstr, "}");
+}
+
 const struct field_type ft_bool = { "BOOLEAN", parse_bool, print_bool };
 const struct field_type ft_int = { "INTEGER", parse_int, print_int };
 const struct field_type ft_oid = { "OBJECT_IDENTIFIER", parse_oid, print_oid };
 const struct field_type ft_8str = { "OCTET_STRING", parse_8str, print_8str };
+const struct field_type ft_ia5str = { "IA5String", parse_ia5str, print_ia5str };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
 const struct field_type ft_bitstr = { "BIT_STRING", parse_bitstr, print_bitstr };
 const struct field_type ft_name = { "Name", parse_name, print_name };
@@ -1356,6 +1500,7 @@ const struct field_type ft_ip_roa = { "IP Resources (ROA)", parse_ips_roa, print
 const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_cer, print_cer_ips };
 const struct field_type ft_asn_cer = { "AS Resources", parse_asns, print_asns };
 const struct field_type ft_revoked = { "Revoked Certificates", parse_revoked_list, print_revokeds };
+const struct field_type ft_filelist = { "File List", parse_filelist, print_filelist };
 
 struct field *
 __field_add(struct field *parent, char const *name)
@@ -1378,19 +1523,26 @@ field_add_static(struct field *parent, char const *name)
 	return __field_add(parent, name);
 }
 
+static void
+n2str(size_t n, char *str)
+{
+	int written;
+
+	written = snprintf(str, 20, "%zu", n);
+	if (written < 0 || written >= 20)
+		panic("snprintf(%zu): %d", n, written);
+}
+
 struct field *
 field_add_static_n(struct field *parent, size_t n)
 {
 	char buf[20];
-	int written;
 	struct field *result;
 
-	written = snprintf(buf, 20, "%zu", n);
-	if (written < 0 || written >= 20)
-		panic("snprintf(%zu): %d", n, written);
+	n2str(n, buf);
 
 	result = field_add_static(parent, pstrdup(buf));
-	result->invisible = true;
+	/* result->invisible = true; */
 	return result;
 }
 
@@ -1435,6 +1587,19 @@ field_add_spki(struct field *parent, char const *name,
 	return new;
 }
 
+void
+field_add_file(struct field *filelist, size_t f, struct FileAndHash *fah,
+    bool name_overridden, bool hash_overridden)
+{
+	struct field *numf, *child;
+
+	numf = field_add_static_n(filelist, f);
+	child = field_add(numf, "file", &ft_ia5str, &fah->file, 0);
+	child->overridden = name_overridden;
+	child = field_add(numf, "hash", &ft_bitstr, &fah->hash, 0);
+	child->overridden = hash_overridden;
+}
+
 struct field *
 fields_find(struct field *root, char const *key)
 {
@@ -1462,10 +1627,22 @@ fields_find(struct field *root, char const *key)
 	} while (true);
 }
 
+struct field *
+fields_find_n(struct field *parent, size_t n)
+{
+	char buf[20];
+	n2str(n, buf);
+	return fields_find(parent, buf);
+}
+
 bool
 fields_overridden(struct field *root, char const *key)
 {
 	struct field *node;
+
+	if (!root)
+		return false;
+
 	node = fields_find(root, key);
 	return node ? node->overridden : false;
 }

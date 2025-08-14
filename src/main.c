@@ -165,13 +165,10 @@ parse_options(int argc, char **argv)
 }
 
 static enum file_type
-__infer_type(struct rpki_tree_node *node)
+infer_type(struct rpki_tree_node *node)
 {
 	size_t namelen;
 	char *extension;
-
-	if (node->type != FT_UNKNOWN)
-		return node->type;
 
 	namelen = strlen(node->meta.name);
 	if (namelen < 4)
@@ -190,76 +187,22 @@ __infer_type(struct rpki_tree_node *node)
 	return FT_UNKNOWN;
 }
 
-static enum file_type
-infer_type(struct rpki_tree_node *node)
-{
-	node->type = __infer_type(node);
-	return node->type;
-}
-
 static struct rpki_tree_node *
 find_child(struct rpki_tree_node *parent, enum file_type type)
 {
 	struct rpki_tree_node *child, *tmp;
 
 	HASH_ITER(phook, parent->children, child, tmp)
-		if (infer_type(child) == type)
+		if (child->type == type)
 			return child;
 
 	return NULL;
 }
 
 static void
-autogenerate_uri_and_path(struct rpki_tree_node *node)
+init_type(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
-	node->meta.uri = generate_uri(node->meta.parent, node->meta.name);
-	pr_debug("- uri: %s", node->meta.uri);
-
-	node->meta.path = generate_path(node->meta.parent, node->meta.name);
-	pr_debug("- path: %s", node->meta.path);
-}
-
-static void
-add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
-    void *arg)
-{
-	struct rpki_tree_node *child;
-	struct rpki_certificate *ca;
-	char *slash;
-
-	if (parent->type != FT_CER && parent->type != FT_TA)
-		return;
-	ca = parent->obj;
-
-	if (find_child(parent, FT_MFT) == NULL) {
-		pr_debug("Need to create %s's Manifest", ca->rpp.caRepository);
-		child = pzalloc(sizeof(struct rpki_tree_node));
-		slash = strrchr(ca->rpp.rpkiManifest, '/');
-		child->meta.name = slash ? (slash + 1) : ca->rpp.rpkiManifest;
-		child->meta.parent = ca;
-		child->meta.fields = pzalloc(sizeof(struct field));
-		child->type = FT_MFT;
-		child->obj = mft_new(&child->meta);
-		autogenerate_uri_and_path(child);
-		mft_generate_paths(child->obj);
-		child->parent = parent;
-		rpkitree_add(tree, parent, child);
-	}
-
-	if (find_child(parent, FT_CRL) == NULL) {
-		pr_debug("Need to create %s's CRL", ca->rpp.caRepository);
-		child = pzalloc(sizeof(struct rpki_tree_node));
-		slash = strrchr(ca->rpp.crldp, '/');
-		child->meta.name = slash ? (slash + 1) : ca->rpp.crldp;
-		child->meta.parent = ca;
-		child->meta.fields = pzalloc(sizeof(struct field));
-		child->type = FT_CRL;
-		child->obj = crl_new(&child->meta);
-		autogenerate_uri_and_path(child);
-		crl_generate_paths(child->obj);
-		child->parent = parent;
-		rpkitree_add(tree, parent, child);
-	}
+	node->type = infer_type(node);
 }
 
 static void
@@ -285,7 +228,7 @@ init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 
 	init_parent(node);
 
-	switch (infer_type(node)) {
+	switch (node->type) {
 	case FT_TA:
 		node->obj = cer_new(&node->meta, CT_TA);
 		break;
@@ -296,7 +239,7 @@ init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 		node->obj = crl_new(&node->meta);
 		break;
 	case FT_MFT:
-		node->obj = mft_new(&node->meta);
+		node->obj = mft_new(node);
 		break;
 	case FT_ROA:
 		node->obj = roa_new(&node->meta);
@@ -307,13 +250,23 @@ init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 }
 
 static void
+autogenerate_uri_and_path(struct rpki_tree_node *node)
+{
+	node->meta.uri = generate_uri(node->meta.parent, node->meta.name);
+	pr_debug("- uri: %s", node->meta.uri);
+
+	node->meta.path = generate_path(node->meta.parent, node->meta.name);
+	pr_debug("- path: %s", node->meta.path);
+}
+
+static void
 generate_paths(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Generating paths: %s", node->meta.name);
 
 	autogenerate_uri_and_path(node);
 
-	switch (infer_type(node)) {
+	switch (node->type) {
 	case FT_TA:
 	case FT_CER:
 		cer_generate_paths(node->obj);
@@ -332,6 +285,57 @@ generate_paths(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	}
 }
 
+static struct rpki_tree_node *
+create_missing_node(char *url, struct rpki_certificate *ca)
+{
+	struct rpki_tree_node *child;
+	char *slash;
+
+	child = pzalloc(sizeof(struct rpki_tree_node));
+	slash = strrchr(url, '/');
+	child->meta.name = slash ? (slash + 1) : url;
+	child->meta.parent = ca;
+	child->meta.fields = pzalloc(sizeof(struct field));
+
+	autogenerate_uri_and_path(child);
+
+	return child;
+}
+
+static void
+add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
+    void *arg)
+{
+	struct rpki_tree_node *mft, *crl;
+	struct rpki_certificate *ca;
+
+	if (parent->type != FT_CER && parent->type != FT_TA)
+		return;
+	ca = parent->obj;
+
+	mft = find_child(parent, FT_MFT);
+	if (!mft) {
+		pr_debug("Need to create %s's Manifest", ca->rpp.caRepository);
+		mft = create_missing_node(ca->rpp.rpkiManifest, ca);
+		mft->type = FT_MFT;
+		mft->parent = parent; /* Needed by mft_new() */
+		mft->obj = mft_new(mft);
+		mft_generate_paths(mft->obj);
+		rpkitree_add(tree, parent, mft);
+	}
+
+	if (find_child(parent, FT_CRL) == NULL) {
+		pr_debug("Need to create %s's CRL", ca->rpp.caRepository);
+		crl = create_missing_node(ca->rpp.crldp, ca);
+		crl->type = FT_CRL;
+		crl->obj = crl_new(&crl->meta);
+		crl_generate_paths(crl->obj);
+		rpkitree_add(tree, parent, crl);
+
+		mft_fix_filelist_crl(mft->obj, crl->meta.name);
+	}
+}
+
 static void
 apply_keyvals(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
@@ -344,7 +348,7 @@ finish_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Finishing (unless it's a manifest): %s", node->meta.name);
 
-	switch (infer_type(node)) {
+	switch (node->type) {
 	case FT_TA:
 		cer_finish_ta(node->obj);
 		break;
@@ -367,7 +371,7 @@ finish_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 static void
 finish_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
-	if (infer_type(node) != FT_MFT)
+	if (node->type != FT_MFT)
 		return;
 
 	pr_debug("Finishing: %s", node->meta.name);
@@ -379,7 +383,7 @@ write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Writing file (unless it's a manifest): %s", node->meta.name);
 
-	switch (infer_type(node)) {
+	switch (node->type) {
 	case FT_TA:
 	case FT_CER:
 		cer_write(node->obj);
@@ -400,7 +404,7 @@ write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 static void
 write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
-	if (infer_type(node) != FT_MFT)
+	if (node->type != FT_MFT)
 		return;
 
 	pr_debug("Writing: %s", node->meta.name);
@@ -424,7 +428,7 @@ print_repository_md(struct rpki_tree *tree)
 		printf("- URI: %s\n", node->meta.uri);
 		printf("- path: %s\n", node->meta.path);
 
-		switch (infer_type(node)) {
+		switch (node->type) {
 		case FT_TA:
 		case FT_CER:
 			cer_print_md(node->obj);
@@ -455,7 +459,7 @@ print_repository_csv(struct rpki_tree *tree)
 	struct rpki_tree_node *node, *tmp;
 
 	HASH_ITER(ghook, tree->nodes, node, tmp) {
-		switch (infer_type(node)) {
+		switch (node->type) {
 		case FT_TA:
 		case FT_CER:
 			cer_print_csv(node->obj);
@@ -491,11 +495,15 @@ main(int argc, char **argv)
 {
 	struct rpki_tree tree;
 
-	/* register_signal_handlers(); TODO */
+	register_signal_handlers();
 
 	parse_options(argc, argv);
 
 	tree = rpkitree_load(repo_descriptor);
+
+	pr_debug("Figuring out object types...");
+	rpkitree_pre_order(&tree, init_type, NULL);
+	pr_debug("Done.\n");
 
 	pr_debug("Instancing generic RPKI objects...");
 	rpkitree_pre_order(&tree, init_object, NULL);

@@ -28,6 +28,11 @@ extern unsigned int verbosity;
 	} while (0)
 #define PR_TRACE pr_trace
 
+#define pr_warn(fmt, ...) do {						\
+		fprintf(stderr, C_YLLW "[WRN %10.10s:%4.4d] " fmt C_RST "\n",\
+		    __func__, __LINE__, ##__VA_ARGS__);			\
+	} while (0)
+
 #define pr_err(fmt, ...) do {						\
 		fprintf(stderr, C_RED "[ERR %10.10s:%4.4d] " fmt C_RST "\n",\
 		    __func__, __LINE__, ##__VA_ARGS__);			\
@@ -42,5 +47,7 @@ extern unsigned int verbosity;
 #define enomem panic("Out of memory")
 
 #define PR_DEBUG printf(C_GRN "[DBG %s:%d]" C_RST "\n", __func__, __LINE__)
+
+void register_signal_handlers(void);
 
 #endif /* SRC_PRINT_H_ */

@@ -6,14 +6,56 @@
 #include "libcrypto.h"
 #include "oid.h"
 
+static void
+init_filelist(Manifest_t *mft, struct rpki_tree_node *node, struct field *field)
+{
+	unsigned int f, c;
+	FileAndHash_t *file;
+	struct rpki_tree_node *sibling, *tmp;
+
+	pr_trace("Creating fileList");
+
+	if (node->parent == NULL)
+		return; /* Leave zeroes */
+
+	f = c = 0;
+	HASH_ITER(phook, node->parent->children, sibling, tmp) {
+		if (sibling->type != FT_MFT)
+			f++;
+		if (sibling->type == FT_CRL)
+			c++;
+	}
+	if (c == 0)
+		f++; /* The CRL will be added later */
+
+	INIT_ASN1_ARRAY(&mft->fileList.list, f, FileAndHash_t);
+
+	f = 0;
+	HASH_ITER(phook, node->parent->children, sibling, tmp) {
+		if (sibling->type == FT_MFT)
+			continue;
+
+		file = mft->fileList.list.array[f];
+		init_8str(&file->file, sibling->meta.name);
+		field_add_file(field, f, file, false, false);
+
+		f++;
+	}
+
+	if (c == 0) { /* Add fields for the CRL we'll add later */
+		file = mft->fileList.list.array[f];
+		field_add_file(field, f, file, false, false);
+	}
+}
+
 struct signed_object *
-mft_new(struct rpki_object *meta)
+mft_new(struct rpki_tree_node *node)
 {
 	struct signed_object *so;
 	Manifest_t *mft;
-	struct field *eContent;
+	struct field *eContent, *fileList;
 
-	so = signed_object_new(meta, NID_id_ct_rpkiManifest, &eContent);
+	so = signed_object_new(&node->meta, NID_id_ct_rpkiManifest, &eContent);
 	mft = &so->obj.mft;
 
 	mft->version = intmax2INTEGER(0);
@@ -31,7 +73,8 @@ mft_new(struct rpki_object *meta)
 	init_oid(&mft->fileHashAlg, NID_sha256);
 	field_add(eContent, "fileHashAlg", &ft_oid, &mft->fileHashAlg, 0);
 
-	/* TODO fileList not implemented yet */
+	fileList = field_add(eContent, "fileList", &ft_filelist, &mft->fileList, 0);
+	init_filelist(mft, node, fileList);
 
 	return so;
 }
@@ -43,30 +86,75 @@ mft_generate_paths(struct signed_object *so)
 }
 
 void
+mft_fix_filelist_crl(struct signed_object *mft, char const *crl_name)
+{
+	struct Manifest__fileList *file_list;
+	FileAndHash_t *file;
+
+	file_list = &mft->obj.mft.fileList;
+	file = file_list->list.array[file_list->list.count - 1];
+
+	init_8str(&file->file, crl_name);
+}
+
+bool
+str_equals_ia5str(char const *str, IA5String_t *ia5)
+{
+	return (strlen(str) == ia5->size)
+	    && (strncmp(str, (char *)ia5->buf, ia5->size) == 0);
+}
+
+struct rpki_tree_node *
+find_sibling(struct rpki_tree_node *siblings, IA5String_t *name)
+{
+	struct rpki_tree_node *sibling, *tmp;
+
+	HASH_ITER(phook, siblings, sibling, tmp)
+		if (str_equals_ia5str(sibling->meta.name, name))
+			return sibling;
+
+	return NULL;
+}
+
+void
 mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
 {
 	Manifest_t *mft;
-	unsigned int nfiles, f;
+	struct field *rootf;
+	int f;
 	FileAndHash_t *file;
+	struct rpki_tree_node *sibling;
 	unsigned char hash[EVP_MAX_MD_SIZE];
 	unsigned int hlen;
-	struct rpki_tree_node *node, *tmp;
 
-	// TODO autocomputed even if overridden
+	pr_debug("- Adding missing fileList hashes");
 
-	pr_debug("- Creating fileList");
 	mft = &so->obj.mft;
-	nfiles = HASH_CNT(phook, siblings) - 1;
-	f = 0;
-	INIT_ASN1_ARRAY(&mft->fileList.list, nfiles, FileAndHash_t);
+	rootf = fields_find(so->meta->fields,
+	    "content.encapContentInfo.eContent.fileList");
 
-	HASH_ITER(phook, siblings, node, tmp) {
-		if (node->type == FT_MFT)
+	for (f = 0; f < mft->fileList.list.count; f++) {
+		file = mft->fileList.list.array[f];
+		if (file->file.size == 0) {
+			pr_trace("  + filelist %d does not have a name", f);
 			continue;
+		}
 
-		file = mft->fileList.list.array[f++];
-		init_8str(&file->file, node->meta.name);
-		sha256_file(node->meta.path, hash, &hlen);
+		if (fields_overridden(fields_find_n(rootf, f), "hash")) {
+			pr_trace("  + filelist %d is overridden", f);
+			continue;
+		}
+
+		sibling = find_sibling(siblings, &file->file);
+		if (!sibling) {
+			pr_warn("I can't find %.*s (fileList %d); "
+			    "its manifest hash will be left blank.",
+			    (int)file->file.size, (char *)file->file.buf, f);
+			continue;
+		}
+
+		pr_trace("  + filelist %d: hashing", f);
+		sha256_file(sibling->meta.path, hash, &hlen);
 		file->hash.buf = pzalloc(hlen);
 		memcpy(file->hash.buf, hash, hlen);
 		file->hash.size = hlen;
