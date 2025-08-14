@@ -455,7 +455,6 @@ Add Github issues:
 - `include`s is configuration
 - Allow newline escaping?
 - I commented the RRDP code to force myself to upload the prototype today
-- The key pair generation is taking too long; maybe provide a means to weaken the RNG
 - May want to purge all the memory leaks
 - Still unimplemented fields
 	- Certificates
@@ -469,8 +468,6 @@ Add Github issues:
 		- AIA extnValue
 		- SIA extnValue
 		- CP extnValue
-	- Manifests
-		- fileList
 	- Manifests, ROAs
 		- signedAttrs
 		- unsignedAttrs
