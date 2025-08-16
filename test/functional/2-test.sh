@@ -12,7 +12,7 @@ mkdir -p "sandbox/rsync"
 mkdir -p "sandbox/tal"
 
 if [ -z "$(ls -A sandbox/keys)" ]; then    # "If sandbox/keys is empty"
-	for i in $(seq 0 10); do
+	for i in $(seq 0 20); do
 		echo "Creating sandbox/keys/$i.pem"
 		openssl genrsa -out "sandbox/keys/$i.pem" 2048
 	done
@@ -80,78 +80,145 @@ FAILS=0
 
 HEXNUM="0x[0-9A-F][0-9A-F]*"
 
-check_output_contains "root-only-signature" "ta\\.cer,signature,0x010203"
-check_output_contains "root-only" "ta\\.cer,signature,$HEXNUM"
-check_output_contains "root-only-signature-crl" "0\\.crl,signature,0x010203"
-check_output_contains "root-only" "0\\.crl,signature,$HEXNUM"
+check_output_contains "tutorial-num" \
+	"1.cer,tbsCertificate.version,INTEGER,0x1234" \
+	"2.cer,tbsCertificate.version,INTEGER,0x1234" \
+	"3.cer,tbsCertificate.version,INTEGER,0x1234" \
+	"1.cer,tbsCertificate.extensions.bc.critical,BOOLEAN,true" \
+	"ta.mft,content.signerInfos.0.signature,OCTET STRING,0x1234" \
+	"1.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1234" \
+	"1.cer,tbsCertificate.signature.parameters,ANY,0x1234" \
+	"2.cer,tbsCertificate.signature.parameters,ANY,0x123456" \
+	"3.cer,tbsCertificate.signature.parameters,ANY,0x123456" \
+	"4.cer,tbsCertificate.signature.parameters,ANY,0x00A100A200A300A400A500A600A700A880B180B280B380B480B580B680B780B8A0C1A0C2A0C3A0C4A0C500C6A0C7A0C8F0D1F0D2F0D3F0D4F0D5F0D6F0D7F0" \
+	"4.cer,tbsCertificate.version,INTEGER,0x00000001" \
+	"5.cer,tbsCertificate.signature.parameters,ANY,0x00000001" \
+	"2.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
+	"3.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
+	"4.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
+	"5.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1000000000000000000000000000000000" \
+	"6.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1000000000000000000000000000000000" \
+	"5.cer,tbsCertificate.version,INTEGER,0x0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+check_output_contains "tutorial-bool" \
+	"ta.cer,tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
+	"ta.cer,tbsCertificate.extensions.asn.critical,BOOLEAN,true" \
+	"ta.cer,tbsCertificate.extensions.ski.critical,BOOLEAN,false"
+
+check_output_contains "tutorial-oid" \
+	"roa1.roa,content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.26 (id-ct-rpkiManifest)"
+
+check_output_contains "tutorial-date" \
+	"ta.cer,tbsCertificate.validity.notBefore,Time,2025-07-15T19:39:38Z"
+
+check_output_contains "tutorial-ext" \
+	"ta.cer,tbsCertificate.extensions,Extensions,\"\[ bc, ski, ku, sia, cp, ip, asn \]\"" \
+	"ca1.cer,tbsCertificate.extensions,Extensions,\"\[ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn \]\"" \
+	"roa1.roa,content.certificates.0.tbsCertificate.extensions,Extensions,\"\[ ski, aki, ku, crldp, aia, sia, cp, ip, asn \]\"" \
+	"ta.crl,tbsCertList.crlExtensions,Extensions,\"\[ aki, crln \]\"" \
+	"ca1.cer,tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.28 (sbgp-ipAddrBlockv2)" \
+	"ca1.cer,tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
+	"ca1.cer,tbsCertificate.extensions.ip.extnValue,IP Resources (Certificate),\"\[ \[ 192.0.2.0/24 \], \[ 2001:db8::/96 \] \]\"" \
+	"ca1.cer,tbsCertificate.extensions.asn.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.29 (sbgp-autonomousSysNumv2)" \
+	"ca1.cer,tbsCertificate.extensions.asn.critical,BOOLEAN,true" \
+	"ca1.cer,tbsCertificate.extensions.asn.extnValue.asnum,AS Resources,\"\[ 0x1234, 0x5678 \]\"" \
+	"ca1.cer,tbsCertificate.extensions.asn.extnValue.rdi,AS Resources,\"\[ 0x9ABC, 0xDEF0 \]\"" \
+	"ca2.cer,tbsCertificate.extensions,Extensions,\"\[ ip, asn \]\"" \
+	"ca2.cer,tbsCertificate.extensions.0.extnID,OBJECT IDENTIFIER,1.2.3.4.5" \
+	"ca3.cer,tbsCertificate.extensions,Extensions,\"\[ ip, asn, ip, bc, ip, asn \]\"" \
+	"ca3.cer,tbsCertificate.extensions.4.extnID,OBJECT IDENTIFIER,1.2.3.4.5"
+
+check_output_contains "tutorial-ip" \
+	"roa1.roa,content.encapContentInfo.eContent.ipAddrBlocks,IP Resources (ROA),\"\[ \[ 192.0.2.0/24, 203.0.113.0/32 \], \[ 2001:db8::/40-48 \] \]\""
+
+check_output_contains "root-only-signature" "ta\\.cer,signature,BIT STRING,0x010203"
+check_output_contains "root-only" "ta\\.cer,signature,BIT STRING,$HEXNUM"
+check_output_contains "root-only-signature-crl" "0\\.crl,signature,BIT STRING,0x010203"
+check_output_contains "root-only" "0\\.crl,signature,BIT STRING,$HEXNUM"
 
 FILELIST="content\\.encapContentInfo\\.eContent\\.fileList"
 check_output_contains "root-only" \
-	"0\\.mft,$FILELIST,{ 0\\.crl=$HEXNUM }" \
-	"0\\.mft,$FILELIST\\.0\\.file,0\\.crl" \
-	"0\\.mft,$FILELIST\\.0\\.hash,$HEXNUM"
+	"0\\.mft,$FILELIST,File List,{ 0\\.crl=$HEXNUM }" \
+	"0\\.mft,$FILELIST\\.0\\.file,IA5String,0\\.crl" \
+	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,$HEXNUM"
 check_output_contains "filelist-str" \
-	"0\\.mft,$FILELIST,\"{ =0, =0, =0 }\"" \
-	"0\\.mft,$FILELIST\\.0\\.file," \
-	"0\\.mft,$FILELIST\\.0\\.hash,0" \
-	"0\\.mft,$FILELIST\\.1\\.file," \
-	"0\\.mft,$FILELIST\\.1\\.hash,0" \
-	"0\\.mft,$FILELIST\\.2\\.file," \
-	"0\\.mft,$FILELIST\\.2\\.hash,0"
+	"0\\.mft,$FILELIST,File List,\"{ =0, =0, =0 }\"" \
+	"0\\.mft,$FILELIST\\.0\\.file,IA5String," \
+	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,0" \
+	"0\\.mft,$FILELIST\\.1\\.file,IA5String," \
+	"0\\.mft,$FILELIST\\.1\\.hash,BIT STRING,0" \
+	"0\\.mft,$FILELIST\\.2\\.file,IA5String," \
+	"0\\.mft,$FILELIST\\.2\\.hash,BIT STRING,0"
 check_output_contains "filelist-str-extra" \
-	"0\\.mft,$FILELIST,\"{ =0, fake=0, =0x0102 }\"" \
-	"0\\.mft,$FILELIST\\.0\\.file," \
-	"0\\.mft,$FILELIST\\.0\\.hash,0" \
-	"0\\.mft,$FILELIST\\.1\\.file,fake" \
-	"0\\.mft,$FILELIST\\.1\\.hash,0" \
-	"0\\.mft,$FILELIST\\.2\\.file," \
-	"0\\.mft,$FILELIST\\.2\\.hash,0x0102"
+	"0\\.mft,$FILELIST,File List,\"{ =0, fake=0, =0x0102 }\"" \
+	"0\\.mft,$FILELIST\\.0\\.file,IA5String," \
+	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,0" \
+	"0\\.mft,$FILELIST\\.1\\.file,IA5String,fake" \
+	"0\\.mft,$FILELIST\\.1\\.hash,BIT STRING,0" \
+	"0\\.mft,$FILELIST\\.2\\.file,IA5String," \
+	"0\\.mft,$FILELIST\\.2\\.hash,BIT STRING,0x0102"
 check_output_contains "filelist-set" \
-	"0\\.mft,$FILELIST,\"{ no1=0, 0\\.crl=$HEXNUM, no2=0 }\"" \
-	"0\\.mft,$FILELIST\\.0\\.file,no1" \
-	"0\\.mft,$FILELIST\\.0\\.hash,0" \
-	"0\\.mft,$FILELIST\\.1\\.file,0\\.crl" \
-	"0\\.mft,$FILELIST\\.1\\.hash,$HEXNUM" \
-	"0\\.mft,$FILELIST\\.2\\.file,no2" \
-	"0\\.mft,$FILELIST\\.2\\.hash,0"
+	"0\\.mft,$FILELIST,File List,\"{ no1=0, 0\\.crl=$HEXNUM, no2=0 }\"" \
+	"0\\.mft,$FILELIST\\.0\\.file,IA5String,no1" \
+	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,0" \
+	"0\\.mft,$FILELIST\\.1\\.file,IA5String,0\\.crl" \
+	"0\\.mft,$FILELIST\\.1\\.hash,BIT STRING,$HEXNUM" \
+	"0\\.mft,$FILELIST\\.2\\.file,IA5String,no2" \
+	"0\\.mft,$FILELIST\\.2\\.hash,BIT STRING,0"
 check_output_contains "filelist-set-extra" \
-	"0\\.mft,$FILELIST,\"{ no1=0x0304, 0\\.crl=$HEXNUM, yes=0 }\"" \
-	"0\\.mft,$FILELIST\\.0\\.file,no1" \
-	"0\\.mft,$FILELIST\\.0\\.hash,0x0304" \
-	"0\\.mft,$FILELIST\\.1\\.file,0\\.crl" \
-	"0\\.mft,$FILELIST\\.1\\.hash,$HEXNUM" \
-	"0\\.mft,$FILELIST\\.2\\.file,yes" \
-	"0\\.mft,$FILELIST\\.2\\.hash,0"
+	"0\\.mft,$FILELIST,File List,\"{ no1=0x0304, 0\\.crl=$HEXNUM, yes=0 }\"" \
+	"0\\.mft,$FILELIST\\.0\\.file,IA5String,no1" \
+	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,0x0304" \
+	"0\\.mft,$FILELIST\\.1\\.file,IA5String,0\\.crl" \
+	"0\\.mft,$FILELIST\\.1\\.hash,BIT STRING,$HEXNUM" \
+	"0\\.mft,$FILELIST\\.2\\.file,IA5String,yes" \
+	"0\\.mft,$FILELIST\\.2\\.hash,BIT STRING,0"
 check_output_contains "filelist-map" \
-	"0\\.mft,$FILELIST,\"{ a=0x01, b=0x02, c=0x03 }\"" \
-	"0\\.mft,$FILELIST\\.0\\.file,a" \
-	"0\\.mft,$FILELIST\\.0\\.hash,0x01" \
-	"0\\.mft,$FILELIST\\.1\\.file,b" \
-	"0\\.mft,$FILELIST\\.1\\.hash,0x02" \
-	"0\\.mft,$FILELIST\\.2\\.file,c" \
-	"0\\.mft,$FILELIST\\.2\\.hash,0x03"
+	"0\\.mft,$FILELIST,File List,\"{ a=0x01, b=0x02, c=0x03 }\"" \
+	"0\\.mft,$FILELIST\\.0\\.file,IA5String,a" \
+	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,0x01" \
+	"0\\.mft,$FILELIST\\.1\\.file,IA5String,b" \
+	"0\\.mft,$FILELIST\\.1\\.hash,BIT STRING,0x02" \
+	"0\\.mft,$FILELIST\\.2\\.file,IA5String,c" \
+	"0\\.mft,$FILELIST\\.2\\.hash,BIT STRING,0x03"
 check_output_contains "filelist-map-extra" \
-	"0\\.mft,$FILELIST,\"{ a=0x01, b=0x10, ddd=0x03 }\"" \
-	"0\\.mft,$FILELIST\\.0\\.file,a" \
-	"0\\.mft,$FILELIST\\.0\\.hash,0x01" \
-	"0\\.mft,$FILELIST\\.1\\.file,b" \
-	"0\\.mft,$FILELIST\\.1\\.hash,0x10" \
-	"0\\.mft,$FILELIST\\.2\\.file,ddd" \
-	"0\\.mft,$FILELIST\\.2\\.hash,0x03"
+	"0\\.mft,$FILELIST,File List,\"{ a=0x01, b=0x10, ddd=0x03 }\"" \
+	"0\\.mft,$FILELIST\\.0\\.file,IA5String,a" \
+	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,0x01" \
+	"0\\.mft,$FILELIST\\.1\\.file,IA5String,b" \
+	"0\\.mft,$FILELIST\\.1\\.hash,BIT STRING,0x10" \
+	"0\\.mft,$FILELIST\\.2\\.file,IA5String,ddd" \
+	"0\\.mft,$FILELIST\\.2\\.hash,BIT STRING,0x03"
 
-check_output_contains "filelist-tutorial-default" \
-	"mft\\.mft,$FILELIST,\"{ crl\\.crl=$HEXNUM, A\\.cer=$HEXNUM, B\\.cer=$HEXNUM }\""
-check_output_contains "filelist-tutorial-default-explicit" \
-	"mft\\.mft,$FILELIST,\"{ crl\\.crl=$HEXNUM, A\\.cer=$HEXNUM, B\\.cer=$HEXNUM }\""
-check_output_contains "filelist-tutorial-crl-omitted" \
-	"mft\\.mft,$FILELIST,\"{ A\\.cer=$HEXNUM, B\\.cer=$HEXNUM, 0\\.crl=$HEXNUM }\""
-check_output_contains "filelist-tutorial-overrides-isolated" \
-	"mft\\.mft,$FILELIST,\"{ crl\\.crl=$HEXNUM, A\\.cer=0x010203, potatoes=0 }\""
-check_output_contains "filelist-tutorial-overrides-full" \
-	"mft\\.mft,$FILELIST,\"{ A\\.cer=0x010203, nonexistent\\.cer=0x040506, mft\\.mft=0x112233, foobar=0x55555555555555 }\""
+check_output_contains "tutorial-filelist-default" \
+	"mft\\.mft,$FILELIST,File List,\"{ crl\\.crl=$HEXNUM, A\\.cer=$HEXNUM, B\\.cer=$HEXNUM }\""
+check_output_contains "tutorial-filelist-default-explicit" \
+	"mft\\.mft,$FILELIST,File List,\"{ crl\\.crl=$HEXNUM, A\\.cer=$HEXNUM, B\\.cer=$HEXNUM }\""
+check_output_contains "tutorial-filelist-crl-omitted" \
+	"mft\\.mft,$FILELIST,File List,\"{ A\\.cer=$HEXNUM, B\\.cer=$HEXNUM, 0\\.crl=$HEXNUM }\""
+check_output_contains "tutorial-filelist-overrides-isolated" \
+	"mft\\.mft,$FILELIST,File List,\"{ crl\\.crl=$HEXNUM, A\\.cer=0x010203, potatoes=0 }\""
+check_output_contains "tutorial-filelist-overrides-full" \
+	"mft\\.mft,$FILELIST,File List,\"{ A\\.cer=0x010203, nonexistent\\.cer=0x040506, mft\\.mft=0x112233, foobar=0x55555555555555 }\""
 
 check_output_contains "eContent" \
-	"0\\.mft,content\\.encapContentInfo\\.eContent,0xAABBCC"
+	"0\\.mft,content\\.encapContentInfo\\.eContent,ANY,0xAABBCC"
+
+check_output_contains "obj0" \
+	"ta\\.cer,tbsCertificate\\.version,INTEGER,0x04" \
+	"ta\\.cer,tbsCertificate\\.serialNumber,INTEGER,0x05" \
+	"ta\\.cer,tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
+	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
+check_output_contains "obj1" \
+	"ta\\.cer,tbsCertificate\\.version,INTEGER,0x04" \
+	"ta\\.cer,tbsCertificate\\.serialNumber,INTEGER,0x05" \
+	"ta\\.cer,tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
+	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
+check_output_contains "obj2" \
+	"ta\\.cer,tbsCertificate\\.version,INTEGER,0x04" \
+	"ta\\.cer,tbsCertificate\\.serialNumber,INTEGER,0x05" \
+	"ta\\.cer,tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
+	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
 
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

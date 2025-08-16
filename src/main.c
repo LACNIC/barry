@@ -340,7 +340,7 @@ static void
 apply_keyvals(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Applying keyvals: %s", node->meta.name);
-	fields_apply_keyvals(node->meta.fields, node->obj, &node->props);
+	fields_apply_keyvals(node->meta.fields, &node->props);
 }
 
 static void

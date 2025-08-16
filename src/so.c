@@ -132,8 +132,8 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 	struct field *sdf;
 	DigestAlgorithmIdentifier_t *dai;
 	struct field *ecif;
-	struct field *cerf;
-	struct field *sif;
+	struct field *cersf, *cerf;
+	struct field *sisf, *sif;
 
 	so = pzalloc(sizeof(struct signed_object));
 	so->meta = meta;
@@ -141,7 +141,7 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 
 	init_oid(&so->ci.contentType, NID_pkcs7_signed);
 	field_add(meta->fields, "contentType", &ft_oid, &so->ci.contentType, 0);
-	sdf = field_add_static(meta->fields, "content");
+	sdf = field_add(meta->fields, "content", &ft_obj, &so->ci.content, 0);
 
 	init_INTEGER(&sd->version, 3);
 	field_add(sdf, "version", &ft_int, &sd->version, 0);
@@ -153,14 +153,15 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 
 	init_oid(&sd->encapContentInfo.eContentType, nid);
 	/* eContent postponed */
-	ecif = field_add_static(sdf, "encapContentInfo");
+	ecif = field_add(sdf, "encapContentInfo", &ft_obj, &sd->encapContentInfo, 0);
 	field_add(ecif, "eContentType", &ft_oid, &sd->encapContentInfo.eContentType, 0);
 	*eContent = field_add(ecif, "eContent", &ft_any,
 	    &sd->encapContentInfo.eContent, sizeof(OCTET_STRING_t));
 
 	sd->certificates = pzalloc(sizeof(struct CertificateSet));
 	INIT_ASN1_ARRAY(&sd->certificates->list, 1, ANY_t);
-	cerf = field_add_static(field_add_static(sdf, "certificates"), "0");
+	cersf = field_add(sdf, "certificates", NULL, NULL, 0);
+	cerf = field_add(cersf, "0", &ft_obj, &so->ee, 0);
 	so->ee_meta.name = meta->name;
 	so->ee_meta.parent = meta->parent;
 	so->ee_meta.fields = cerf;
@@ -170,7 +171,8 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 
 	INIT_ASN1_ARRAY(&sd->signerInfos.list, 1, SignerInfo_t);
 	sd->signerInfos.list.array[0] = &so->si;
-	sif = field_add_static(field_add_static(sdf, "signerInfos"), "0");
+	sisf = field_add(sdf, "signerInfos", NULL, NULL, 0);
+	sif = field_add(sisf, "0", &ft_obj, &so->si, 0);
 	init_signer_info(&so->si, nid, sif);
 
 	return so;

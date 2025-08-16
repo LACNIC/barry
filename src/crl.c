@@ -38,7 +38,7 @@ crl_new(struct rpki_object *meta)
 	crl->meta = meta;
 
 	tbs = &crl->obj.tbsCertList;
-	tbsf = field_add_static(meta->fields, "tbsCertList");
+	tbsf = field_add(meta->fields, "tbsCertList", &ft_obj, tbs, 0);
 
 	tbs->version = intmax2INTEGER(1);
 	field_add(tbsf, "version", &ft_int, &tbs->version, sizeof(Version_t));
@@ -112,11 +112,16 @@ finish_extensions(struct rpki_crl *crl)
 {
 	struct ext_list_node *ext;
 	unsigned int extn;
+	struct field *fld;
 
 	extn = 0;
+	fld = fields_find(crl->meta->fields, "tbsCertList.crlExtensions");
+	if (!fld)
+		panic("CRL lacks a 'tbsCertList.crlExtensions' field.");
+
 	STAILQ_FOREACH(ext, &crl->exts, hook) {
 		if (ext->type == EXT_AKI)
-			if (!EXT_FIELD_SET(crl, "aki", extn, ".keyIdentifier"))
+			if (!EXT_FIELD_SET(fld, "aki", extn, ".keyIdentifier"))
 				finish_aki(&ext->v.aki, crl);
 
 		extn++;

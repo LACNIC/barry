@@ -48,6 +48,7 @@ struct field {
 	UT_hash_handle hh;
 };
 
+extern const struct field_type ft_obj;
 extern const struct field_type ft_bool;
 extern const struct field_type ft_int;
 extern const struct field_type ft_oid;
@@ -65,9 +66,9 @@ extern const struct field_type ft_asn_cer;
 extern const struct field_type ft_revoked;
 extern const struct field_type ft_filelist;
 
-struct field *field_add_static(struct field *, char const *);
-struct field *field_add_static_n(struct field *, size_t);
 struct field *field_add(struct field *, char const *, struct field_type const *,
+    void *, size_t);
+struct field *field_addn(struct field *, size_t, struct field_type const *,
     void *, size_t);
 struct field *field_add_algorithm(struct field *, char const *,
     AlgorithmIdentifier_t *);
@@ -79,7 +80,7 @@ struct field *fields_find(struct field *, char const *);
 struct field *fields_find_n(struct field *, size_t);
 bool fields_overridden(struct field *, char const *);
 
-void fields_apply_keyvals(struct field *, void *, struct keyvals *);
+error_msg fields_apply_keyvals(struct field *, struct keyvals *);
 void fields_print_md(struct field const *);
 void fields_print_csv(struct field const *, char const *);
 

@@ -91,13 +91,14 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 {
 	TBSCertificate_t *tbs;
 	struct field *tbsf;
+	struct field *valf;
 	struct field *extf;
 
 	cer->meta = meta;
 	cer->keys = keys_new();
 
 	tbs = &cer->obj.tbsCertificate;
-	tbsf = field_add_static(meta->fields, "tbsCertificate");
+	tbsf = field_add(meta->fields, "tbsCertificate", &ft_obj, tbs, 0);
 
 	tbs->version = intmax2INTEGER(2);
 	field_add(tbsf, "version", &ft_int, &tbs->version, sizeof(Version_t));
@@ -113,10 +114,10 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	field_add(tbsf, "issuer", &ft_name, &tbs->issuer, 0);
 
 	init_time_now(&tbs->validity.notBefore);
-	field_add(tbsf, "validity.notBefore", &ft_time, &tbs->validity.notBefore, 0);
-
 	init_time_later(&tbs->validity.notAfter);
-	field_add(tbsf, "validity.notAfter", &ft_time, &tbs->validity.notAfter, 0);
+	valf = field_add(tbsf, "validity", &ft_obj, &tbs->validity, 0);
+	field_add(valf, "notBefore", &ft_time, &tbs->validity.notBefore, 0);
+	field_add(valf, "notAfter", &ft_time, &tbs->validity.notAfter, 0);
 
 	init_name(&tbs->subject, meta->name);
 	field_add(tbsf, "subject", &ft_name, &tbs->subject, 0);
@@ -191,8 +192,12 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 {
 	struct ext_list_node *ext;
 	unsigned int extn;
+	struct field *fld;
 
 	extn = 0;
+	fld = fields_find(cer->meta->fields, "tbsCertificate.extensions");
+	if (!fld)
+		panic("Certificate lacks a 'tbsCertificate.extensions' field.");
 
 	STAILQ_FOREACH(ext, &cer->exts, hook) {
 		switch (ext->type) {
@@ -201,47 +206,47 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 			break;
 
 		case EXT_SKI:
-			if (!EXT_FIELD_SET(cer, "ski", extn, ))
+			if (!EXT_FIELD_SET(fld, "ski", extn, ))
 				ext_finish_ski(&ext->v.ski, &cer->SPKI);
 			break;
 
 		case EXT_AKI:
-			if (!EXT_FIELD_SET(cer, "aki", extn, ".keyIdentifier"))
+			if (!EXT_FIELD_SET(fld, "aki", extn, ".keyIdentifier"))
 				finish_aki(&ext->v.aki, cer);
 			break;
 
 		case EXT_KU:
-			if (!EXT_FIELD_SET(cer, "ku", extn, ))
+			if (!EXT_FIELD_SET(fld, "ku", extn, ))
 				ext_finish_ku(&ext->v.ku, type);
 			break;
 
 		case EXT_CRLDP:
-			if (!EXT_FIELD_SET(cer, "crldp", extn, ))
+			if (!EXT_FIELD_SET(fld, "crldp", extn, ))
 				finish_crldp(&ext->v.crldp, cer);
 			break;
 
 		case EXT_AIA:
-			if (!EXT_FIELD_SET(cer, "aia", extn, ))
+			if (!EXT_FIELD_SET(fld, "aia", extn, ))
 				finish_aia(&ext->v.aia, cer);
 			break;
 
 		case EXT_SIA:
-			if (!EXT_FIELD_SET(cer, "sia", extn, ))
+			if (!EXT_FIELD_SET(fld, "sia", extn, ))
 				finish_sia(&ext->v.sia, cer, type, so_uri);
 			break;
 
 		case EXT_CP:
-			if (!EXT_FIELD_SET(cer, "cp", extn, ))
+			if (!EXT_FIELD_SET(fld, "cp", extn, ))
 				ext_finish_cp(&ext->v.cp);
 			break;
 
 		case EXT_IP:
-			if (!EXT_FIELD_SET(cer, "ip", extn, ))
+			if (!EXT_FIELD_SET(fld, "ip", extn, ))
 				ext_finish_ip(&ext->v.ip);
 			break;
 
 		case EXT_ASN:
-			if (!EXT_FIELD_SET(cer, "asn", extn, ".asnum"))
+			if (!EXT_FIELD_SET(fld, "asn", extn, ".asnum"))
 				ext_finish_asn(&ext->v.asn);
 			break;
 		}

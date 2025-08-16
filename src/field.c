@@ -41,9 +41,18 @@ static error_msg const BITSTR_FORMAT = "Unknown BIT_STRING format";
 static error_msg const BAD_OID = "Unparseable OBJECT_IDENTIFIER";
 static error_msg const BAD_IP = "Unparseable IP address";
 static error_msg const NEED_STRING = "Expected a string value";
-static error_msg const NEED_SET = "Expected a set/array value";
+static error_msg const NEED_SET = "Expected a set/array value ([brackets])";
+static error_msg const NEED_MAP = "Expected a map value ({braces})";
 static error_msg const BAD_NAME = "Names are supposed to be arrays of maps whose values are strings";
 static error_msg const BAD_ASN = "Expected an array of AS identifiers or 'inherit'";
+
+static error_msg
+parse_obj(struct field *fields, struct kv_value *src, void *dst)
+{
+	return (src->type == VALT_MAP)
+		? fields_apply_keyvals(fields, &src->v.map)
+		: NEED_MAP;
+}
 
 static int
 next_hex_digit(char const **_str)
@@ -1486,13 +1495,14 @@ print_filelist(struct dynamic_string *dstr, void *arg)
 	dstr_append(dstr, "}");
 }
 
+const struct field_type ft_obj = { "Object", parse_obj, NULL };
 const struct field_type ft_bool = { "BOOLEAN", parse_bool, print_bool };
 const struct field_type ft_int = { "INTEGER", parse_int, print_int };
-const struct field_type ft_oid = { "OBJECT_IDENTIFIER", parse_oid, print_oid };
-const struct field_type ft_8str = { "OCTET_STRING", parse_8str, print_8str };
+const struct field_type ft_oid = { "OBJECT IDENTIFIER", parse_oid, print_oid };
+const struct field_type ft_8str = { "OCTET STRING", parse_8str, print_8str };
 const struct field_type ft_ia5str = { "IA5String", parse_ia5str, print_ia5str };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
-const struct field_type ft_bitstr = { "BIT_STRING", parse_bitstr, print_bitstr };
+const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr };
 const struct field_type ft_name = { "Name", parse_name, print_name };
 const struct field_type ft_time = { "Time", parse_time, print_time };
 const struct field_type ft_gtime = { "GeneralizedTime", parse_gtime, print_gtime };
@@ -1518,12 +1528,6 @@ __field_add(struct field *parent, char const *name)
 	return new;
 }
 
-struct field *
-field_add_static(struct field *parent, char const *name)
-{
-	return __field_add(parent, name);
-}
-
 static void
 n2str(size_t n, char *str)
 {
@@ -1535,14 +1539,15 @@ n2str(size_t n, char *str)
 }
 
 struct field *
-field_add_static_n(struct field *parent, size_t n)
+field_addn(struct field *parent, size_t n,
+    struct field_type const *type, void *address, size_t size)
 {
 	char buf[20];
 	struct field *result;
 
 	n2str(n, buf);
 
-	result = field_add_static(parent, pstrdup(buf));
+	result = field_add(parent, pstrdup(buf), type, address, size);
 	/* result->invisible = true; */
 	return result;
 }
@@ -1567,7 +1572,7 @@ field_add_algorithm(struct field *parent, char const *name,
 {
 	struct field *new;
 
-	new = field_add_static(parent, name);
+	new = field_add(parent, name, &ft_obj, value, 0);
 	field_add(new, "algorithm", &ft_oid, &value->algorithm, 0);
 	field_add(new, "parameters", &ft_any, &value->parameters,
 	    sizeof(ANY_t));
@@ -1581,7 +1586,7 @@ field_add_spki(struct field *parent, char const *name,
 {
 	struct field *new;
 
-	new = field_add_static(parent, name);
+	new = field_add(parent, name, &ft_obj, value, 0);
 	field_add_algorithm(new, "algorithm", &value->algorithm);
 	field_add(new, "subjectPublicKey", &ft_bitstr, &value->subjectPublicKey, 0);
 
@@ -1594,7 +1599,7 @@ field_add_file(struct field *filelist, size_t f, struct FileAndHash *fah,
 {
 	struct field *numf, *child;
 
-	numf = field_add_static_n(filelist, f);
+	numf = field_addn(filelist, f, &ft_obj, fah, 0);
 	child = field_add(numf, "file", &ft_ia5str, &fah->file, 0);
 	child->overridden = name_overridden;
 	child = field_add(numf, "hash", &ft_bitstr, &fah->hash, 0);
@@ -1654,8 +1659,8 @@ is_pointer(struct field const *field)
 	return field->size != 0;
 }
 
-void
-fields_apply_keyvals(struct field *ht, void *target, struct keyvals *kvs)
+error_msg
+fields_apply_keyvals(struct field *ht, struct keyvals *kvs)
 {
 	struct keyval *kv;
 	struct field *field;
@@ -1680,10 +1685,12 @@ fields_apply_keyvals(struct field *ht, void *target, struct keyvals *kvs)
 			error = field->type->parser(field, &kv->value, value);
 		}
 		if (error)
-			panic("%s", error);
+			return error;
 
 		field->overridden = true;
 	}
+
+	return NULL;
 }
 
 static void
@@ -1752,6 +1759,7 @@ __fields_print_csv(char const *name, struct field const *field,
 
 		csv_print(name, ',');
 		csv_print(key, ',');
+		csv_print(field->type->name, ',');
 		csv_print(dstr_finish(&dstr), '\n');
 
 		dstr_cleanup(&dstr);

@@ -29,7 +29,7 @@ add_bc_fields(struct field *parent, struct ext_list_node *ext)
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
 
-	value = field_add_static(parent, "extnValue");
+	value = field_add(parent, "extnValue", &ft_obj, &ext->v, 0);
 	field_add(value, "cA", &ft_bool, &ext->v.bc.cA, 0);
 	field_add(value, "pathLenConstraint", &ft_int,
 	    &ext->v.bc.pathLenConstraint, sizeof(INTEGER_t));
@@ -44,8 +44,8 @@ exts_add_bc(struct extensions *exts, size_t extn, struct field *parent)
 	    &asn_DEF_BasicConstraints);
 	ext->v.bc.cA = 0xFF;
 
-	add_bc_fields(field_add_static(parent, "bc"), ext);
-	add_bc_fields(field_add_static_n(parent, extn), ext);
+	add_bc_fields(field_add(parent, "bc", &ft_obj, &ext->v, 0), ext);
+	add_bc_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -53,7 +53,7 @@ add_ski_fields(struct field *parent, struct ext_list_node *ext)
 {
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
-	field_add(parent, "extnValue", &ft_8str, &ext->v.ski, 0);
+	field_add(parent, "extnValue", &ft_8str, &ext->v, 0);
 }
 
 void
@@ -64,8 +64,8 @@ exts_add_ski(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_subject_key_identifier, false, EXT_SKI,
 	    &asn_DEF_SubjectKeyIdentifier);
 
-	add_ski_fields(field_add_static(parent, "ski"), ext);
-	add_ski_fields(field_add_static_n(parent, extn), ext);
+	add_ski_fields(field_add(parent, "ski", &ft_obj, &ext->v, 0), ext);
+	add_ski_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -75,8 +75,8 @@ add_aki_fields(struct field *parent, struct ext_list_node *ext)
 
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
+	value = field_add(parent, "extnValue", &ft_obj, &ext->v, 0);
 
-	value = field_add_static(parent, "extnValue");
 	field_add(value, "keyIdentifier", &ft_8str,
 	    &ext->v.aki.keyIdentifier,
 	    sizeof(KeyIdentifier_t));
@@ -97,8 +97,8 @@ exts_add_aki(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_authority_key_identifier, false, EXT_AKI,
 	    &asn_DEF_AuthorityKeyIdentifier);
 
-	add_aki_fields(field_add_static(parent, "aki"), ext);
-	add_aki_fields(field_add_static_n(parent, extn), ext);
+	add_aki_fields(field_add(parent, "aki", &ft_obj, &ext->v, 0), ext);
+	add_aki_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -117,8 +117,8 @@ exts_add_ku(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_key_usage, true, EXT_KU,
 	    &asn_DEF_KeyUsage);
 
-	add_ku_fields(field_add_static(parent, "ku"), ext);
-	add_ku_fields(field_add_static_n(parent, extn), ext);
+	add_ku_fields(field_add(parent, "ku", &ft_obj, &ext->v, 0), ext);
+	add_ku_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -137,8 +137,8 @@ exts_add_crldp(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_crl_distribution_points, false, EXT_CRLDP,
 	    &asn_DEF_CRLDistributionPoints);
 
-	add_crldp_fields(field_add_static(parent, "crldp"), ext);
-	add_crldp_fields(field_add_static_n(parent, extn), ext);
+	add_crldp_fields(field_add(parent, "crldp", &ft_obj, &ext->v, 0), ext);
+	add_crldp_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -157,8 +157,8 @@ exts_add_aia(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_info_access, false, EXT_AIA,
 	    &asn_DEF_AuthorityInfoAccessSyntax);
 
-	add_aia_fields(field_add_static(parent, "aia"), ext);
-	add_aia_fields(field_add_static_n(parent, extn), ext);
+	add_aia_fields(field_add(parent, "aia", &ft_obj, &ext->v, 0), ext);
+	add_aia_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -177,8 +177,8 @@ exts_add_sia(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_sinfo_access, false, EXT_SIA,
 	    &asn_DEF_SubjectInfoAccessSyntax);
 
-	add_sia_fields(field_add_static(parent, "sia"), ext);
-	add_sia_fields(field_add_static_n(parent, extn), ext);
+	add_sia_fields(field_add(parent, "sia", &ft_obj, &ext->v, 0), ext);
+	add_sia_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -197,8 +197,8 @@ exts_add_cp(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_certificate_policies, true, EXT_CP,
 	    &asn_DEF_CertificatePolicies);
 
-	add_cp_fields(field_add_static(parent, "cp"), ext);
-	add_cp_fields(field_add_static_n(parent, extn), ext);
+	add_cp_fields(field_add(parent, "cp", &ft_obj, &ext->v, 0), ext);
+	add_cp_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -217,8 +217,8 @@ exts_add_ip(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_sbgp_ipAddrBlockv2, true, EXT_IP,
 	    &asn_DEF_IPAddrBlocks);
 
-	add_ip_fields(field_add_static(parent, "ip"), ext);
-	add_ip_fields(field_add_static_n(parent, extn), ext);
+	add_ip_fields(field_add(parent, "ip", &ft_obj, &ext->v, 0), ext);
+	add_ip_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -229,7 +229,7 @@ add_asn_fields(struct field *parent, struct ext_list_node *ext)
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
 
-	value = field_add_static(parent, "extnValue");
+	value = field_add(parent, "extnValue", &ft_obj, &ext->v, 0);
 	field_add(value, "asnum", &ft_asn_cer, &ext->v.asn.asnum,
 	    sizeof(ASIdentifierChoice_t));
 	field_add(value, "rdi", &ft_asn_cer, &ext->v.asn.rdi,
@@ -244,8 +244,8 @@ exts_add_asn(struct extensions *exts, size_t extn, struct field *parent)
 	ext = add_extension(exts, NID_sbgp_autonomousSysNumv2, true, EXT_ASN,
 	    &asn_DEF_ASIdentifiers);
 
-	add_asn_fields(field_add_static(parent, "asn"), ext);
-	add_asn_fields(field_add_static_n(parent, extn), ext);
+	add_asn_fields(field_add(parent, "asn", &ft_obj, &ext->v, 0), ext);
+	add_asn_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -265,8 +265,8 @@ exts_add_crln(struct extensions *exts, size_t extn, struct field *parent)
 	    &asn_DEF_CRLNumber);
 	init_INTEGER(&ext->v.crln, 1);
 
-	add_crln_fields(field_add_static(parent, "crln"), ext);
-	add_crln_fields(field_add_static_n(parent, extn), ext);
+	add_crln_fields(field_add(parent, "crln", &ft_obj, &ext->v, 0), ext);
+	add_crln_fields(field_addn(parent, extn, &ft_obj, &ext->v, 0), ext);
 }
 
 void

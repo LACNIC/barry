@@ -1,0 +1,11 @@
+ta.cer
+
+[ta.cer]
+tbsCertificate = {
+	version = 0x04,
+	serialNumber = 0x05,
+	signature = {
+		algorithm = 1.2.3.4,
+		parameters = 0x0607
+	}
+}

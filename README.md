@@ -199,6 +199,74 @@ $ barry -p markdown minimal.repo > tree.md
 
 Incidentally, this is an okay way to find all the available keys for a given file type.
 
+## Repository Descriptor specification prototype
+
+Reminder: This is a WIP. It's liable to change backwards-incompatibly until `barry` version 1.0.0 has been consumated.
+
+The confirmed reserved characters are `=` (assignment), `,` (separator), `{` and `}` (map delimiters), `[` and `]` (array/set delimiters) and `#` (comment).
+
+The only other token type is String, which is either
+
+1. A continuous sequence of unreserved and non-whitespace characters (eg. `10`, `0x0100`, `potatoes`, `192.0.2.0/24-28`),
+2. or a quoted sequence of any character except `"` (eg. `"also a string"`, `"!#$%^&*()[]{}"`). (There is no way to escape `"` at the moment.)
+
+The key-value section is a JSON-adjacent hierarchy. Here is an example in which the user has overridden the valid dates of the TA and the addresses it can delegate:
+
+```
+[ta.cer]
+"tbsCertificate" = {
+	"validity" = {
+		"notBefore" = "2025-06-01T00:00:00Z",
+		"notAfter" = "2026-06-01T00:00:00Z"
+	},
+	"extensions" = {
+		"ip" = { 
+			"extnValue" = [
+				"192.0.2.0/24-28",
+				"2001:db8::/64"
+			]
+		}
+	}
+}
+```
+
+It differs from JSON in several ways:
+
+1. You can comment out the remainder of a line by issuing the `#` character outside of a string,
+2. as you can see above, the assignment reserved character is `=` (not `:`),
+3. the last element of any set or map is allowed to be suffixed by a redundant comma (for reduced diff noise),
+4. if a string (whether key or value) does not contain reserved characters or whitespace, then you can omit the quotes,
+5. you can reduce stacking by dot-chaining field names as you see fit,
+6. and quoted strings can contain newlines.
+
+Hence, the example above is equivalent to
+
+```
+[ta.cer]
+# This line is a comment <-- 1
+tbsCertificate = { # <-- 4
+	validity = {
+		notBefore = 2025-06-01T00:00:00Z, # <-- 4 (x2)
+		notAfter = 2026-06-01T00:00:00Z
+	},
+	extensions.ip.extnValue = [ # <-- 5
+		192.0.2.0/24-28,
+		2001:db8::/64, # <-- 3
+	], # <-- 3
+}
+```
+
+Which is also equivalent to
+
+```
+[ta.cer]
+tbsCertificate.validity.notBefore = 2025-06-01T00:00:00Z
+tbsCertificate.validity.notAfter = 2026-06-01T00:00:00Z
+tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24-28, 2001:db8::/64 ]
+```
+
+(See [Numerics](#numerics) below for an example of 6.)
+
 ## Attribute Data Types
 
 ### Numerics
@@ -207,15 +275,15 @@ Because of their numeric natures, `INTEGER`, `BOOLEAN`s, `OCTET STRING`s, `BIT S
 
 ```
 # INTEGER
-content.encapContentInfo.eContent.version = 4660
-content.encapContentInfo.eContent.version = 0x1234
-content.encapContentInfo.eContent.version = 0b0001001000110100
+tbsCertificate.version = 4660
+tbsCertificate.version = 0x1234
+tbsCertificate.version = 0b0001001000110100
 
 # BOOLEAN
 tbsCertificate.extensions.bc.critical = 9999
 
 # OCTET STRING
-content.signerInfos[0].sid.subjectKeyIdentifier = 4660
+content.signerInfos.0.signature = 4660
 
 # BIT STRING
 tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1234
@@ -232,14 +300,21 @@ tbsCertificate.signature.parameters = 0x123456
 # BTW: You can use colons or underscores as visual separators.
 # If you quote the number, you can also use whitespace.
 tbsCertificate.signature.parameters = "0b_0001:0010_0011,0100 0101 0110"
+# Note, quoted strings are allowed to span several lines.
+tbsCertificate.signature.parameters = "0x
+	00a1 00a2 00a3 00a4 00a5 00a6 00a7 00a8
+	80b1 80b2 80b3 80b4 80b5 80b6 80b7 80b8
+	A0c1 A0c2 A0c3 A0c4 A0c5 00c6 A0c7 A0c8
+	F0d1 F0d2 F0d3 F0d4 F0d5 F0d6 F0d7 F0
+"
 ```
 
-Notice, this is the human-readable value. It later gets DER-encoded, which might result in some mutations, such as truncated leading zeroes on `INTEGER`s.
+Also notice, this is the human-readable value. It later gets DER-encoded, which might result in some mutations, such as truncated leading zeroes on `INTEGER`s:
 
 ```
 # This INTEGER Becomes { 2, 1, 1 } when encoded.
 # (2 = INTEGER type, 1 = length, 1 = value, leading zeroes excluded)
-content.encapContentInfo.eContent.version = 0x00000001  
+tbsCertificate.version = 0x00000001
 # This ANY actually encodes into { 0, 0, 0, 1 }.
 tbsCertificate.signature.parameters = 0x00000001
 ```
@@ -254,7 +329,7 @@ tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0xF8/6
 tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b11111/6
 ```
 
-Please note that prefixing swaps the anchoring of the number! As an `INTEGER`, `0x1234` equals `0x001234`, but `0x1234/24` equals `0x123400`.
+(Please note that prefixing swaps the anchoring of the number! As an `INTEGER`, `0x1234` equals `0x001234`, but `0x1234/24` equals `0x123400`.)
 
 Prefix lengths give you free padding, I guess. The following two are equivalent:
 
@@ -306,6 +381,8 @@ Applies to both `Time`s and `GeneralizedTime`s. Notice the UTC+0 enforcement.
 
 ### Names
 
+> TODO this section is probably outdated
+
 `Name`s are arrays of maps:
 
 ```
@@ -337,6 +414,9 @@ tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
 content.certificates.0.tbsCertificate.extensions = [
 	ski, aki, ku, crldp, aia, sia, cp, ip, asn
 ]
+
+# CRLs
+tbsCertList.crlExtensions = [ aki, crln ]
 ```
 
 The presently implemented extensions are
@@ -370,8 +450,6 @@ tbsCertificate.extensions.asn.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
 If you want a different extension list, override it. Assignments are handled sequentially:
 
 ```
-[ta.cer]
-
 # Override the OID of the default 6th extension
 tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 
@@ -383,7 +461,7 @@ tbsCertificate.extensions = [ ip, asn ]
 tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 ```
 
-You can also refer to extensions by zero-based index, which might be useful if you declare multiple of the same type:
+You can also refer to extensions by (zero-based) index, which might be useful if you declare multiple of the same type:
 
 ```
 tbsCertificate.extensions = [ ip, asn, ip, bc, ip, asn ]
@@ -396,13 +474,16 @@ tbsCertificate.extensions.4.extnID = 1.2.3.4.5
 ```
 content.encapContentInfo.eContent.ipAddrBlocks = [
 	192.0.2.0/24,
-	203.0.113.0, 2001:db8::/40-48
+	203.0.113.0,
+	2001:db8::/40-48
 ]
 ```
 
 List as many as you need. `barry` will automatically detect IP version and drop each entry to the corresponding `ROAIPAddressFamily`.
 
 ### fileList
+
+> TODO this section is probably outdated
 
 By default, `barry` populates manifest fileLists with the actual names and hashes of the files it creates. The following RD:
 
@@ -453,7 +534,6 @@ Add Github issues:
 
 - Configuration file section: `[Alias]`
 - `include`s is configuration
-- Allow newline escaping?
 - I commented the RRDP code to force myself to upload the prototype today
 - May want to purge all the memory leaks
 - Still unimplemented fields
@@ -477,4 +557,3 @@ Add Github issues:
 	- Several EE certificate extensions
 - Document
 	- Program arguments
-	- '#' comments in RD

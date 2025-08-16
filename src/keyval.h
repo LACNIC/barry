@@ -9,12 +9,15 @@ enum kv_type {
 	VALT_MAP,
 };
 
+struct keyval;
+STAILQ_HEAD(keyvals, keyval);
+
 struct kv_value {
 	enum kv_type type;
 	union {
 		char *str;
 		STAILQ_HEAD(kv_set, kv_node) set;
-		STAILQ_HEAD(kv_map, keyval) map;
+		struct keyvals map;
 	} v;
 };
 
@@ -28,7 +31,5 @@ struct keyval {
 	struct kv_value value;
 	STAILQ_ENTRY(keyval) hook;
 };
-
-STAILQ_HEAD(keyvals, keyval);
 
 #endif /* SRC_KEYVAL_H_ */
