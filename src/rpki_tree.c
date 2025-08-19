@@ -312,23 +312,31 @@ accept_value(struct rd_parse_context *ctx, struct token *peek)
 		result.type = VALT_SET;
 		STAILQ_INIT(&result.v.set);
 
-		if (next_token(ctx, &tkn) == TKNT_SET_END)
-			return result;
-
 		do {
-			node = pzalloc(sizeof(struct kv_node));
-			node->value = accept_value(ctx, &tkn);
-			STAILQ_INSERT_TAIL(&result.v.set, node, hook);
-
 			switch (next_token(ctx, &tkn)) {
-			case TKNT_SET_END:	return result;
-			case TKNT_SEPARATOR:	break;
-			default:		UNEXPECTED_TOKEN(ctx, tkn.str);
-			}
+			case TKNT_STR:
+			case TKNT_SET_START:
+			case TKNT_MAP_START:
+				node = pzalloc(sizeof(struct kv_node));
+				node->value = accept_value(ctx, &tkn);
+				STAILQ_INSERT_TAIL(&result.v.set, node, hook);
 
-			next_token(ctx, &tkn);
+				switch (next_token(ctx, &tkn)) {
+				case TKNT_SET_END:
+					return result;
+				case TKNT_SEPARATOR:
+					break;
+				default:
+					UNEXPECTED_TOKEN(ctx, tkn.str);
+				}
+
+				break;
+			case TKNT_SET_END:
+				return result;
+			default:
+				UNEXPECTED_TOKEN(ctx, tkn.str);
+			}
 		} while (true);
-		break;
 
 	case TKNT_MAP_START:
 		result.type = VALT_MAP;

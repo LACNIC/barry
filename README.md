@@ -381,23 +381,38 @@ Applies to both `Time`s and `GeneralizedTime`s. Notice the UTC+0 enforcement.
 
 ### Names
 
-> TODO this section is probably outdated
-
-`Name`s are arrays of maps:
+Names consist of a [single choice](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L240-L241) (`rdnSequence`) consisting of [arrays](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L243) of [arrays of `AttributeNameAndValue`s](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L247). Formally, an overly-populated certificate name `subject` might look like this:
 
 ```
-tbsCertificate.subject = [
-	{ commonName=potato, 2.5.4.4=potatoes },
-	{ commonName=tomato, 2.5.4.4=tomatoes }
+tbsCertificate.subject.rdnSequence = [
+	[ # RelativeDistinguishedName 1
+		{ # AttributeTypeAndValue 1
+			type = 2.5.4.3,   # commonName
+			value = aaa
+		},
+		{ # AttributeTypeAndValue 2
+			type = 2.5.4.5,   # serialNumber
+			value = bbb
+		},
+	],
+	[ # RelativeDistinguishedName 2
+		{ # AttributeTypeAndValue 1
+			type = 2.5.4.4,   # surname
+			value = ccc
+		},
+		{ # AttributeTypeAndValue 2
+			type = 2.5.4.42,  # givenName
+			value = ddd
+		},
+		{ # AttributeTypeAndValue 3
+			type = 2.5.4.43,  # initials
+			value = eee
+		}
+	]
 ]
 ```
 
-But you can also enter a simple string, which will be assumed to be the `commonName` (OID 2.5.4.3) of a one-element map in a one-element array. The following two are equivalent:
-
-```
-tbsCertificate.subject = [ { commonName=potato } ]
-tbsCertificate.subject = potato
-```
+RPKI mostly only requires a single `RelativeDistinguishedName` containing `commonName` and (optionally) `serialNumber`.
 
 ### Extensions
 

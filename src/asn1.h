@@ -33,8 +33,8 @@
 
 void init_8str(OCTET_STRING_t *, char const *);
 
-INTEGER_t *intmax2INTEGER(intmax_t src);
-void init_INTEGER(INTEGER_t *field, intmax_t value);
+INTEGER_t *intmax2INTEGER(intmax_t);
+void init_INTEGER(INTEGER_t *, intmax_t);
 void init_oid(OBJECT_IDENTIFIER_t *, int);
 ANY_t *create_null(void);
 void init_name(Name_t *, char const *);

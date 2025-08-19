@@ -111,6 +111,20 @@ check_output_contains "tutorial-oid" \
 check_output_contains "tutorial-date" \
 	"ta.cer,tbsCertificate.validity.notBefore,Time,2025-07-15T19:39:38Z"
 
+check_output_contains "tutorial-name" \
+	"ta.cer,tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
+	"ta.cer,tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,ta.cer" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,aaa" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.0.1.type,OBJECT IDENTIFIER,2.5.4.5 (serialNumber)" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.0.1.value,PrintableString in ANY,bbb" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.1.0.type,OBJECT IDENTIFIER,2.5.4.4 (surname)" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.1.0.value,PrintableString in ANY,ccc" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.1.1.type,OBJECT IDENTIFIER,2.5.4.42 (givenName)" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.1.1.value,PrintableString in ANY,ddd" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.1.2.type,OBJECT IDENTIFIER,2.5.4.43 (initials)" \
+	"ca1.cer,tbsCertificate.subject.rdnSequence.1.2.value,PrintableString in ANY,eee"
+
 check_output_contains "tutorial-ext" \
 	"ta.cer,tbsCertificate.extensions,Extensions,\"\[ bc, ski, ku, sia, cp, ip, asn \]\"" \
 	"ca1.cer,tbsCertificate.extensions,Extensions,\"\[ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn \]\"" \

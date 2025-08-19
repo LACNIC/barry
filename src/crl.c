@@ -48,7 +48,7 @@ crl_new(struct rpki_object *meta)
 	field_add_algorithm(tbsf, "signature", &tbs->signature);
 
 	/* issuer: Postpone (needs parent's subject) */
-	field_add(tbsf, "issuer", &ft_name, &tbs->issuer, 0);
+	field_add_name(tbsf, "issuer", &tbs->issuer);
 
 	init_time_now(&tbs->thisUpdate);
 	field_add(tbsf, "thisUpdate", &ft_time, &tbs->thisUpdate, 0);

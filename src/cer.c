@@ -111,7 +111,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	field_add_algorithm(tbsf, "signature", &tbs->signature);
 
 	/* issuer: Postpone (needs parent's subject) */
-	field_add(tbsf, "issuer", &ft_name, &tbs->issuer, 0);
+	field_add_name(tbsf, "issuer", &tbs->issuer);
 
 	init_time_now(&tbs->validity.notBefore);
 	init_time_later(&tbs->validity.notAfter);
@@ -120,7 +120,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	field_add(valf, "notAfter", &ft_time, &tbs->validity.notAfter, 0);
 
 	init_name(&tbs->subject, meta->name);
-	field_add(tbsf, "subject", &ft_name, &tbs->subject, 0);
+	field_add_name(tbsf, "subject", &tbs->subject);
 
 	pubkey2asn1(cer->keys, &tbs->subjectPublicKeyInfo);
 	field_add_spki(tbsf, "subjectPublicKeyInfo", &tbs->subjectPublicKeyInfo);

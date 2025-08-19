@@ -43,7 +43,6 @@ static error_msg const BAD_IP = "Unparseable IP address";
 static error_msg const NEED_STRING = "Expected a string value";
 static error_msg const NEED_SET = "Expected a set/array value ([brackets])";
 static error_msg const NEED_MAP = "Expected a map value ({braces})";
-static error_msg const BAD_NAME = "Names are supposed to be arrays of maps whose values are strings";
 static error_msg const BAD_ASN = "Expected an array of AS identifiers or 'inherit'";
 
 static error_msg
@@ -516,6 +515,35 @@ print_ia5str(struct dynamic_string *dstr, void *val)
 	dstr_append(dstr, "%.*s", (int)ia5str->size, (char *)ia5str->buf);
 }
 
+static error_msg
+parse_anystr(struct field *fields, struct kv_value *src, void *dst)
+{
+	ANY_t *anystr = dst;
+	PrintableString_t ps;
+
+	if (src->type != VALT_STR)
+		return NEED_STRING;
+
+	init_8str(&ps, src->v.str);
+	der_encode_any(&asn_DEF_PrintableString, &ps, anystr);
+	return NULL;
+}
+
+static void
+print_anystr(struct dynamic_string *dstr, void *val)
+{
+	ANY_t *anystr = val;
+
+	if (anystr->size < 3 || anystr->buf[0] != 0x13) {
+		dstr_append(dstr, "<Not a PrintableString>");
+		return;
+	}
+
+	dstr_append(dstr, "%.*s",
+	    (int)(anystr->size - 2),
+	    (char *)(anystr->buf + 2));
+}
+
 static bool
 is_printable(uint8_t chr)
 {
@@ -579,112 +607,65 @@ print_any(struct dynamic_string *dstr, void *val)
 }
 
 static error_msg
-parse_name(struct field *fields, struct kv_value *src, void *dst)
+parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
 {
-	struct kv_value array1;
-	struct kv_node node1;
-	struct keyval kv1;
+	struct kv_node *rdn_src;
+	struct kv_node *atv_src;
 
-	Name_t *name;
-	struct RelativeDistinguishedName *rdn;
-	struct AttributeTypeAndValue *atv;
-	PrintableString_t ps;
+	Name_t *name = dst;
+	RelativeDistinguishedName_t *rdn_dst;
+	AttributeTypeAndValue_t *atv_dst;
 
-	struct kv_node *node;
-	struct keyval *kv;
-	size_t n;
-	size_t k;
+	struct field *rdnf;
+	struct field *atvf;
 
-	switch (src->type) {
-	case VALT_STR:
-		memset(&node1, 0, sizeof(node1));
-		memset(&kv1, 0, sizeof(kv1));
+	size_t r, a;
 
-		STAILQ_INIT(&array1.v.set);
-		STAILQ_INSERT_TAIL(&array1.v.set, &node1, hook);
-		node1.value.type = VALT_MAP;
-		STAILQ_INIT(&node1.value.v.set);
-		STAILQ_INSERT_TAIL(&node1.value.v.map, &kv1, hook);
-		kv1.key = "2.5.4.3";
-		kv1.value.type = VALT_STR;
-		kv1.value.v.str = src->v.str;
-		src = &array1;
-		break;
+	error_msg error;
 
-	case VALT_SET:
-		break;
+	if (src->type != VALT_SET)
+		return NEED_SET;
 
-	case VALT_MAP:
-		return BAD_NAME;
-	}
-
-	n = 0;
-	STAILQ_FOREACH(node, &src->v.set, hook)
-		n++;
-
-	name = dst;
 	name->present = Name_PR_rdnSequence;
-	INIT_ASN1_ARRAY(&name->choice.rdnSequence.list, n, RelativeDistinguishedName_t);
+	fields->children = NULL;
 
-	n = 0;
-	STAILQ_FOREACH(node, &src->v.set, hook) {
-		if (node->value.type != VALT_MAP)
-			return BAD_NAME;
+	r = 0;
+	STAILQ_FOREACH(rdn_src, &src->v.set, hook)
+		r++;
+	INIT_ASN1_ARRAY(&name->choice.rdnSequence.list, r, RelativeDistinguishedName_t);
 
-		k = 0;
-		STAILQ_FOREACH(kv, &node->value.v.map, hook)
-			k++;
+	r = 0;
+	STAILQ_FOREACH(rdn_src, &src->v.set, hook) {
+		if (rdn_src->value.type != VALT_SET)
+			return NEED_SET;
 
-		rdn = name->choice.rdnSequence.list.array[n++];
-		INIT_ASN1_ARRAY(&rdn->list, k, AttributeTypeAndValue_t);
+		a = 0;
+		STAILQ_FOREACH(atv_src, &rdn_src->value.v.set, hook)
+			a++;
 
-		k = 0;
-		STAILQ_FOREACH(kv, &node->value.v.map, hook) {
-			atv = rdn->list.array[k++];
+		rdn_dst = name->choice.rdnSequence.list.array[r];
+		INIT_ASN1_ARRAY(&rdn_dst->list, a, AttributeTypeAndValue_t);
+		rdnf = field_addn(fields, r, NULL, rdn_dst, 0);
 
-			parse_oid_str(kv->key, &atv->type);
+		a = 0;
+		STAILQ_FOREACH(atv_src, &rdn_src->value.v.set, hook) {
+			atv_dst = rdn_dst->list.array[a];
 
-			if (kv->value.type != VALT_STR)
-				return BAD_NAME;
-			init_8str(&ps, kv->value.v.str);
-			der_encode_any(&asn_DEF_PrintableString, &ps, &atv->value);
+			atvf = field_addn(rdnf, a, &ft_obj, atv_dst, 0);
+			field_add(atvf, "type", &ft_oid, &atv_dst->type, 0);
+			field_add(atvf, "value", &ft_anystr, &atv_dst->value, 0);
+
+			error = parse_obj(atvf, &atv_src->value, atv_dst);
+			if (error)
+				return error;
+
+			a++;
 		}
+
+		r++;
 	}
 
 	return NULL;
-}
-
-static void
-print_name(struct dynamic_string *dstr, void *val)
-{
-	Name_t *name = val;
-	struct RelativeDistinguishedName *rdn;
-	struct AttributeTypeAndValue *tv;
-	int r, t;
-
-	switch (name->present) {
-	case Name_PR_NOTHING:
-		dstr_append(dstr, "<Undefined>");
-		break;
-
-	case Name_PR_rdnSequence:
-		dstr_append(dstr, "[ ");
-		for (r = 0; r < name->choice.rdnSequence.list.count; r++) {
-			rdn = name->choice.rdnSequence.list.array[r];
-			dstr_append(dstr, "{ ");
-			for (t = 0; t < rdn->list.count; t++) {
-				tv = rdn->list.array[t];
-				dstr_append(dstr, "\"");
-				print_oid(dstr, &tv->type);
-				dstr_append(dstr, "\"=");
-				print_any(dstr, &tv->value);
-				dstr_append(dstr, " ");
-			}
-			dstr_append(dstr, "} ");
-		}
-		dstr_append(dstr, "]");
-		break;
-	}
 }
 
 static error_msg
@@ -1501,9 +1482,10 @@ const struct field_type ft_int = { "INTEGER", parse_int, print_int };
 const struct field_type ft_oid = { "OBJECT IDENTIFIER", parse_oid, print_oid };
 const struct field_type ft_8str = { "OCTET STRING", parse_8str, print_8str };
 const struct field_type ft_ia5str = { "IA5String", parse_ia5str, print_ia5str };
+const struct field_type ft_anystr = { "PrintableString in ANY", parse_anystr, print_anystr };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
 const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr };
-const struct field_type ft_name = { "Name", parse_name, print_name };
+const struct field_type ft_rdnseq = { "RDN Sequence", parse_rdnseq, NULL };
 const struct field_type ft_time = { "Time", parse_time, print_time };
 const struct field_type ft_gtime = { "GeneralizedTime", parse_gtime, print_gtime };
 const struct field_type ft_exts = { "Extensions", parse_exts, print_exts };
@@ -1564,6 +1546,34 @@ field_add(struct field *parent, char const *name,
 	new->size = size;
 
 	return new;
+}
+
+struct field *
+field_add_name(struct field *parent, char const *key, Name_t *name)
+{
+	struct RelativeDistinguishedName *rdn;
+	struct AttributeTypeAndValue *atv;
+	struct field *rootf, *rdnsf;
+	struct field *rdnf, *atvf;
+	int r, a;
+
+	rootf = field_add(parent, key, &ft_obj, name, 0);
+	rdnsf = field_add(rootf, "rdnSequence", &ft_rdnseq, name, 0);
+
+	for (r = 0; r < name->choice.rdnSequence.list.count; r++) {
+		rdn = name->choice.rdnSequence.list.array[r];
+		rdnf = field_addn(rdnsf, 0, NULL, NULL, 0);
+
+		for (a = 0; a < rdn->list.count; a++) {
+			atv = rdn->list.array[a];
+			atvf = field_addn(rdnf, 0, &ft_obj, atv, 0);
+
+			field_add(atvf, "type", &ft_oid, &atv->type, 0);
+			field_add(atvf, "value", &ft_anystr, &atv->value, 0);
+		}
+	}
+
+	return rootf;
 }
 
 struct field *

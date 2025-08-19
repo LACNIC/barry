@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <libasn1fort/AlgorithmIdentifier.h>
 #include <libasn1fort/FileAndHash.h>
+#include <libasn1fort/Name.h>
 #include <libasn1fort/SubjectPublicKeyInfo.h>
 
 #include "keyval.h"
@@ -54,9 +55,10 @@ extern const struct field_type ft_int;
 extern const struct field_type ft_oid;
 extern const struct field_type ft_8str;		/* octet string */
 extern const struct field_type ft_ia5str;
+extern const struct field_type ft_anystr;
 extern const struct field_type ft_any;
 extern const struct field_type ft_bitstr;
-extern const struct field_type ft_name;
+extern const struct field_type ft_rdnseq;
 extern const struct field_type ft_time;
 extern const struct field_type ft_gtime;	/* generalized time */
 extern const struct field_type ft_exts;
@@ -70,6 +72,7 @@ struct field *field_add(struct field *, char const *, struct field_type const *,
     void *, size_t);
 struct field *field_addn(struct field *, size_t, struct field_type const *,
     void *, size_t);
+struct field *field_add_name(struct field *, char const *, Name_t *);
 struct field *field_add_algorithm(struct field *, char const *,
     AlgorithmIdentifier_t *);
 struct field *field_add_spki(struct field *, char const *,
