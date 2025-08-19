@@ -13,16 +13,19 @@
 #include "asn1.h"
 #include "cer.h"
 #include "crl.h"
+#include "libcrypto.h"
 #include "mft.h"
 #include "print.h"
 #include "roa.h"
 #include "rpki_tree.h"
+#include "rrdp.h"
 #include "str.h"
 #include "tal.h"
 
 char const *repo_descriptor;
 char const *rsync_uri = "rsync://localhost:8873/rpki";
 char const *rsync_path = "rsync/";
+char const *rrdp_path;
 char const *tal_path;
 Time_t default_now;
 Time_t default_later;
@@ -34,6 +37,7 @@ unsigned int verbosity;
 
 #define OPTLONG_RSYNC_URI	"rsync-uri"
 #define OPTLONG_RSYNC_PATH	"rsync-path"
+#define OPTLONG_RRDP_PATH	"rrdp-path"
 #define OPTLONG_TAL_PATH	"tal-path"
 #define OPTLONG_NOW		"now"
 #define OPTLONG_LATER		"later"
@@ -47,6 +51,7 @@ print_help(void)
 {
 	printf("Usage: barry	[--" OPTLONG_RSYNC_URI "=<URL>]\n");
 	printf("		[--" OPTLONG_RSYNC_PATH "=<Path>]\n");
+	printf("		[--" OPTLONG_RRDP_PATH "=<Path>]\n");
 	printf("		[--" OPTLONG_TAL_PATH "=<Path>]\n");
 	printf("		[--" OPTLONG_NOW "=<Datetime>]\n");
 	printf("		[--" OPTLONG_LATER "=<Datetime>]\n");
@@ -93,6 +98,7 @@ parse_options(int argc, char **argv)
 	static struct option opts[] = {
 		{ OPTLONG_RSYNC_URI,  required_argument, 0, 1024 },
 		{ OPTLONG_RSYNC_PATH, required_argument, 0, 1025 },
+		{ OPTLONG_RRDP_PATH,  required_argument, 0, 1027 },
 		{ OPTLONG_TAL_PATH,   required_argument, 0, 't' },
 		{ OPTLONG_NOW,        required_argument, 0, 'P' },
 		{ OPTLONG_LATER,      required_argument, 0, 1026 },
@@ -113,6 +119,9 @@ parse_options(int argc, char **argv)
 			break;
 		case 1025:
 			rsync_path = optarg;
+			break;
+		case 1027:
+			rrdp_path = optarg;
 			break;
 		case 't':
 			tal_path = optarg;
@@ -155,6 +164,7 @@ parse_options(int argc, char **argv)
 	pr_debug("   Repository Descriptor"          ": %s", repo_descriptor);
 	pr_debug("   --" OPTLONG_RSYNC_URI "          : %s", rsync_uri);
 	pr_debug("   --" OPTLONG_RSYNC_PATH "         : %s", rsync_path);
+	pr_debug("   --" OPTLONG_RRDP_PATH "          : %s", rrdp_path);
 	pr_debug("   --" OPTLONG_TAL_PATH "       (-t): %s", tal_path);
 	pr_debug("   --" OPTLONG_NOW "            (-P): %s", optnow);
 	pr_debug("   --" OPTLONG_LATER "              : %s", optlater);
@@ -412,6 +422,32 @@ write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 }
 
 static void
+write_snapshot(struct rpki_tree *tree)
+{
+	size_t count, f;
+	struct rrdp_entry_file *files;
+	struct rpki_tree_node *node, *tmp;
+
+	count = HASH_CNT(ghook, tree->nodes);
+	files = pcalloc(count, sizeof(struct rrdp_entry_file));
+
+	f = 0;
+	HASH_ITER(ghook, tree->nodes, node, tmp) {
+		files[f].type = &PUBLISH;
+		files[f].uri = node->meta.uri;
+		files[f].path = node->meta.path;
+//		files[f].hash = sha256_file_str(node->meta.path);
+		f++;
+	}
+
+	rrdp_save(rrdp_path, &SNAPSHOT, files, count);
+
+	for (f = 0; f < count; f++)
+		free(files[f].hash);
+	free(files);
+}
+
+static void
 print_repository_md(struct rpki_tree *tree)
 {
 	struct rpki_tree_node *node, *tmp;
@@ -539,6 +575,12 @@ main(int argc, char **argv)
 	pr_debug("Writing files (manifests)...");
 	rpkitree_pre_order(&tree, write_mfts, NULL);
 	pr_debug("Done.\n");
+
+	if (rrdp_path) {
+		pr_debug("Writing snapshot...");
+		write_snapshot(&tree);
+		pr_debug("Done.\n");
+	}
 
 	if (print_format) {
 		pr_debug("Printing objects...");

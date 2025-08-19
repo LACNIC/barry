@@ -29,6 +29,18 @@ pzalloc(size_t size)
 	return result;
 }
 
+void *
+pcalloc(size_t n, size_t size)
+{
+	void *result;
+
+	result = calloc(n, size);
+	if (!result)
+		enomem;
+
+	return result;
+}
+
 char *
 pstrdup(char const *s)
 {

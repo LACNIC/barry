@@ -12,12 +12,9 @@ extern const struct rrdp_entry_type WITHDRAW;
 struct rrdp_entry_file {
 	struct rrdp_entry_type const *type;
 	char const *uri;
-	char const *hash;
 	char const *path;
+	char *hash;
 };
-
-void rrdp_file_init(struct rrdp_entry_file *, struct rrdp_entry_type const *,
-    char const *, char const *, char const *);
 
 void rrdp_save(char const *, struct rrdp_type const *,
     struct rrdp_entry_file *, unsigned int);

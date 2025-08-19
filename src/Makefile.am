@@ -18,6 +18,7 @@ barry_SOURCES += roa.c roa.h
 barry_SOURCES += rpki_object.c rpki_object.h
 barry_SOURCES += rpki_tree.c rpki_tree.h
 barry_SOURCES += rpp.c rpp.h
+barry_SOURCES += rrdp.c rrdp.h
 barry_SOURCES += so.c so.h
 barry_SOURCES += str.c str.h
 barry_SOURCES += tal.c tal.h
