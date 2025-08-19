@@ -93,7 +93,7 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 	/* ski postponed */
 
 	init_oid(&si->digestAlgorithm.algorithm, NID_sha256);
-	/* TODO what happened to params? */
+	si->digestAlgorithm.parameters = NULL;
 	field_add_algorithm(sif, "digestAlgorithm", &si->digestAlgorithm);
 
 	si->signedAttrs = pzalloc(sizeof(SignedAttributes_t));
@@ -116,7 +116,7 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 	/* TODO signedAttrs field not implemented yet */
 
 	init_oid(&si->signatureAlgorithm.algorithm, NID_rsaEncryption);
-	/* TODO what happened to params? */
+	si->signatureAlgorithm.parameters = NULL;
 	field_add_algorithm(sif, "signatureAlgorithm", &si->signatureAlgorithm);
 
 	field_add(sif, "signature", &ft_8str, &si->signature, 0);
