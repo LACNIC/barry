@@ -432,12 +432,6 @@ write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	mft_write(node->obj);
 }
 
-static char *
-utf8str2str(UTF8String_t *utf8str)
-{
-	return pstrndup((char *)(utf8str->buf), utf8str->size);
-}
-
 static void
 write_rrdp(struct rpki_tree *tree)
 {
@@ -447,9 +441,6 @@ write_rrdp(struct rpki_tree *tree)
 	struct rrdp_entry_file *req;
 	size_t namelen;
 	struct rpki_tree_node *node;
-	char *snapshot_path;
-	char *snapshot_uri;
-	char *notif_path;
 
 	HASH_ITER(hh, tree->notifications, notif, tmp) {
 		if (STAILQ_EMPTY(&notif->snapshot.files))
@@ -457,7 +448,7 @@ write_rrdp(struct rpki_tree *tree)
 
 		pr_trace("- Notification: %s", notif->uri);
 
-		if (notif->path.size == 0) {
+		if (notif->path == NULL) {
 			pr_err("%s does not match --rrdp-uri (%s), "
 			    "so I cannot autocompute a path. "
 			    "Please set it manually:\n"
@@ -467,15 +458,13 @@ write_rrdp(struct rpki_tree *tree)
 			pr_warn("Skipping %s.", notif->uri);
 			continue;
 		}
-		if (notif->snapshot.path.size == 0) {
-			pr_err("%.*s does not match --rrdp-uri (%s), "
+		if (notif->snapshot.path == NULL) {
+			pr_err("%s does not match --rrdp-uri (%s), "
 			    "so I cannot autocompute a path. "
 			    "Please set it manually:\n"
 			    "	[notification: %s]\n"
 			    "	snapshot.path = some/path/here.xml",
-			    (int)notif->snapshot.uri.size,
-			    (char *)notif->snapshot.uri.buf,
-			    rrdp_uri, notif->uri);
+			    notif->snapshot.uri, rrdp_uri, notif->uri);
 			pr_warn("Skipping %s.", notif->uri);
 			continue;
 		}
@@ -500,17 +489,9 @@ write_rrdp(struct rpki_tree *tree)
 			f++;
 		}
 
-		snapshot_path = utf8str2str(&notif->snapshot.path);
-		snapshot_uri = utf8str2str(&notif->snapshot.uri);
-		notif_path = utf8str2str(&notif->path);
-
-		rrdp_save_snapshot(snapshot_path, &SNAPSHOT, req, f);
-		rrdp_save_notification(notif_path, snapshot_uri,
-		    sha256_file_str(snapshot_path));
-
-		free(notif_path);
-		free(snapshot_uri);
-		free(snapshot_path);
+		rrdp_save_snapshot(notif->snapshot.path, &SNAPSHOT, req, f);
+		rrdp_save_notification(notif->path, notif->snapshot.uri,
+		    sha256_file_str(notif->snapshot.path));
 
 //		for (f = 0; f < count; f++)
 //			free(files[f].hash);

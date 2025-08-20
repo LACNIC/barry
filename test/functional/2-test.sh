@@ -238,14 +238,14 @@ check_output_contains "obj2" \
 	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
 
 check_output_contains "notification-1" \
-	"https://localhost:8080/rpki/notification-1.xml,path,UTF8String,sandbox/rrdp/notification-1.xml" \
-	"https://localhost:8080/rpki/notification-1.xml,snapshot.uri,UTF8String,https://localhost:8080/rpki/notification-1.xml.snapshot" \
-	"https://localhost:8080/rpki/notification-1.xml,snapshot.path,UTF8String,sandbox/rrdp/notification-1.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-1.xml,path,C String,sandbox/rrdp/notification-1.xml" \
+	"https://localhost:8080/rpki/notification-1.xml,snapshot.uri,C String,https://localhost:8080/rpki/notification-1.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-1.xml,snapshot.path,C String,sandbox/rrdp/notification-1.xml.snapshot" \
 	"https://localhost:8080/rpki/notification-1.xml,snapshot.files,Snapshot Files,\"\[ 0.crl, 0.mft \]\""
 check_output_contains "notification-2" \
-	"https://localhost:8080/rpki/notification-2.xml,path,UTF8String,sandbox/rrdp/notification-2.xml" \
-	"https://localhost:8080/rpki/notification-2.xml,snapshot.uri,UTF8String,https://localhost:8080/rpki/notification-2.xml.snapshot" \
-	"https://localhost:8080/rpki/notification-2.xml,snapshot.path,UTF8String,sandbox/rrdp/notification-2.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-2.xml,path,C String,sandbox/rrdp/notification-2.xml" \
+	"https://localhost:8080/rpki/notification-2.xml,snapshot.uri,C String,https://localhost:8080/rpki/notification-2.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-2.xml,snapshot.path,C String,sandbox/rrdp/notification-2.xml.snapshot" \
 	"https://localhost:8080/rpki/notification-2.xml,snapshot.files,Snapshot Files,\"\[ A.cer, A.roa, 1.crl, B.cer, 2.crl, 0.crl, 1.mft, 2.mft, 0.mft \]\""
 
 echo "Successes: $SUCCESSES"

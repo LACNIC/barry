@@ -47,11 +47,11 @@ struct rrdp_file {
 
 struct rrdp_notification {
 	char *uri;
-	UTF8String_t path;
+	char *path;
 
 	struct {
-		UTF8String_t uri;
-		UTF8String_t path;
+		char *uri;
+		char *path;
 		STAILQ_HEAD(rrdp_files, rrdp_file) files;
 	} snapshot;
 

@@ -57,6 +57,7 @@ extern const struct field_type ft_8str;		/* octet string */
 extern const struct field_type ft_utf8str;
 extern const struct field_type ft_ia5str;
 extern const struct field_type ft_anystr;
+extern const struct field_type ft_cstr;		/* char * */
 extern const struct field_type ft_any;
 extern const struct field_type ft_bitstr;
 extern const struct field_type ft_rdnseq;

@@ -618,32 +618,17 @@ default_paths(struct rrdp_notification *notif, char const *notif_uri)
 {
 	extern char const *rrdp_uri; /* --rrdp-uri */
 	extern char const *rrdp_path; /* --rrdp-path */
-	char *snapshot_uri;
-	char *notif_path;
-	char *snapshot_path;
 	size_t rrdp_uri_len;
 
-	/* Notification URI */
 	notif->uri = pstrdup(notif_uri);
-
-	/* Snapshot URI */
-	snapshot_uri = concat(notif_uri, ".snapshot");
-	notif->snapshot.uri.buf = (uint8_t *)snapshot_uri;
-	notif->snapshot.uri.size = strlen(snapshot_uri);
+	notif->snapshot.uri = concat(notif_uri, ".snapshot");
 
 	rrdp_uri_len = strlen(rrdp_uri);
 	if (strncmp(notif_uri, rrdp_uri, rrdp_uri_len) != 0)
 		return; /* The user will have to override the paths */
 
-	/* Notification path */
-	notif_path = join_paths(rrdp_path, notif_uri + rrdp_uri_len);
-	notif->path.buf = (uint8_t *)notif_path;
-	notif->path.size = strlen(notif_path);
-
-	/* Snapshot path */
-	snapshot_path = concat(notif_path, ".snapshot");
-	notif->snapshot.path.buf = (uint8_t *)snapshot_path;
-	notif->snapshot.path.size = strlen(snapshot_path);
+	notif->path = join_paths(rrdp_path, notif_uri + rrdp_uri_len);
+	notif->snapshot.path = concat(notif->path, ".snapshot");
 }
 
 static void
@@ -653,11 +638,11 @@ init_notif_fields(struct rrdp_notification *notif)
 
 	notif->fields = pzalloc(sizeof(struct field));
 
-	field_add(notif->fields, "path", &ft_utf8str, &notif->path, 0);
+	field_add(notif->fields, "path", &ft_cstr, &notif->path, 0);
 
 	ssf = field_add(notif->fields, "snapshot", &ft_obj, &notif->snapshot, 0);
-	field_add(ssf, "uri", &ft_utf8str, &notif->snapshot.uri, 0);
-	field_add(ssf, "path", &ft_utf8str, &notif->snapshot.path, 0);
+	field_add(ssf, "uri", &ft_cstr, &notif->snapshot.uri, 0);
+	field_add(ssf, "path", &ft_cstr, &notif->snapshot.path, 0);
 	field_add(ssf, "files", &ft_files, &notif->snapshot.files, 0);
 }
 

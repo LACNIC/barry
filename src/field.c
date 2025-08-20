@@ -546,6 +546,27 @@ print_anystr(struct dynamic_string *dstr, void *val)
 	    (char *)(anystr->buf + 2));
 }
 
+static error_msg
+parse_cstr(struct field *fields, struct kv_value *src, void *dst)
+{
+	char **cstr = dst;
+
+	if (src->type != VALT_STR)
+		return NEED_STRING;
+
+	*cstr = src->v.str;
+	return NULL;
+}
+
+static void
+print_cstr(struct dynamic_string *dstr, void *val)
+{
+	char **cstr = val;
+
+	if (*cstr != NULL)
+		dstr_append(dstr, "%s", *cstr);
+}
+
 static bool
 is_printable(uint8_t chr)
 {
@@ -1546,6 +1567,7 @@ const struct field_type ft_8str = { "OCTET STRING", parse_8str, print_8str };
 const struct field_type ft_utf8str = { "UTF8String", parse_utf8str, print_utf8str };
 const struct field_type ft_ia5str = { "IA5String", parse_utf8str, print_utf8str };
 const struct field_type ft_anystr = { "PrintableString in ANY", parse_anystr, print_anystr };
+const struct field_type ft_cstr = { "C String", parse_cstr, print_cstr };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
 const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr };
 const struct field_type ft_rdnseq = { "RDN Sequence", parse_rdnseq, NULL };
