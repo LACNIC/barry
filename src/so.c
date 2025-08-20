@@ -189,13 +189,6 @@ signed_object_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 void
 so_print_csv(struct signed_object *so)
 {
-	char const *type = "unknown";
-
-	switch (so->type) {
-	case SO_MFT:	type = "mft";	break;
-	case SO_ROA:	type = "roa";	break;
-	}
-
-	meta_print_csv(so->meta, type);
+	meta_print_csv(so->meta);
 	fields_print_csv(so->meta->fields, so->meta->name);
 }

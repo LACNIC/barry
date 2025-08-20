@@ -370,7 +370,7 @@ cer_print_md(struct rpki_certificate *cer)
 void
 cer_print_csv(struct rpki_certificate *cer)
 {
-	meta_print_csv(cer->meta, "cer");
+	meta_print_csv(cer->meta);
 
 	csv_print3(cer->meta, "caRepository", cer->rpp.caRepository);
 	csv_print3(cer->meta, "rpkiManifest", cer->rpp.rpkiManifest);

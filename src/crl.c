@@ -176,6 +176,6 @@ crl_print_md(struct rpki_crl *crl)
 void
 crl_print_csv(struct rpki_crl *crl)
 {
-	meta_print_csv(crl->meta, "crl");
+	meta_print_csv(crl->meta);
 	fields_print_csv(crl->meta->fields, crl->meta->name);
 }

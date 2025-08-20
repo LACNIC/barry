@@ -769,6 +769,30 @@ node_is_str(struct kv_node *node, char const *name)
 }
 
 static error_msg
+parse_filetype(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
+{
+	return NULL; /* Actually done elsewhere */
+}
+
+static void
+print_filetype(struct dynamic_string *dstr, void *val)
+{
+	enum file_type *ft = val;
+	char const *str;
+
+	switch (*ft) {
+	case FT_TA:
+	case FT_CER:	str = "cer";	break;
+	case FT_CRL:	str = "crl";	break;
+	case FT_MFT:	str = "mft";	break;
+	case FT_ROA:	str = "roa";	break;
+	default:	str = "?";	break;
+	}
+
+	dstr_append(dstr, "%s", str);
+}
+
+static error_msg
 parse_exts(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
 {
 	struct extensions *dst_exts;
@@ -1573,6 +1597,7 @@ const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr }
 const struct field_type ft_rdnseq = { "RDN Sequence", parse_rdnseq, NULL };
 const struct field_type ft_time = { "Time", parse_time, print_time };
 const struct field_type ft_gtime = { "GeneralizedTime", parse_gtime, print_gtime };
+const struct field_type ft_filetype = { "File Type", parse_filetype, print_filetype };
 const struct field_type ft_exts = { "Extensions", parse_exts, print_exts };
 const struct field_type ft_ip_roa = { "IP Resources (ROA)", parse_ips_roa, print_roa_ips };
 const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_cer, print_cer_ips };

@@ -153,6 +153,18 @@ check_output_contains "root-only" "ta\\.cer,signature,BIT STRING,$HEXNUM"
 check_output_contains "root-only-signature-crl" "0\\.crl,signature,BIT STRING,0x010203"
 check_output_contains "root-only" "0\\.crl,signature,BIT STRING,$HEXNUM"
 
+check_output_contains "type" \
+	"ta.cer,type,File Type,cer" \
+	"ta.cer,tbsCertificate.version,INTEGER,0x02" \
+	"roa.roa,type,File Type,cer" \
+	"roa.roa,tbsCertificate.version,INTEGER,0x02" \
+	"certificate.cer,type,File Type,roa" \
+	"certificate.cer,content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.24 (id-ct-routeOriginAuthz)" \
+	"crl.crl,type,File Type,mft" \
+	"crl.crl,content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.26 (id-ct-rpkiManifest)" \
+	"manifest.mft,type,File Type,crl" \
+	"manifest.mft,tbsCertList.version,INTEGER,0x01"
+
 FILELIST="content\\.encapContentInfo\\.eContent\\.fileList"
 check_output_contains "root-only" \
 	"0\\.mft,$FILELIST,File List,{ 0\\.crl=$HEXNUM }" \

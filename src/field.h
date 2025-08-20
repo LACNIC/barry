@@ -63,6 +63,7 @@ extern const struct field_type ft_bitstr;
 extern const struct field_type ft_rdnseq;
 extern const struct field_type ft_time;
 extern const struct field_type ft_gtime;	/* generalized time */
+extern const struct field_type ft_filetype;
 extern const struct field_type ft_exts;
 extern const struct field_type ft_ip_roa;
 extern const struct field_type ft_ip_cer;

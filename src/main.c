@@ -184,26 +184,44 @@ parse_options(int argc, char **argv)
 }
 
 static enum file_type
+str2ft(struct rpki_tree_node *node, char const *str)
+{
+	if (strcmp(str, "cer") == 0)
+		return (node->parent == NULL) ? FT_TA : FT_CER;
+	if (strcmp(str, "crl") == 0)
+		return FT_CRL;
+	if (strcmp(str, "mft") == 0)
+		return FT_MFT;
+	if (strcmp(str, "roa") == 0)
+		return FT_ROA;
+	return FT_UNKNOWN;
+}
+
+static enum file_type
 infer_type(struct rpki_tree_node *node)
 {
+	struct kv_value *type_kv;
 	size_t namelen;
 	char *extension;
+	enum file_type result;
+
+	type_kv = keyvals_find(&node->props, "type");
+	if (type_kv != NULL) {
+		if (type_kv->type != VALT_STR)
+			panic("type: Expected a string value");
+
+		result = str2ft(node, type_kv->v.str);
+		if (result == FT_UNKNOWN)
+			panic("Unknown type: %s", type_kv->v.str);
+
+		return result;
+	}
 
 	namelen = strlen(node->meta.name);
 	if (namelen < 4)
 		return FT_UNKNOWN;
-
-	extension = node->meta.name + strlen(node->meta.name) - 4;
-
-	if (strcmp(extension, ".cer") == 0)
-		return (node->parent == NULL) ? FT_TA : FT_CER;
-	if (strcmp(extension, ".crl") == 0)
-		return FT_CRL;
-	if (strcmp(extension, ".mft") == 0)
-		return FT_MFT;
-	if (strcmp(extension, ".roa") == 0)
-		return FT_ROA;
-	return FT_UNKNOWN;
+	extension = node->meta.name + namelen - 4;
+	return (extension[0] == '.') ? str2ft(node, extension + 1) : FT_UNKNOWN;
 }
 
 static struct rpki_tree_node *
@@ -246,6 +264,7 @@ init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	pr_debug("Initializing: %s", node->meta.name);
 
 	init_parent(node);
+	field_add(node->meta.fields, "type", &ft_filetype, &node->type, 0);
 
 	switch (node->type) {
 	case FT_TA:

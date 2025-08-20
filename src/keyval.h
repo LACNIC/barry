@@ -32,4 +32,6 @@ struct keyval {
 	STAILQ_ENTRY(keyval) hook;
 };
 
+struct kv_value *keyvals_find(struct keyvals *, char const *);
+
 #endif /* SRC_KEYVAL_H_ */
