@@ -4,7 +4,7 @@ ta.cer
 	A.cer
 	B.cer
 
-[mft.mft]
+[node: mft.mft]
 content.encapContentInfo.eContent.fileList = {
 	# <File name> = <Hash>
 	crl.crl = 0x14A9B4039E1EDC10C1314C435828B418417E8B152CD173696B776EF24D9A9E41,

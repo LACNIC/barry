@@ -13,6 +13,7 @@
 #include "asn1.h"
 #include "cer.h"
 #include "crl.h"
+#include "file.h"
 #include "libcrypto.h"
 #include "mft.h"
 #include "print.h"
@@ -25,7 +26,8 @@
 char const *repo_descriptor;
 char const *rsync_uri = "rsync://localhost:8873/rpki";
 char const *rsync_path = "rsync/";
-char const *rrdp_path;
+char const *rrdp_uri = "https://localhost:8080/rpki";
+char const *rrdp_path = "rrdp/";
 char const *tal_path;
 Time_t default_now;
 Time_t default_later;
@@ -37,6 +39,7 @@ unsigned int verbosity;
 
 #define OPTLONG_RSYNC_URI	"rsync-uri"
 #define OPTLONG_RSYNC_PATH	"rsync-path"
+#define OPTLONG_RRDP_URI	"rrdp-uri"
 #define OPTLONG_RRDP_PATH	"rrdp-path"
 #define OPTLONG_TAL_PATH	"tal-path"
 #define OPTLONG_NOW		"now"
@@ -51,6 +54,7 @@ print_help(void)
 {
 	printf("Usage: barry	[--" OPTLONG_RSYNC_URI "=<URL>]\n");
 	printf("		[--" OPTLONG_RSYNC_PATH "=<Path>]\n");
+	printf("		[--" OPTLONG_RRDP_URI "=<URL>]\n");
 	printf("		[--" OPTLONG_RRDP_PATH "=<Path>]\n");
 	printf("		[--" OPTLONG_TAL_PATH "=<Path>]\n");
 	printf("		[--" OPTLONG_NOW "=<Datetime>]\n");
@@ -98,6 +102,7 @@ parse_options(int argc, char **argv)
 	static struct option opts[] = {
 		{ OPTLONG_RSYNC_URI,  required_argument, 0, 1024 },
 		{ OPTLONG_RSYNC_PATH, required_argument, 0, 1025 },
+		{ OPTLONG_RRDP_URI,   required_argument, 0, 1028 },
 		{ OPTLONG_RRDP_PATH,  required_argument, 0, 1027 },
 		{ OPTLONG_TAL_PATH,   required_argument, 0, 't' },
 		{ OPTLONG_NOW,        required_argument, 0, 'P' },
@@ -119,6 +124,9 @@ parse_options(int argc, char **argv)
 			break;
 		case 1025:
 			rsync_path = optarg;
+			break;
+		case 1028:
+			rrdp_uri = optarg;
 			break;
 		case 1027:
 			rrdp_path = optarg;
@@ -164,6 +172,7 @@ parse_options(int argc, char **argv)
 	pr_debug("   Repository Descriptor"          ": %s", repo_descriptor);
 	pr_debug("   --" OPTLONG_RSYNC_URI "          : %s", rsync_uri);
 	pr_debug("   --" OPTLONG_RSYNC_PATH "         : %s", rsync_path);
+	pr_debug("   --" OPTLONG_RRDP_URI "           : %s", rrdp_uri);
 	pr_debug("   --" OPTLONG_RRDP_PATH "          : %s", rrdp_path);
 	pr_debug("   --" OPTLONG_TAL_PATH "       (-t): %s", tal_path);
 	pr_debug("   --" OPTLONG_NOW "            (-P): %s", optnow);
@@ -296,7 +305,8 @@ generate_paths(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 }
 
 static struct rpki_tree_node *
-create_missing_node(char *url, struct rpki_certificate *ca)
+create_missing_node(struct rpki_tree *tree, char *url,
+    struct rpki_certificate *ca)
 {
 	struct rpki_tree_node *child;
 	char *slash;
@@ -304,6 +314,7 @@ create_missing_node(char *url, struct rpki_certificate *ca)
 	child = pzalloc(sizeof(struct rpki_tree_node));
 	slash = strrchr(url, '/');
 	child->meta.name = slash ? (slash + 1) : url;
+	child->meta.tree = tree;
 	child->meta.parent = ca;
 	child->meta.fields = pzalloc(sizeof(struct field));
 
@@ -326,7 +337,7 @@ add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
 	mft = find_child(parent, FT_MFT);
 	if (!mft) {
 		pr_debug("Need to create %s's Manifest", ca->rpp.caRepository);
-		mft = create_missing_node(ca->rpp.rpkiManifest, ca);
+		mft = create_missing_node(tree, ca->rpp.rpkiManifest, ca);
 		mft->type = FT_MFT;
 		mft->parent = parent; /* Needed by mft_new() */
 		mft->obj = mft_new(mft);
@@ -336,7 +347,7 @@ add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
 
 	if (find_child(parent, FT_CRL) == NULL) {
 		pr_debug("Need to create %s's CRL", ca->rpp.caRepository);
-		crl = create_missing_node(ca->rpp.crldp, ca);
+		crl = create_missing_node(tree, ca->rpp.crldp, ca);
 		crl->type = FT_CRL;
 		crl->obj = crl_new(&crl->meta);
 		crl_generate_paths(crl->obj);
@@ -421,30 +432,90 @@ write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	mft_write(node->obj);
 }
 
-static void
-write_snapshot(struct rpki_tree *tree)
+static char *
+utf8str2str(UTF8String_t *utf8str)
 {
-	size_t count, f;
-	struct rrdp_entry_file *files;
-	struct rpki_tree_node *node, *tmp;
+	return pstrndup((char *)(utf8str->buf), utf8str->size);
+}
 
-	count = HASH_CNT(ghook, tree->nodes);
-	files = pcalloc(count, sizeof(struct rrdp_entry_file));
+static void
+write_rrdp(struct rpki_tree *tree)
+{
+	struct rrdp_notification *notif, *tmp;
+	size_t f;
+	struct rrdp_file *file;
+	struct rrdp_entry_file *req;
+	size_t namelen;
+	struct rpki_tree_node *node;
+	char *snapshot_path;
+	char *snapshot_uri;
+	char *notif_path;
 
-	f = 0;
-	HASH_ITER(ghook, tree->nodes, node, tmp) {
-		files[f].type = &PUBLISH;
-		files[f].uri = node->meta.uri;
-		files[f].path = node->meta.path;
-//		files[f].hash = sha256_file_str(node->meta.path);
-		f++;
+	HASH_ITER(hh, tree->notifications, notif, tmp) {
+		if (STAILQ_EMPTY(&notif->snapshot.files))
+			continue;
+
+		pr_trace("- Notification: %s", notif->uri);
+
+		if (notif->path.size == 0) {
+			pr_err("%s does not match --rrdp-uri (%s), "
+			    "so I cannot autocompute a path. "
+			    "Please set it manually:\n"
+			    "	[notification: %s]\n"
+			    "	path = some/path/here.xml",
+			    notif->uri, rrdp_uri, notif->uri);
+			pr_warn("Skipping %s.", notif->uri);
+			continue;
+		}
+		if (notif->snapshot.path.size == 0) {
+			pr_err("%.*s does not match --rrdp-uri (%s), "
+			    "so I cannot autocompute a path. "
+			    "Please set it manually:\n"
+			    "	[notification: %s]\n"
+			    "	snapshot.path = some/path/here.xml",
+			    (int)notif->snapshot.uri.size,
+			    (char *)notif->snapshot.uri.buf,
+			    rrdp_uri, notif->uri);
+			pr_warn("Skipping %s.", notif->uri);
+			continue;
+		}
+
+		f = 0;
+		STAILQ_FOREACH(file, &notif->snapshot.files, hook)
+			f++;
+
+		req = pcalloc(f, sizeof(struct rrdp_entry_file));
+
+		f = 0;
+		STAILQ_FOREACH(file, &notif->snapshot.files, hook) {
+			namelen = strlen(file->name);
+			HASH_FIND(ghook, tree->nodes, file->name, namelen, node);
+			if (!node)
+				panic("Node does not exist: %s", file->name);
+
+			req[f].type = &PUBLISH;
+			req[f].uri = node->meta.uri;
+			req[f].path = node->meta.path;
+//			files[f].hash = sha256_file_str(node->meta.path);
+			f++;
+		}
+
+		snapshot_path = utf8str2str(&notif->snapshot.path);
+		snapshot_uri = utf8str2str(&notif->snapshot.uri);
+		notif_path = utf8str2str(&notif->path);
+
+		rrdp_save_snapshot(snapshot_path, &SNAPSHOT, req, f);
+		rrdp_save_notification(notif_path, snapshot_uri,
+		    sha256_file_str(snapshot_path));
+
+		free(notif_path);
+		free(snapshot_uri);
+		free(snapshot_path);
+
+//		for (f = 0; f < count; f++)
+//			free(files[f].hash);
+		free(req);
 	}
-
-	rrdp_save(rrdp_path, &SNAPSHOT, files, count);
-
-	for (f = 0; f < count; f++)
-		free(files[f].hash);
-	free(files);
 }
 
 static void
@@ -492,9 +563,10 @@ print_repository_md(struct rpki_tree *tree)
 static void
 print_repository_csv(struct rpki_tree *tree)
 {
-	struct rpki_tree_node *node, *tmp;
+	struct rpki_tree_node *node, *tmp1;
+	struct rrdp_notification *notif, *tmp2;
 
-	HASH_ITER(ghook, tree->nodes, node, tmp) {
+	HASH_ITER(ghook, tree->nodes, node, tmp1) {
 		switch (node->type) {
 		case FT_TA:
 		case FT_CER:
@@ -513,6 +585,10 @@ print_repository_csv(struct rpki_tree *tree)
 			pr_err("Unknown file type: %s", node->meta.name);
 		}
 	}
+
+	HASH_ITER(hh, tree->notifications, notif, tmp2)
+		if (!STAILQ_EMPTY(&notif->snapshot.files))
+			fields_print_csv(notif->fields, notif->uri);
 }
 
 static void
@@ -529,13 +605,13 @@ print_repository(struct rpki_tree *tree)
 int
 main(int argc, char **argv)
 {
-	struct rpki_tree tree;
+	struct rpki_tree tree = { 0 };
 
 	register_signal_handlers();
 
 	parse_options(argc, argv);
 
-	tree = rpkitree_load(repo_descriptor);
+	rpkitree_load(repo_descriptor, &tree);
 
 	pr_debug("Figuring out object types...");
 	rpkitree_pre_order(&tree, init_type, NULL);
@@ -576,9 +652,9 @@ main(int argc, char **argv)
 	rpkitree_pre_order(&tree, write_mfts, NULL);
 	pr_debug("Done.\n");
 
-	if (rrdp_path) {
-		pr_debug("Writing snapshot...");
-		write_snapshot(&tree);
+	if (rrdp_uri && rrdp_path) {
+		pr_debug("Writing RRDP XMLs...");
+		write_rrdp(&tree);
 		pr_debug("Done.\n");
 	}
 

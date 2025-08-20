@@ -130,6 +130,24 @@ finish_extensions(struct rpki_crl *crl)
 	ext_compile(&crl->exts, &crl->obj.tbsCertList.crlExtensions);
 }
 
+static void
+finish_rrdp(struct rpki_crl *crl)
+{
+	struct rrdp_notification *notif;
+	char const *rpkiNotify;
+
+	pr_debug("- Adding CRL to the RRDP Notification");
+
+	rpkiNotify = crl->meta->parent->rpp.rpkiNotify;
+	if (rpkiNotify == NULL) {
+		pr_trace("Parent has no rpkiNotify.");
+		return;
+	}
+
+	notif = notif_getsert(crl->meta->tree, rpkiNotify);
+	notif_add_file(notif, crl->meta->name);
+}
+
 void
 crl_finish(struct rpki_crl *crl)
 {
@@ -138,6 +156,7 @@ crl_finish(struct rpki_crl *crl)
 		init_name(&crl->obj.tbsCertList.issuer,
 		    crl->meta->parent->meta->name);
 	}
+	finish_rrdp(crl);
 	finish_extensions(crl);
 	update_signature(crl);
 }

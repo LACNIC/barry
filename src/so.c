@@ -163,6 +163,7 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 	cersf = field_add(sdf, "certificates", NULL, NULL, 0);
 	cerf = field_add(cersf, "0", &ft_obj, &so->ee, 0);
 	so->ee_meta.name = meta->name;
+	so->ee_meta.tree = meta->tree;
 	so->ee_meta.parent = meta->parent;
 	so->ee_meta.fields = cerf;
 	cer_init(&so->ee, &so->ee_meta, CT_EE);
@@ -181,7 +182,7 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 void
 signed_object_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 {
-	cer_finish_ee(&so->ee, so->meta->uri);
+	cer_finish_ee(&so->ee, so->meta);
 	finish_content_info(so, td);
 }
 

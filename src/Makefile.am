@@ -9,6 +9,7 @@ barry_SOURCES += crl.c crl.h
 barry_SOURCES += csv.c csv.h
 barry_SOURCES += ext.c ext.h
 barry_SOURCES += field.c field.h
+barry_SOURCES += file.c file.h
 barry_SOURCES += keyval.h
 barry_SOURCES += libcrypto.c libcrypto.h
 barry_SOURCES += mft.c mft.h

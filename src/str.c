@@ -2,7 +2,24 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+
+#include "alloc.h"
 #include "print.h"
+
+char *
+concat(char const *s1, char const *s2)
+{
+	size_t len1, len2;
+	char *result;
+
+	len1 = strlen(s1);
+	len2 = strlen(s2);
+
+	result = pmalloc(len1 + len2 + 1);
+	strcpy(result, s1);
+	strcpy(result + len1, s2);
+	return result;
+}
 
 static size_t
 next_power_of_2(size_t src)

@@ -159,7 +159,7 @@ That translates into `bad.repo`:
 ta.cer
 	roa.roa
 
-[roa.roa]
+[node: roa.roa]
 content.encapContentInfo.eContent.version = 2
 ```
 
@@ -213,7 +213,7 @@ The only other token type is String, which is either
 The key-value section is a JSON-adjacent hierarchy. Here is an example in which the user has overridden the valid dates of the TA and the addresses it can delegate:
 
 ```
-[ta.cer]
+[node: ta.cer]
 "tbsCertificate" = {
 	"validity" = {
 		"notBefore" = "2025-06-01T00:00:00Z",
@@ -242,7 +242,7 @@ It differs from JSON in several ways:
 Hence, the example above is equivalent to
 
 ```
-[ta.cer]
+[node: ta.cer]
 # This line is a comment <-- 1
 tbsCertificate = { # <-- 4
 	validity = {
@@ -259,7 +259,7 @@ tbsCertificate = { # <-- 4
 Which is also equivalent to
 
 ```
-[ta.cer]
+[node: ta.cer]
 tbsCertificate.validity.notBefore = 2025-06-01T00:00:00Z
 tbsCertificate.validity.notAfter = 2026-06-01T00:00:00Z
 tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24-28, 2001:db8::/64 ]
@@ -513,7 +513,7 @@ ta.cer
 Implies (with possible hashes)
 
 ```
-[mft.mft]
+[node: mft.mft]
 content.encapContentInfo.eContent.fileList = {
 	# <File name>: <Hash>
 	crl.crl: 0x14A9B4039E1EDC10C1314C435828B418417E8B152CD173696B776EF24D9A9E41,
@@ -543,13 +543,67 @@ content.encapContentInfo.eContent.fileList = {
 }
 ```
 
+## Tutorial: RRDP
+
+RRDP has two relevant program arguments:
+
+```
+barry
+    --rrdp-uri=<RRDP-URI>    # default: https://localhost:8080/rpki
+    --rrdp-path=<RRDP-PATH>  # default: rrdp/
+    ...
+```
+
+By default, all the non-TA tree files `barry` produces are snapshot'd into `<RRDP-PATH>/snapshot.xml` (which is assumed to be served from URL `[RRDP-URI]/snapshot.xml`), which is then referenced by `<RRDP-PATH>/notification.xml` (`[RRDP-URI]/notification.xml`). <s>Simply because of inertia, the TA is copied to `<RRDP-PATH>/<Name of TA>` (`[RRDP-URI]/<Name of TA>`).</s> No deltas are produced.
+
+> Note: If `--rrdp-uri` is an empty string, RRDP will be completely disabled. (SIAs will not contain `rpkiNotify`s and RRDP files will not be generated.) Otherwise, if `rrdp-path` is an empty string, the SIAs will contain the corresponding `rpkiNotify`s, but no RRDP XMLs will be generated.
+
+Every certificate in the tree has an additional key-value URL named `rpp.rpkiNotify`, which is normally autocomputed early in the repository building process. If you don't override anything else, all of said certificate's descendants will be snapshot'd into the `rpp.rpkiNotify` RRDP context:
+
+```
+ta.cer
+	A.cer
+		A1.roa
+		A2.roa
+	B.cer
+		B1.roa
+		B2.cer
+			BB1.roa
+
+[node: ta.cer]
+rpp.rpkiNotify = https://potato/rrdp/notification.xml
+
+[node: B.cer]
+rpp.rpkiNotify = https://tomato/rrdp/notification.xml
+
+[node: B2.cer]
+rpp.rpkiNotify = https://lettuce/rrdp/notification.xml
+```
+
+- `potato`'s snapshot will contain `A.cer`, `A1.roa`, `A2.roa` and `B.cer`.
+- `tomato`'s snapshot will contain `B1.roa` and `B2.cer`.
+- `lettuce`'s snapshot will contain `BB1.roa`.
+
+> Note: If the object is the TA, its default `rpp.rpkiNotify` is `[RRDP-URI]/snapshot.xml`. Otherwise, its default is inherited from its parent.
+
+> Note: `rpp.rpkiNotify` is also copied to the certificate's SIA extension, <s>though that can also be overridden</s> (not yet).
+
+You can also induce further chaos by overriding the files actually contained by each snapshot, whether it makes sense or not:
+
+```
+[notification: https://potato/rrdp/notification.xml]
+snapshot.files = [ ta.cer, A1.roa, A1.roa, BB1.roa ]
+```
+
+I haven't implemented deltas yet.
+
 ## TODO
 
 Add Github issues:
 
 - Configuration file section: `[Alias]`
 - `include`s is configuration
-- I commented the RRDP code to force myself to upload the prototype today
+- RRDP deltas
 - May want to purge all the memory leaks
 - Still unimplemented fields
 	- Certificates

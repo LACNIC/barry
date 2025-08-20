@@ -1,6 +1,6 @@
 ta.cer
 
-[ta.cer]
+[node: ta.cer]
 tbsCertificate = {
 	version = 0x04,
 	serialNumber = 0x05,

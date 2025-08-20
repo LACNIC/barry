@@ -3,38 +3,12 @@
 #include <string.h>
 #include "alloc.h"
 #include "cer.h"
+#include "file.h"
 #include "print.h"
 
 extern char *rsync_uri;
 extern char *rsync_path;
 unsigned int rpp_counter;
-
-static char *
-join_paths(char const *base, char const *filename)
-{
-	size_t nbase, nfilename, nresult;
-	char *result;
-
-	nbase = strlen(base);
-	nfilename = strlen(filename);
-
-	if (base[nbase - 1] == '/')
-		nbase--;
-	if (filename[0] == '/') {
-		filename++;
-		nfilename--;
-	}
-
-	nresult = nbase + nfilename + 2;
-	result = pmalloc(nresult);
-
-	strncpy(result, base, nbase);
-	result[nbase] = '/';
-	strncpy(result + nbase + 1, filename, nfilename);
-	result[nresult -1] = '\0';
-
-	return result;
-}
 
 char *
 generate_uri(struct rpki_certificate *parent, char const *filename)
@@ -51,8 +25,24 @@ generate_path(struct rpki_certificate *parent, char const *filename)
 	return join_paths(parent ? parent->rpp.path : rsync_path, filename);
 }
 
+static char *
+autocompute_notify(struct rpki_certificate *cer)
+{
+	extern char const *rrdp_uri;
+	char *rpkiNotify;
+
+	if (rrdp_uri == NULL)
+		return NULL;
+	if (cer->meta->parent != NULL)
+		return NULL; /* Everything except TA inherits by default */
+
+	rpkiNotify = join_paths(rrdp_uri, "notification.xml");
+	notif_getsert(cer->meta->tree, rpkiNotify);
+	return rpkiNotify;
+}
+
 struct rpp
-rpp_new(void)
+rpp_new(struct rpki_certificate *cer)
 {
 #define NAME_SIZE 64
 	char name[NAME_SIZE];
@@ -75,12 +65,8 @@ rpp_new(void)
 	result.crldp = join_paths(result.caRepository, name);
 	pr_debug("- RPP CRL: %s", result.path);
 
-	result.rpkiNotify = NULL;
-	/*
-	psnprintf(name, NAME_SIZE, "%X.xml", result.id);
-	result.rpkiNotify = join_paths(rrdp_uri, name);
+	result.rpkiNotify = autocompute_notify(cer);
 	pr_debug("- RPP rpkiNotify: %s", result.rpkiNotify);
-	*/
 
 	return result;
 }

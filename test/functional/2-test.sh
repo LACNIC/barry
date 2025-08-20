@@ -8,6 +8,7 @@ cd "test/functional"
 # Prepare test sandbox
 mkdir -p "sandbox/keys"
 mkdir -p "sandbox/output"
+mkdir -p "sandbox/rrdp"
 mkdir -p "sandbox/rsync"
 mkdir -p "sandbox/tal"
 
@@ -19,16 +20,18 @@ if [ -z "$(ls -A sandbox/keys)" ]; then    # "If sandbox/keys is empty"
 fi
 
 rm -rf sandbox/output/*
+rm -rf sandbox/rrdp/*
 rm -rf sandbox/rsync/*
 rm -rf sandbox/tal/*
 
 # Prepare common barry arguments, needed by all tests
 BARRY="../../src/barry"
 RSYNC_PATH="--rsync-path sandbox/rsync"
+RRDP_PATH="--rrdp-path sandbox/rrdp"
 KEYS="--keys sandbox/keys"
 PRINTS="-vvp csv"
 TIMES="--now 2025-01-01T00:00:00Z --later 2026-01-01T00:00:00Z"
-BASIC_ARGS="$RSYNC_PATH $KEYS $PRINTS $TIMES"
+BASIC_ARGS="$RSYNC_PATH $RRDP_PATH $KEYS $PRINTS $TIMES"
 
 # Cache default outputs.
 # (Several tests want to compare their outputs to these.)
@@ -233,6 +236,17 @@ check_output_contains "obj2" \
 	"ta\\.cer,tbsCertificate\\.serialNumber,INTEGER,0x05" \
 	"ta\\.cer,tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
 	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
+
+check_output_contains "notification-1" \
+	"https://localhost:8080/rpki/notification-1.xml,path,UTF8String,sandbox/rrdp/notification-1.xml" \
+	"https://localhost:8080/rpki/notification-1.xml,snapshot.uri,UTF8String,https://localhost:8080/rpki/notification-1.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-1.xml,snapshot.path,UTF8String,sandbox/rrdp/notification-1.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-1.xml,snapshot.files,Snapshot Files,\"\[ 0.crl, 0.mft \]\""
+check_output_contains "notification-2" \
+	"https://localhost:8080/rpki/notification-2.xml,path,UTF8String,sandbox/rrdp/notification-2.xml" \
+	"https://localhost:8080/rpki/notification-2.xml,snapshot.uri,UTF8String,https://localhost:8080/rpki/notification-2.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-2.xml,snapshot.path,UTF8String,sandbox/rrdp/notification-2.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-2.xml,snapshot.files,Snapshot Files,\"\[ A.cer, A.roa, 1.crl, B.cer, 2.crl, 0.crl, 1.mft, 2.mft, 0.mft \]\""
 
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

@@ -16,7 +16,8 @@ struct rrdp_entry_file {
 	char *hash;
 };
 
-void rrdp_save(char const *, struct rrdp_type const *,
+void rrdp_save_notification(char const *, char const *, char const *);
+void rrdp_save_snapshot(char const *, struct rrdp_type const *,
     struct rrdp_entry_file *, unsigned int);
 
 #endif /* SRC_OBJ_RRDP_H_ */

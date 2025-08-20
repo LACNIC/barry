@@ -1,6 +1,6 @@
 ta.cer
 
-[ta.cer]
+[node: ta.cer]
 "tbsCertificate" = {
 	"validity" = {
 		"notBefore" = "2025-06-01T00:00:00Z",

@@ -54,6 +54,7 @@ extern const struct field_type ft_bool;
 extern const struct field_type ft_int;
 extern const struct field_type ft_oid;
 extern const struct field_type ft_8str;		/* octet string */
+extern const struct field_type ft_utf8str;
 extern const struct field_type ft_ia5str;
 extern const struct field_type ft_anystr;
 extern const struct field_type ft_any;
@@ -67,6 +68,8 @@ extern const struct field_type ft_ip_cer;
 extern const struct field_type ft_asn_cer;
 extern const struct field_type ft_revoked;
 extern const struct field_type ft_filelist;
+extern const struct field_type ft_notif;
+extern const struct field_type ft_files;
 
 struct field *field_add(struct field *, char const *, struct field_type const *,
     void *, size_t);

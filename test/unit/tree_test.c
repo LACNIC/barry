@@ -7,7 +7,20 @@
 #define RDFD 0
 #define WRFD 1
 
+/* Mocks */
+
+char const *rrdp_uri = "https://localhost:8080/rpki";
+char const *rrdp_path = "rrdp/";
 unsigned int verbosity = 2;
+
+struct field *
+field_add(struct field *parent, char const *name,
+    struct field_type const *type, void *address, size_t size)
+{
+	ck_abort_msg("%s() called!", __func__);
+}
+
+/* Tests */
 
 static void
 send_input(int fd, char *input)
@@ -223,7 +236,8 @@ START_TEST(check_accept_value)
 END_TEST
 
 static void
-init_ctx(struct rd_parse_context *ctx, char const *name, char const *content)
+init_ctx(struct rd_parse_context *ctx, struct rpki_tree *tree,
+    char const *name, char const *content)
 {
 	int fds[2];
 	size_t content_len;
@@ -235,9 +249,11 @@ init_ctx(struct rd_parse_context *ctx, char const *name, char const *content)
 	close(fds[1]);
 
 	memset(ctx, 0, sizeof(*ctx));
+	memset(tree, 0, sizeof(*tree));
 	ctx->fd = fds[0];
 	ctx->path = name;
 	ctx->line = 1;
+	ctx->result = tree;
 }
 
 static void
@@ -247,7 +263,7 @@ ck_gnode(struct rd_parse_context *ctx, char const *name)
 	struct rpki_tree_node *node;
 
 	namelen = strlen(name);
-	HASH_FIND(ghook, ctx->result.nodes, name, namelen, node);
+	HASH_FIND(ghook, ctx->result->nodes, name, namelen, node);
 	ck_assert_ptr_ne(NULL, node);
 	ck_assert_str_eq(name, node->meta.name);
 }
@@ -278,7 +294,7 @@ ck_global(struct rd_parse_context *ctx, ...)
 		n++;
 	va_end(ap);
 
-	ck_assert_uint_eq(n, HASH_CNT(ghook, ctx->result.nodes));
+	ck_assert_uint_eq(n, HASH_CNT(ghook, ctx->result->nodes));
 	va_start(ap, ctx);
 	while ((name = va_arg(ap, char const *)) != NULL)
 		ck_gnode(ctx, name);
@@ -288,8 +304,8 @@ ck_global(struct rd_parse_context *ctx, ...)
 static void
 ck_root(struct rd_parse_context *ctx, char const *name)
 {
-	ck_assert_ptr_ne(NULL, ctx->result.root);
-	ck_assert_str_eq(name, ctx->result.root->meta.name);
+	ck_assert_ptr_ne(NULL, ctx->result->root);
+	ck_assert_str_eq(name, ctx->result->root->meta.name);
 }
 
 static void
@@ -323,7 +339,7 @@ find_descendant(struct rd_parse_context *ctx, ...)
 	va_list ap;
 	char const *name;
 
-	node = ctx->result.root;
+	node = ctx->result->root;
 
 	va_start(ap, ctx);
 	while ((name = va_arg(ap, char const *)) != NULL) {
@@ -339,11 +355,12 @@ find_descendant(struct rd_parse_context *ctx, ...)
 START_TEST(check_read_tree)
 {
 	struct rd_parse_context ctx;
+	struct rpki_tree tree;
 	struct rpki_tree_node *node;
 
 	/******************/
 
-	init_ctx(&ctx, "Just the TA", "test.ta");
+	init_ctx(&ctx, &tree, "Just the TA", "test.ta");
 	read_tree(&ctx);
 
 	ck_global(&ctx, "test.ta", NULL);
@@ -351,29 +368,29 @@ START_TEST(check_read_tree)
 
 	/******************/
 
-	init_ctx(&ctx, "Minimal tree",
+	init_ctx(&ctx, &tree, "Minimal tree",
 		"test.ta\n"
 		"	child.cer");
 	read_tree(&ctx);
 
 	ck_global(&ctx, "test.ta", "child.cer", NULL);
 	ck_root(&ctx, "test.ta");
-	ck_children(ctx.result.root, "child.cer", NULL);
+	ck_children(ctx.result->root, "child.cer", NULL);
 
 	/******************/
 
-	init_ctx(&ctx, "Same, but newline at the end",
+	init_ctx(&ctx, &tree, "Same, but newline at the end",
 		"test.ta\n"
 		"	child.cer\n");
 	read_tree(&ctx);
 
 	ck_global(&ctx, "test.ta", "child.cer", NULL);
 	ck_root(&ctx, "test.ta");
-	ck_children(ctx.result.root, "child.cer", NULL);
+	ck_children(ctx.result->root, "child.cer", NULL);
 
 	/******************/
 
-	init_ctx(&ctx, "Comments and empty lines",
+	init_ctx(&ctx, &tree, "Comments and empty lines",
 		"# Lorem ipsum dolor sit amet.\n"
 		"root.achoo # Donec sollicitudin ipsum eget sodales\n"
 		"\n"
@@ -390,11 +407,11 @@ START_TEST(check_read_tree)
 
 	ck_global(&ctx, "root.achoo", "ca1.cer", "roa.roa", "mft.mft", NULL);
 	ck_root(&ctx, "root.achoo");
-	ck_children(ctx.result.root, "ca1.cer", "roa.roa", "mft.mft", NULL);
+	ck_children(ctx.result->root, "ca1.cer", "roa.roa", "mft.mft", NULL);
 
 	/******************/
 
-	init_ctx(&ctx, "More floors and indentation shenanigans",
+	init_ctx(&ctx, &tree, "More floors and indentation shenanigans",
 		"root\n"
 		"  1\n"
 		"	11\n"
@@ -412,7 +429,7 @@ START_TEST(check_read_tree)
 	ck_global(&ctx, "root", "1", "11", "111", "112", "12", "121", "112",
 	    "2", "3", NULL);
 	ck_root(&ctx, "root");
-	ck_children(ctx.result.root, "1", "2", "3", NULL);
+	ck_children(ctx.result->root, "1", "2", "3", NULL);
 
 	node = find_descendant(&ctx, "1", NULL);
 	ck_children(node, "11", "12", NULL);
@@ -438,6 +455,7 @@ END_TEST
 START_TEST(check_read_keyvals)
 {
 	struct rd_parse_context ctx;
+	struct rpki_tree tree;
 	struct rpki_tree_node *node;
 	struct keyval *kv;
 	struct kv_node *setnode;
@@ -445,14 +463,14 @@ START_TEST(check_read_keyvals)
 
 	/******************/
 
-	init_ctx(&ctx, "Single integer tweak",
+	init_ctx(&ctx, &tree, "Single integer tweak",
 		"ta.cer\n"
-		"[ta.cer]\n"
+		"[node: ta.cer]\n"
 		"potato = 1\n");
 	read_tree(&ctx);
 	read_keyvals(&ctx);
 
-	node = ctx.result.root;
+	node = ctx.result->root;
 	ck_assert_ptr_ne(NULL, node);
 	kv = STAILQ_FIRST(&node->props);
 	ck_keyval_str("potato", "1", kv);
@@ -461,19 +479,19 @@ START_TEST(check_read_keyvals)
 
 	/******************/
 
-	init_ctx(&ctx, "Multiple files",
+	init_ctx(&ctx, &tree, "Multiple files",
 		"ta.cer\n"
 		"	ca.cer\n"
 		"\n"
-		"[ta.cer]\n"
+		"[node: ta.cer]\n"
 		"potato = 12345\n"
 		"\n"
-		"[ca.cer]\n"
+		"[node: ca.cer]\n"
 		"tomato = aoeui\n");
 	read_tree(&ctx);
 	read_keyvals(&ctx);
 
-	node = ctx.result.root;
+	node = ctx.result->root;
 	ck_assert_ptr_ne(NULL, node);
 	kv = STAILQ_FIRST(&node->props);
 	ck_keyval_str("potato", "12345", kv);
@@ -488,15 +506,15 @@ START_TEST(check_read_keyvals)
 
 	/******************/
 
-	init_ctx(&ctx, "Multiple props",
+	init_ctx(&ctx, &tree, "Multiple props",
 		"ta.cer\n"
-		"[ta.cer]\n"
+		"[node: ta.cer]\n"
 		"potato = 12345\n"
 		"tomato = aoeui");
 	read_tree(&ctx);
 	read_keyvals(&ctx);
 
-	node = ctx.result.root;
+	node = ctx.result->root;
 	ck_assert_ptr_ne(NULL, node);
 	kv = STAILQ_FIRST(&node->props);
 	ck_keyval_str("potato", "12345", kv);
@@ -507,15 +525,15 @@ START_TEST(check_read_keyvals)
 
 	/******************/
 
-	init_ctx(&ctx, "Other data types",
+	init_ctx(&ctx, &tree, "Other data types",
 		"ta.cer\n"
-		"[ta.cer]\n"
+		"[node: ta.cer]\n"
 		"a.b.c = [ 12345, \"23456\" ]\n"
 		"\"a.b.d\" = { \"aoeui\" = \"333\", dhtns = 444 }");
 	read_tree(&ctx);
 	read_keyvals(&ctx);
 
-	node = ctx.result.root;
+	node = ctx.result->root;
 	ck_assert_ptr_ne(NULL, node);
 
 	kv = STAILQ_FIRST(&node->props);
@@ -555,10 +573,10 @@ START_TEST(check_read_keyvals)
 
 	/******************/
 
-	init_ctx(&ctx, "Whitespace, comments",
+	init_ctx(&ctx, &tree, "Whitespace, comments",
 		"ta.cer\n"
 		"		# Integer eget dui sit amet.\n"
-		"[ta.cer]       # Donec a urna turpis\n"
+		"[node: ta.cer] # Donec a urna turpis\n"
 		"  # Nulla ut tellus nec augue malesuada aliquet in vel eros\n"
 		"a\n" "=\n" "\"aa bb cc\n" "dd ee ff\"\n"
 		"b\n" "=\n" "[\n" "12345\n" ",\n" "23456\n" "] "
@@ -566,7 +584,7 @@ START_TEST(check_read_keyvals)
 	read_tree(&ctx);
 	read_keyvals(&ctx);
 
-	node = ctx.result.root;
+	node = ctx.result->root;
 	ck_assert_ptr_ne(NULL, node);
 
 	kv = STAILQ_FIRST(&node->props);

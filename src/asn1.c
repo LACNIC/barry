@@ -13,6 +13,7 @@
 #include <libasn1fort/RelativeDistinguishedName.h>
 
 #include "alloc.h"
+#include "file.h"
 #include "oid.h"
 #include "print.h"
 
@@ -248,41 +249,6 @@ write_bytes(const void *buffer, size_t size, void *arg)
 {
 	int fd = *((int *)arg);
 	return write(fd, buffer, size);
-}
-
-/* Does not care if the path already exists. */
-void
-exec_mkdir(char *path)
-{
-	pr_trace("mkdir '%s'", path);
-	if (mkdir(path, 0750) < 0 && errno != EEXIST)
-		panic("mkdir(%s): %s", path, strerror(errno));
-}
-
-/* Does not care if the path already exists, automatically creates parents. */
-void
-exec_mkdir_p(char const *_path, bool include_last)
-{
-	char *path, *slash;
-
-	if (_path == NULL)
-		panic("Path is NULL.");
-	if (_path[0] == '\0')
-		panic("Path is empty.");
-
-	path = pstrdup(_path);
-	slash = path;
-
-	while ((slash = strchr(slash + 1, '/')) != NULL) {
-		*slash = '\0';
-		exec_mkdir(path);
-		*slash = '/';
-	};
-
-	if (include_last)
-		exec_mkdir(path);
-
-	free(path);
 }
 
 /* DER-encodes @obj (whose metadata is @td) into file @path. */

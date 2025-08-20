@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+char *concat(char const *, char const *);
+
 struct dynamic_string {
 	char *buf;
 	size_t len;

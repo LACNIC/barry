@@ -1,6 +1,6 @@
 ta.cer
 
-[ta.cer]
+[node: ta.cer]
 # This line is a comment <-- 1
 tbsCertificate = { # <-- 4
 	validity = {

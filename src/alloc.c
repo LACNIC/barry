@@ -53,6 +53,18 @@ pstrdup(char const *s)
 	return result;
 }
 
+char *
+pstrndup(char const *s, size_t size)
+{
+	char *result;
+
+	result = strndup(s, size);
+	if (!result)
+		enomem;
+
+	return result;
+}
+
 void
 psnprintf(char *buf, size_t size, char const *tpl, ...)
 {

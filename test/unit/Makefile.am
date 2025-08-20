@@ -27,6 +27,7 @@ field_test_LDADD = ${MY_LDADD}
 
 tree_test_SOURCES  = tree_test.c
 tree_test_SOURCES += ../../src/alloc.c ../../src/alloc.h
+tree_test_SOURCES += ../../src/file.c ../../src/file.h
 tree_test_SOURCES += ../../src/str.c ../../src/str.h
 tree_test_LDADD = ${MY_LDADD}
 

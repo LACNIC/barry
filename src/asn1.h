@@ -49,14 +49,11 @@ void init_gtime_tm(GeneralizedTime_t *, struct tm *);
 void init_gtime_now(GeneralizedTime_t *);
 void init_gtime_later(GeneralizedTime_t *);
 
-
 void der_encode_any(const asn_TYPE_descriptor_t *, void *, ANY_t *);
 void der_encode_8str(const asn_TYPE_descriptor_t *, void *, OCTET_STRING_t *);
 
 void ber2asn1(const void *, size_t, const asn_TYPE_descriptor_t *, void *);
 
-void exec_mkdir(char *);
-void exec_mkdir_p(char const *, bool);
 void asn1_write(char *, const asn_TYPE_descriptor_t *, const void *);
 
 #endif /* SRC_ASN1_H_ */

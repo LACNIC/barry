@@ -23,10 +23,12 @@
 
 #include "alloc.h"
 #include "asn1.h"
+#include "cer.h"
 #include "csv.h"
 #include "ext.h"
 #include "oid.h"
 #include "print.h"
+#include "rpki_tree.h"
 #include "str.h"
 
 static error_msg const HEX_EMPTY = "Hexadecimal string is empty";
@@ -497,7 +499,7 @@ parse_8str(struct field *fields, struct kv_value *src, void *dst)
 }
 
 static error_msg
-parse_ia5str(struct field *fields, struct kv_value *src, void *dst)
+parse_utf8str(struct field *fields, struct kv_value *src, void *dst)
 {
 	IA5String_t *ia5str = dst;
 
@@ -509,7 +511,7 @@ parse_ia5str(struct field *fields, struct kv_value *src, void *dst)
 }
 
 static void
-print_ia5str(struct dynamic_string *dstr, void *val)
+print_utf8str(struct dynamic_string *dstr, void *val)
 {
 	IA5String_t *ia5str = val;
 	dstr_append(dstr, "%.*s", (int)ia5str->size, (char *)ia5str->buf);
@@ -1466,7 +1468,7 @@ print_filelist(struct dynamic_string *dstr, void *arg)
 
 	for (f = 0; f < filelist->list.count; f++) {
 		fah = filelist->list.array[f];
-		print_ia5str(dstr, &fah->file);
+		print_utf8str(dstr, &fah->file);
 		dstr_append(dstr, "=");
 		print_bitstr(dstr, &fah->hash);
 
@@ -1476,12 +1478,73 @@ print_filelist(struct dynamic_string *dstr, void *arg)
 	dstr_append(dstr, "}");
 }
 
+static error_msg
+parse_notif(struct field *rootf, struct kv_value *src, void *arg)
+{
+	struct rpki_certificate *cer = arg;
+
+	if (src->type != VALT_STR)
+		return NEED_STRING;
+
+	cer->rpp.rpkiNotify = pstrdup(src->v.str);
+	notif_getsert(cer->meta->tree, cer->rpp.rpkiNotify);
+
+	return NULL;
+}
+
+static void
+print_notif(struct dynamic_string *dstr, void *arg)
+{
+	struct rpki_certificate *cer = arg;
+	if (cer->rpp.rpkiNotify != NULL)
+		dstr_append(dstr, "%s", cer->rpp.rpkiNotify);
+}
+
+static error_msg
+parse_files(struct field *rootf, struct kv_value *src, void *dst)
+{
+	struct kv_node *node;
+	struct rrdp_file *file;
+	struct rrdp_files *files = dst;
+
+	if (src->type != VALT_SET)
+		return NEED_SET;
+
+	STAILQ_FOREACH(node, &src->v.set, hook) {
+		if (node->value.type != VALT_STR)
+			return NEED_STRING;
+
+		pr_trace("Adding %s to Notification", node->value.v.str);
+		file = pzalloc(sizeof(struct rrdp_file));
+		file->name = node->value.v.str;
+		STAILQ_INSERT_TAIL(files, file, hook);
+	}
+
+	return NULL;
+}
+
+static void
+print_files(struct dynamic_string *dstr, void *arg)
+{
+	struct rrdp_files *files = arg;
+	struct rrdp_file *file;
+
+	dstr_append(dstr, "[ ");
+	STAILQ_FOREACH(file, files, hook) {
+		dstr_append(dstr, "%s", file->name);
+		if (STAILQ_NEXT(file, hook) != NULL)
+			dstr_append(dstr, ", ");
+	}
+	dstr_append(dstr, " ]");
+}
+
 const struct field_type ft_obj = { "Object", parse_obj, NULL };
 const struct field_type ft_bool = { "BOOLEAN", parse_bool, print_bool };
 const struct field_type ft_int = { "INTEGER", parse_int, print_int };
 const struct field_type ft_oid = { "OBJECT IDENTIFIER", parse_oid, print_oid };
 const struct field_type ft_8str = { "OCTET STRING", parse_8str, print_8str };
-const struct field_type ft_ia5str = { "IA5String", parse_ia5str, print_ia5str };
+const struct field_type ft_utf8str = { "UTF8String", parse_utf8str, print_utf8str };
+const struct field_type ft_ia5str = { "IA5String", parse_utf8str, print_utf8str };
 const struct field_type ft_anystr = { "PrintableString in ANY", parse_anystr, print_anystr };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
 const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr };
@@ -1494,6 +1557,8 @@ const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_ce
 const struct field_type ft_asn_cer = { "AS Resources", parse_asns, print_asns };
 const struct field_type ft_revoked = { "Revoked Certificates", parse_revoked_list, print_revokeds };
 const struct field_type ft_filelist = { "File List", parse_filelist, print_filelist };
+const struct field_type ft_notif = { "Notification", parse_notif, print_notif };
+const struct field_type ft_files = { "Snapshot Files", parse_files, print_files };
 
 struct field *
 __field_add(struct field *parent, char const *name)

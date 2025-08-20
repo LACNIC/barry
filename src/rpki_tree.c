@@ -6,6 +6,7 @@
 #include <fcntl.h>
 
 #include "alloc.h"
+#include "file.h"
 #include "print.h"
 #include "str.h"
 
@@ -26,7 +27,7 @@ struct rd_parse_context {
 	/* Total meaningful bytes in @buf, since buf[0] */
 	size_t size;
 
-	struct rpki_tree result;
+	struct rpki_tree *result;
 };
 
 enum token_type {
@@ -47,7 +48,7 @@ find_node(struct rd_parse_context *ctx, char const *name)
 	size_t keylen;
 
 	keylen = strlen(name);
-	HASH_FIND(ghook, ctx->result.nodes, name, keylen, node);
+	HASH_FIND(ghook, ctx->result->nodes, name, keylen, node);
 
 	return node;
 }
@@ -64,7 +65,7 @@ add_node(struct rd_parse_context *ctx, struct rpki_tree_node *node)
 {
 	if (find_node(ctx, node->meta.name) != NULL)
 		panic("There is more than one node named '%s'.", node->meta.name);
-	__add_node(&ctx->result, node);
+	__add_node(ctx->result, node);
 }
 
 static void
@@ -380,38 +381,58 @@ static void
 read_keyvals(struct rd_parse_context *ctx)
 {
 	struct token tkn;
-	char *filename;
-	struct rpki_tree_node *file;
+	char *type, *id;
+	struct rpki_tree_node *node;
+	struct rrdp_notification *notif;
 	struct keyval *kv;
 
-	do {
-		switch (next_token(ctx, &tkn)) {
-		case TKNT_SET_START:
-			filename = expect_token(ctx, TKNT_STR);
-			file = find_node(ctx, filename);
-			if (file == NULL)
+again:
+	switch (next_token(ctx, &tkn)) {
+	case TKNT_SET_START:
+		type = expect_token(ctx, TKNT_STR);
+		if (strcmp(type, "node:") == 0) {
+			id = expect_token(ctx, TKNT_STR);
+			node = find_node(ctx, id);
+			if (node == NULL)
 				BADCFG(ctx,
-				    "The tree does not declare file '%s'",
-				    filename);
-			expect_token(ctx, TKNT_SET_END);
-			break;
+				    "The tree does not declare node '%s'",
+				    id);
+			notif = NULL;
 
-		case TKNT_STR:
-			kv = pzalloc(sizeof(struct keyval));
-			kv->key = tkn.str;
-			expect_token(ctx, TKNT_ASSIGNMENT);
-			kv->value = accept_value(ctx, NULL);
-			STAILQ_INSERT_TAIL(&file->props, kv, hook);
-			break;
+		} else if (strcmp(type, "notification:") == 0) {
+			id = expect_token(ctx, TKNT_STR);
+			notif = notif_getsert(ctx->result, id);
+			node = NULL;
 
-		case TKNT_EOF:
-			pr_trace("EOF.");
-			return;
-
-		default:
-			BADCFG(ctx, "Unexpected keyval token: %s", tkn.str);
+		} else {
+			panic("Expected 'node:' or 'notification:', "
+			    "instead got '%s'", type);
 		}
-	} while (true);
+		expect_token(ctx, TKNT_SET_END);
+		break;
+
+	case TKNT_STR:
+		kv = pzalloc(sizeof(struct keyval));
+		kv->key = tkn.str;
+		expect_token(ctx, TKNT_ASSIGNMENT);
+		kv->value = accept_value(ctx, NULL);
+		if (node)
+			STAILQ_INSERT_TAIL(&node->props, kv, hook);
+		else if (notif)
+			STAILQ_INSERT_TAIL(&notif->props, kv, hook);
+		else
+			panic("Missing context for keyval '%s'", kv->key);
+		break;
+
+	case TKNT_EOF:
+		pr_trace("EOF.");
+		return;
+
+	default:
+		BADCFG(ctx, "Unexpected keyval token: %s", tkn.str);
+	}
+
+	goto again;
 }
 
 static unsigned int
@@ -460,7 +481,7 @@ read_tree(struct rd_parse_context *ctx)
 
 	refresh_reader(ctx);
 
-	ctx->result.root = last = NULL;
+	ctx->result->root = last = NULL;
 	do {
 		indent = count_indentation(ctx);
 
@@ -468,14 +489,15 @@ read_tree(struct rd_parse_context *ctx)
 		case TKNT_STR:
 			current = pzalloc(sizeof(struct rpki_tree_node));
 			current->meta.name = tkn.str;
+			current->meta.tree = ctx->result;
 			current->meta.fields = pzalloc(sizeof(struct field));
 			current->indent = indent;
 			STAILQ_INIT(&current->props);
 
 			add_node(ctx, current);
 
-			if (ctx->result.root == NULL) {
-				ctx->result.root = last = current;
+			if (ctx->result->root == NULL) {
+				ctx->result->root = last = current;
 
 			} else if (current->indent > last->indent) {
 				add_child(last, current);
@@ -510,8 +532,8 @@ sibling:			if (last->parent == NULL)
 	} while (true);
 }
 
-struct rpki_tree
-rpkitree_load(char const *rd_path)
+void
+rpkitree_load(char const *rd_path, struct rpki_tree *result)
 {
 	struct rd_parse_context ctx = { 0 };
 
@@ -525,6 +547,7 @@ rpkitree_load(char const *rd_path)
 
 	ctx.path = rd_path;
 	ctx.line = 1;
+	ctx.result = result;
 
 	pr_debug("Reading tree from input...");
 	read_tree(&ctx);
@@ -533,8 +556,6 @@ rpkitree_load(char const *rd_path)
 	pr_debug("Reading keyvals from input...");
 	read_keyvals(&ctx);
 	pr_debug("Done.\n");
-
-	return ctx.result;
 }
 
 static void
@@ -590,4 +611,88 @@ void
 rpkitree_print(struct rpki_tree *tree)
 {
 	print_node(tree->root, 0);
+}
+
+static void
+default_paths(struct rrdp_notification *notif, char const *notif_uri)
+{
+	extern char const *rrdp_uri; /* --rrdp-uri */
+	extern char const *rrdp_path; /* --rrdp-path */
+	char *snapshot_uri;
+	char *notif_path;
+	char *snapshot_path;
+	size_t rrdp_uri_len;
+
+	/* Notification URI */
+	notif->uri = pstrdup(notif_uri);
+
+	/* Snapshot URI */
+	snapshot_uri = concat(notif_uri, ".snapshot");
+	notif->snapshot.uri.buf = (uint8_t *)snapshot_uri;
+	notif->snapshot.uri.size = strlen(snapshot_uri);
+
+	rrdp_uri_len = strlen(rrdp_uri);
+	if (strncmp(notif_uri, rrdp_uri, rrdp_uri_len) != 0)
+		return; /* The user will have to override the paths */
+
+	/* Notification path */
+	notif_path = join_paths(rrdp_path, notif_uri + rrdp_uri_len);
+	notif->path.buf = (uint8_t *)notif_path;
+	notif->path.size = strlen(notif_path);
+
+	/* Snapshot path */
+	snapshot_path = concat(notif_path, ".snapshot");
+	notif->snapshot.path.buf = (uint8_t *)snapshot_path;
+	notif->snapshot.path.size = strlen(snapshot_path);
+}
+
+static void
+init_notif_fields(struct rrdp_notification *notif)
+{
+	struct field *ssf;
+
+	notif->fields = pzalloc(sizeof(struct field));
+
+	field_add(notif->fields, "path", &ft_utf8str, &notif->path, 0);
+
+	ssf = field_add(notif->fields, "snapshot", &ft_obj, &notif->snapshot, 0);
+	field_add(ssf, "uri", &ft_utf8str, &notif->snapshot.uri, 0);
+	field_add(ssf, "path", &ft_utf8str, &notif->snapshot.path, 0);
+	field_add(ssf, "files", &ft_files, &notif->snapshot.files, 0);
+}
+
+struct rrdp_notification *
+notif_getsert(struct rpki_tree *tree, char const *uri)
+{
+	struct rrdp_notification *notif;
+	size_t urlen;
+
+	if (uri == NULL)
+		return NULL;
+
+	pr_trace("Upserting Notification %s", uri);
+
+	urlen = strlen(uri);
+	HASH_FIND(hh, tree->notifications, uri, urlen, notif);
+	if (notif == NULL) {
+		notif = pzalloc(sizeof(struct rrdp_notification));
+		default_paths(notif, uri);
+		STAILQ_INIT(&notif->snapshot.files);
+		init_notif_fields(notif);
+		HASH_ADD_KEYPTR(hh, tree->notifications, notif->uri, urlen,
+		    notif);
+	}
+
+	return notif;
+}
+
+void
+notif_add_file(struct rrdp_notification *notif, char *filename)
+{
+	struct rrdp_file *file;
+
+	pr_trace("Adding %s to Notification %s", filename, notif->uri);
+	file = pzalloc(sizeof(struct rrdp_file));
+	file->name = filename;
+	STAILQ_INSERT_TAIL(&notif->snapshot.files, file, hook);
 }

@@ -2,6 +2,8 @@
 
 #include <check.h>
 
+/* Mocks */
+
 Time_t default_now;
 Time_t default_later;
 GeneralizedTime_t default_gnow;
@@ -9,6 +11,20 @@ GeneralizedTime_t default_glater;
 
 char const *keys_path = NULL;
 unsigned int verbosity = 0;
+
+struct rrdp_notification *
+notif_getsert(struct rpki_tree *tree, char const *uri)
+{
+	ck_abort_msg("%s() called!", __func__);
+}
+
+void
+exec_mkdir_p(char const *_path, bool include_last)
+{
+	ck_abort_msg("%s() called!", __func__);
+}
+
+/* Tests */
 
 #define ck_hexstr(input, bytes, unused) do {				\
 		memset(&bs, 0, sizeof(bs));				\
@@ -299,6 +315,7 @@ START_TEST(check_tutorial_examples)
 {
 	struct kv_value kv;
 	INTEGER_t num;
+	struct field dummy = { 0};
 	OCTET_STRING_t os;
 	BIT_STRING_t bs;
 	ANY_t any;
@@ -316,35 +333,35 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "4660";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x1234";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0b0001001000110100";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&os, 0, sizeof(os));
 	kv.v.str = "4660";
-	ck_assert_pstr_eq(NULL, parse_8str(NULL, &kv, &os));
+	ck_assert_pstr_eq(NULL, parse_8str(&dummy, &kv, &os));
 	ck_assert_int_eq(os.size, 2);
 	ck_assert_int_eq(os.buf[0], 0x12);
 	ck_assert_int_eq(os.buf[1], 0x34);
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0x1234";
-	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, &kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(&dummy, &kv, &bs));
 	ck_assert_int_eq(bs.size, 2);
 	ck_assert_int_eq(bs.buf[0], 0x12);
 	ck_assert_int_eq(bs.buf[1], 0x34);
@@ -352,7 +369,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0b0001001000110100";
-	ck_assert_pstr_eq(NULL, parse_any(NULL, &kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(&dummy, &kv, &any));
 	ck_assert_int_eq(any.size, 2);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -364,7 +381,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0x123456";
-	ck_assert_pstr_eq(NULL, parse_any(NULL, &kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(&dummy, &kv, &any));
 	ck_assert_int_eq(any.size, 3);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -372,7 +389,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0b000100100011010001010110";
-	ck_assert_pstr_eq(NULL, parse_any(NULL, &kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(&dummy, &kv, &any));
 	ck_assert_int_eq(any.size, 3);
 	ck_assert_int_eq(any.buf[0], 0x12);
 	ck_assert_int_eq(any.buf[1], 0x34);
@@ -386,7 +403,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x00000001";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 4);
 	ck_assert_int_eq(num.buf[0], 0x00);
 	ck_assert_int_eq(num.buf[1], 0x00);
@@ -401,7 +418,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&any, 0, sizeof(any));
 	kv.v.str = "0x00000001";
-	ck_assert_pstr_eq(NULL, parse_any(NULL, &kv, &any));
+	ck_assert_pstr_eq(NULL, parse_any(&dummy, &kv, &any));
 	ck_assert_int_eq(any.size, 4);
 	ck_assert_int_eq(any.buf[0], 0x00);
 	ck_assert_int_eq(any.buf[1], 0x00);
@@ -424,21 +441,21 @@ START_TEST(check_tutorial_examples)
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0b111110";
-	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, &kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(&dummy, &kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0xF8/6";
-	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, &kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(&dummy, &kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0b11111/6";
-	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, &kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(&dummy, &kv, &bs));
 	ck_assert_int_eq(bs.size, 1);
 	ck_assert_int_eq(bs.buf[0], 0xF8);
 	ck_assert_int_eq(bs.bits_unused, 2);
@@ -451,14 +468,14 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x1234";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 2);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x001234";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x00);
 	ck_assert_int_eq(num.buf[1], 0x12);
@@ -466,7 +483,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x1234/24";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
@@ -474,7 +491,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x123400";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 3);
 	ck_assert_int_eq(num.buf[0], 0x12);
 	ck_assert_int_eq(num.buf[1], 0x34);
@@ -487,7 +504,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0x1000000000000000000000000000000000";
-	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, &kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(&dummy, &kv, &bs));
 	ck_assert_int_eq(bs.size, 17);
 	ck_assert_int_eq(bs.buf[0], 0x10);
 	for (i = 1; i < 17; i++)
@@ -496,7 +513,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&bs, 0, sizeof(bs));
 	kv.v.str = "0x10/136";
-	ck_assert_pstr_eq(NULL, parse_bitstr(NULL, &kv, &bs));
+	ck_assert_pstr_eq(NULL, parse_bitstr(&dummy, &kv, &bs));
 	ck_assert_int_eq(bs.size, 17);
 	ck_assert_int_eq(bs.buf[0], 0x10);
 	for (i = 1; i < 17; i++)
@@ -511,7 +528,7 @@ START_TEST(check_tutorial_examples)
 
 	memset(&num, 0, sizeof(num));
 	kv.v.str = "0x01/1000";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
+	ck_assert_pstr_eq(NULL, parse_int(&dummy, &kv, &num));
 	ck_assert_int_eq(num.size, 125);
 	ck_assert_int_eq(num.buf[0], 0x01);
 	for (i = 1; i < 125; i++)

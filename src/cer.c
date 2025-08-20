@@ -7,6 +7,7 @@
 #include "asn1.h"
 #include "csv.h"
 #include "field.h"
+#include "file.h"
 #include "libcrypto.h"
 #include "oid.h"
 #include "print.h"
@@ -89,12 +90,15 @@ void
 cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
     enum cer_type type)
 {
+	struct field *rppf;
 	TBSCertificate_t *tbs;
 	struct field *tbsf;
 	struct field *valf;
 	struct field *extf;
 
 	cer->meta = meta;
+	rppf = field_add(meta->fields, "rpp", &ft_obj, &cer->rpp, 0);
+	field_add(rppf, "rpkiNotify", &ft_notif, cer, 0);
 	cer->keys = keys_new();
 
 	tbs = &cer->obj.tbsCertificate;
@@ -194,6 +198,8 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 	unsigned int extn;
 	struct field *fld;
 
+	pr_debug("- Autofilling extensions");
+
 	extn = 0;
 	fld = fields_find(cer->meta->fields, "tbsCertificate.extensions");
 	if (!fld)
@@ -277,7 +283,7 @@ update_signature(struct rpki_certificate *cer, EVP_PKEY *keys)
 void
 cer_generate_paths(struct rpki_certificate *cer)
 {
-	cer->rpp = rpp_new();
+	cer->rpp = rpp_new(cer);
 }
 
 void
@@ -291,6 +297,26 @@ cer_finish_ta(struct rpki_certificate *ta)
 	update_signature(ta, ta->keys);
 }
 
+static void
+finish_rpp(struct rpki_certificate *cer, char *obj_name)
+{
+	struct rrdp_notification *notif;
+
+	if (fields_overridden(cer->meta->fields, "rpp.rpkiNotify"))
+		return;
+
+	pr_debug("- Autofilling rpkiNotify");
+
+	cer->rpp.rpkiNotify = cer->meta->parent->rpp.rpkiNotify;
+	if (cer->rpp.rpkiNotify == NULL) {
+		pr_trace("There's no rpkiNotify to inherit.");
+		return;
+	}
+
+	notif = notif_getsert(cer->meta->tree, cer->rpp.rpkiNotify);
+	notif_add_file(notif, obj_name);
+}
+
 void
 cer_finish_ca(struct rpki_certificate *ca)
 {
@@ -301,12 +327,13 @@ cer_finish_ca(struct rpki_certificate *ca)
 		init_name(&ca->obj.tbsCertificate.issuer,
 		    ca->meta->parent->meta->name);
 	}
+	finish_rpp(ca, ca->meta->name);
 	finish_extensions(ca, CT_CA, NULL);
 	update_signature(ca, ca->meta->parent->keys);
 }
 
 void
-cer_finish_ee(struct rpki_certificate *ee, char const *so_uri)
+cer_finish_ee(struct rpki_certificate *ee, struct rpki_object *so)
 {
 	if (ee->meta->parent == NULL)
 		panic("EE '%s' has no parent.", ee->meta->name);
@@ -316,7 +343,8 @@ cer_finish_ee(struct rpki_certificate *ee, char const *so_uri)
 		init_name(&ee->obj.tbsCertificate.issuer,
 		    ee->meta->parent->meta->name);
 	}
-	finish_extensions(ee, CT_EE, so_uri);
+	finish_rpp(ee, so->name);
+	finish_extensions(ee, CT_EE, so->uri);
 	update_signature(ee, ee->meta->parent->keys);
 }
 

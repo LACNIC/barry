@@ -16,6 +16,6 @@ struct rpp {
 
 char *generate_uri(struct rpki_certificate *, char const *);
 char *generate_path(struct rpki_certificate *, char const *);
-struct rpp rpp_new(void);
+struct rpp rpp_new(struct rpki_certificate *);
 
 #endif /* SRC_RPP_H_ */

@@ -2,6 +2,7 @@
 #define SRC_RPKI_TREE_H_
 
 #include <stdbool.h>
+#include <libasn1fort/UTF8String.h>
 
 #include "field.h"
 #include "keyval.h"
@@ -39,14 +40,39 @@ struct rpki_tree_node {
 	UT_hash_handle ghook;
 };
 
+struct rrdp_file {
+	char *name;
+	STAILQ_ENTRY(rrdp_file) hook;
+};
+
+struct rrdp_notification {
+	char *uri;
+	UTF8String_t path;
+
+	struct {
+		UTF8String_t uri;
+		UTF8String_t path;
+		STAILQ_HEAD(rrdp_files, rrdp_file) files;
+	} snapshot;
+
+	/* All the tweakable fields in the object */
+	struct field *fields;
+	/* Overrides by the user */
+	struct keyvals props;
+
+	UT_hash_handle hh;
+};
+
 struct rpki_tree {
 	/* Linked hash table; all nodes, listed without hierarchy */
 	struct rpki_tree_node *nodes;
 	/* Nodes in tree form. Pointer to root node; not a hash table. */
 	struct rpki_tree_node *root;
+	/* RRDP notifications hash table */
+	struct rrdp_notification *notifications;
 };
 
-struct rpki_tree rpkitree_load(char const *);
+void rpkitree_load(char const *, struct rpki_tree *);
 
 void
 rpkitree_pre_order(
@@ -62,5 +88,9 @@ void rpkitree_add(
 );
 
 void rpkitree_print(struct rpki_tree *);
+
+struct rrdp_notification *notif_getsert(struct rpki_tree *, char const *);
+void notif_add_file(struct rrdp_notification *, char *);
+void __notif_add_file(char const *, struct rrdp_files *, char *);
 
 #endif /* SRC_RPKI_TREE_H_ */

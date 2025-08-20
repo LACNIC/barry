@@ -27,7 +27,7 @@ void cer_init(struct rpki_certificate *, struct rpki_object *, enum cer_type);
 void cer_generate_paths(struct rpki_certificate *);
 void cer_finish_ta(struct rpki_certificate *);
 void cer_finish_ca(struct rpki_certificate *);
-void cer_finish_ee(struct rpki_certificate *, char const *);
+void cer_finish_ee(struct rpki_certificate *, struct rpki_object *);
 void cer_write(struct rpki_certificate *cer);
 void cer_print_md(struct rpki_certificate *cer);
 void cer_print_csv(struct rpki_certificate *cer);

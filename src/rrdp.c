@@ -25,15 +25,11 @@ struct rrdp_entry_type {
 const struct rrdp_entry_type PUBLISH = { "publish" };
 const struct rrdp_entry_type WITHDRAW = { "withdraw" };
 
-void
-rrdp_save(char const *path, struct rrdp_type const *type,
-    struct rrdp_entry_file *files, unsigned int count)
+static int
+write_open(char const *path)
 {
-	int fd;
-	unsigned int tabbing;
-	unsigned int f;
-	struct rrdp_entry_file *file;
 	int error;
+	int fd;
 
 	if (unlink(path)) {
 		error = errno;
@@ -44,6 +40,38 @@ rrdp_save(char const *path, struct rrdp_type const *type,
 	fd = open(path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	if (fd < 0)
 		panic("open(%s): %s", path, strerror(errno));
+
+	return fd;
+}
+
+void
+rrdp_save_notification(char const *path, char const *ss_uri, char const *ss_hash)
+{
+	int fd;
+
+	fd = write_open(path);
+
+	// TODO the attributes need to be args
+	dprintf(fd, "<notification xmlns=\"%s\"\n", "http://www.ripe.net/rpki/rrdp");
+	dprintf(fd, "              version=\"%u\"\n", 1);
+	dprintf(fd, "              session_id=\"%s\"\n", "9df4b597-af9e-4dca-bdda-719cce2c4e28");
+	dprintf(fd, "              serial=\"%u\">\n", 3);
+	dprintf(fd, "  <snapshot uri=\"%s\" hash=\"%s\"/>\n", ss_uri, ss_hash);
+	dprintf(fd, "</notification>\n");
+
+	close(fd);
+}
+
+void
+rrdp_save_snapshot(char const *path, struct rrdp_type const *type,
+    struct rrdp_entry_file *files, unsigned int count)
+{
+	int fd;
+	unsigned int tabbing;
+	unsigned int f;
+	struct rrdp_entry_file *file;
+
+	fd = write_open(path);
 
 	tabbing = strlen(type->name) + 2;
 	dprintf(fd, "<%s xmlns=\"%s\"\n", type->name, "http://www.ripe.net/rpki/rrdp");
