@@ -260,5 +260,32 @@ check_output_contains "notification-2" \
 	"https://localhost:8080/rpki/notification-2.xml,snapshot.path,C String,sandbox/rrdp/notification-2.xml.snapshot" \
 	"https://localhost:8080/rpki/notification-2.xml,snapshot.files,Snapshot Files,\"\[ A.cer, A.roa, 1.crl, B.cer, 2.crl, 0.crl, 1.mft, 2.mft, 0.mft \]\""
 
+check_output_contains "root-only" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/0.mft" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"ta.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml"
+check_output_contains "gname" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,rfc822Name" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,yeah sure" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,iPAddress" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,OCTET STRING,0x010203" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,registeredID" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"B.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"B.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
+	"B.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String," \
+	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
+	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,separate"
+
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

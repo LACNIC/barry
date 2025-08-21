@@ -2,8 +2,10 @@
 #define SRC_FIELD_H_
 
 #include <stdbool.h>
+#include <libasn1fort/AccessDescription.h>
 #include <libasn1fort/AlgorithmIdentifier.h>
 #include <libasn1fort/FileAndHash.h>
+#include <libasn1fort/GeneralName.h>
 #include <libasn1fort/Name.h>
 #include <libasn1fort/SubjectPublicKeyInfo.h>
 
@@ -43,6 +45,7 @@ struct field {
 	/* Hide field during print? */
 	bool invisible;
 
+	struct field *parent;
 	/* Tree children (hash table) */
 	struct field *children;
 	/* Parent's hash table hook */
@@ -61,10 +64,12 @@ extern const struct field_type ft_cstr;		/* char * */
 extern const struct field_type ft_any;
 extern const struct field_type ft_bitstr;
 extern const struct field_type ft_rdnseq;
+extern const struct field_type ft_gname_type;	/* GeneralName type */
 extern const struct field_type ft_time;
-extern const struct field_type ft_gtime;	/* generalized time */
+extern const struct field_type ft_gtime;	/* GeneralizedTime */
 extern const struct field_type ft_filetype;
 extern const struct field_type ft_exts;
+extern const struct field_type ft_ads;		/* AccessDescriptions array */
 extern const struct field_type ft_ip_roa;
 extern const struct field_type ft_ip_cer;
 extern const struct field_type ft_asn_cer;
@@ -78,11 +83,13 @@ struct field *field_add(struct field *, char const *, struct field_type const *,
 struct field *field_addn(struct field *, size_t, struct field_type const *,
     void *, size_t);
 struct field *field_add_name(struct field *, char const *, Name_t *);
+struct field *field_add_gname(struct field *, char const *, GeneralName_t *);
 struct field *field_add_algorithm(struct field *, char const *,
     AlgorithmIdentifier_t *);
 struct field *field_add_spki(struct field *, char const *,
     SubjectPublicKeyInfo_t *);
 void field_add_file(struct field *, size_t, struct FileAndHash *, bool, bool);
+struct field *field_add_ad(struct field *, size_t, AccessDescription_t *);
 
 struct field *fields_find(struct field *, char const *);
 struct field *fields_find_n(struct field *, size_t);

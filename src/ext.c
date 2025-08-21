@@ -166,7 +166,7 @@ add_sia_fields(struct field *parent, struct ext_list_node *ext)
 {
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
-//	"extnValue", &ext->v.sia, 0	TODO not implemented yet
+	field_add(parent, "extnValue", &ft_ads, &ext->v.sia, 0);
 }
 
 void

@@ -56,7 +56,7 @@ struct rrdp_notification {
 	} snapshot;
 
 	/* All the tweakable fields in the object */
-	struct field *fields;
+	struct field *fields; /* TODO why is this a pointer? */
 	/* Overrides by the user */
 	struct keyvals props;
 

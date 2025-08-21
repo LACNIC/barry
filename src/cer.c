@@ -191,6 +191,23 @@ finish_sia(SubjectInfoAccessSyntax_t *sia, struct rpki_certificate *cer,
 }
 
 static void
+finish_sia_fields(struct field *extsf, unsigned int extn,
+    SubjectInfoAccessSyntax_t *sia)
+{
+	struct field *idf;
+	struct field *numf;
+	int a;
+
+	idf = fields_find(extsf, "sia.extnValue");
+	numf = fields_find(fields_find_n(extsf, extn), "extnValue");
+
+	for (a = 0; a < sia->list.count; a++) {
+		field_add_ad(idf, a, sia->list.array[a]);
+		field_add_ad(numf, a, sia->list.array[a]);
+	}
+}
+
+static void
 finish_extensions(struct rpki_certificate *cer, enum cer_type type,
     char const *so_uri)
 {
@@ -237,8 +254,10 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 			break;
 
 		case EXT_SIA:
-			if (!EXT_FIELD_SET(fld, "sia", extn, ))
+			if (!EXT_FIELD_SET(fld, "sia", extn, )) {
 				finish_sia(&ext->v.sia, cer, type, so_uri);
+				finish_sia_fields(fld, extn, &ext->v.sia);
+			}
 			break;
 
 		case EXT_CP:

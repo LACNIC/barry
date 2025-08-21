@@ -586,7 +586,7 @@ rpp.rpkiNotify = https://lettuce/rrdp/notification.xml
 
 > Note: If the object is the TA, its default `rpp.rpkiNotify` is `[RRDP-URI]/snapshot.xml`. Otherwise, its default is inherited from its parent.
 
-> Note: `rpp.rpkiNotify` is also copied to the certificate's SIA extension, <s>though that can also be overridden</s> (not yet).
+> Note: `rpp.rpkiNotify` is also copied to the certificate's SIA extension, though [that can also be overridden](test/functional/rd/gname.rd).
 
 You can also induce further chaos by overriding the files actually contained by each snapshot, whether it makes sense or not:
 
@@ -615,7 +615,6 @@ Add Github issues:
 		- AKI authorityCertIssuer
 		- CRLDP extnValue
 		- AIA extnValue
-		- SIA extnValue
 		- CP extnValue
 	- Manifests, ROAs
 		- signedAttrs

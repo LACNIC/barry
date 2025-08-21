@@ -501,20 +501,32 @@ parse_8str(struct field *fields, struct kv_value *src, void *dst)
 static error_msg
 parse_utf8str(struct field *fields, struct kv_value *src, void *dst)
 {
-	IA5String_t *ia5str = dst;
+	OCTET_STRING_t *str = dst;
 
 	if (src->type != VALT_STR)
 		return NEED_STRING;
 
-	init_8str(ia5str, src->v.str);
+	init_8str(str, src->v.str);
 	return NULL;
 }
 
 static void
 print_utf8str(struct dynamic_string *dstr, void *val)
 {
-	IA5String_t *ia5str = val;
-	dstr_append(dstr, "%.*s", (int)ia5str->size, (char *)ia5str->buf);
+	OCTET_STRING_t *str = val;
+	dstr_append(dstr, "%.*s", (int)str->size, (char *)str->buf);
+}
+
+static error_msg
+parse_ia5str(struct field *fields, struct kv_value *src, void *dst)
+{
+	return parse_utf8str(fields, src, dst);
+}
+
+static void
+print_ia5str(struct dynamic_string *dstr, void *val)
+{
+	print_utf8str(dstr, val);
 }
 
 static error_msg
@@ -689,6 +701,86 @@ parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
 	}
 
 	return NULL;
+}
+
+static error_msg
+parse_gname_type(struct field *fields, struct kv_value *src, void *dst)
+{
+	GeneralName_PR present;
+	struct field_type const *ft;
+	GeneralName_t *gname = dst;
+
+	if (src->type != VALT_STR)
+		return NEED_STRING;
+
+	if (strcmp(src->v.str, "rfc822Name") == 0) {
+		present = GeneralName_PR_rfc822Name;
+		ft = &ft_ia5str;
+	} else if (strcmp(src->v.str, "dNSName") == 0) {
+		present = GeneralName_PR_dNSName;
+		ft = &ft_ia5str;
+	} else if (strcmp(src->v.str, "uniformResourceIdentifier") == 0) {
+		present = GeneralName_PR_uniformResourceIdentifier;
+		ft = &ft_ia5str;
+	} else if (strcmp(src->v.str, "iPAddress") == 0) {
+		present = GeneralName_PR_iPAddress;
+		ft = &ft_8str;
+	} else if (strcmp(src->v.str, "registeredID") == 0) {
+		present = GeneralName_PR_registeredID;
+		ft = &ft_oid;
+	} else {
+		panic("Unknown GeneralName variant: %s", fields->key);
+	}
+
+	if (gname->present == present)
+		return NULL;
+
+	gname->present = present;
+	memset(&gname->choice, 0, sizeof(gname->choice));
+	field_add(fields->parent, "value", ft, &gname->choice, 0);
+	return NULL;
+}
+
+static void
+print_gname_type(struct dynamic_string *dstr, void *arg)
+{
+	GeneralName_t *gname = arg;
+	char const *value = NULL;
+
+	switch (gname->present) {
+	case GeneralName_PR_otherName:
+		value = "otherName";
+		break;
+	case GeneralName_PR_rfc822Name:
+		value = "rfc822Name";
+		break;
+	case GeneralName_PR_dNSName:
+		value = "dNSName";
+		break;
+	case GeneralName_PR_x400Address:
+		value = "x400Address";
+		break;
+	case GeneralName_PR_directoryName:
+		value = "directoryName";
+		break;
+	case GeneralName_PR_ediPartyName:
+		value = "ediPartyName";
+		break;
+	case GeneralName_PR_uniformResourceIdentifier:
+		value = "uniformResourceIdentifier";
+		break;
+	case GeneralName_PR_iPAddress:
+		value = "iPAddress";
+		break;
+	case GeneralName_PR_registeredID:
+		value = "registeredID";
+		break;
+	case GeneralName_PR_NOTHING:
+		break;
+	}
+
+	if (value)
+		dstr_append(dstr, value);
 }
 
 static error_msg
@@ -888,6 +980,40 @@ struct ip_list_node {
 
 	STAILQ_ENTRY(ip_list_node) hook;
 };
+
+static error_msg
+parse_ads(struct field *fields, struct kv_value *src, void *dst)
+{
+	SubjectInfoAccessSyntax_t *sia = dst;
+	struct kv_node *src_node;
+	AccessDescription_t *dst_ad;
+	struct field *adf;
+	size_t a;
+	error_msg error;
+
+	if (src->type != VALT_SET)
+		return NEED_SET;
+
+	fields->children = NULL;
+
+	a = 0;
+	STAILQ_FOREACH(src_node, &src->v.set, hook)
+		a++;
+	INIT_ASN1_ARRAY(&sia->list, a, AccessDescription_t);
+
+	a = 0;
+	STAILQ_FOREACH(src_node, &src->v.set, hook) {
+		dst_ad = sia->list.array[a];
+		adf = field_add_ad(fields, a, dst_ad);
+		error = parse_obj(adf, &src_node->value, dst_ad);
+		if (error)
+			return error;
+
+		a++;
+	}
+
+	return NULL;
+}
 
 STAILQ_HEAD(ip_list, ip_list_node);
 
@@ -1589,16 +1715,18 @@ const struct field_type ft_int = { "INTEGER", parse_int, print_int };
 const struct field_type ft_oid = { "OBJECT IDENTIFIER", parse_oid, print_oid };
 const struct field_type ft_8str = { "OCTET STRING", parse_8str, print_8str };
 const struct field_type ft_utf8str = { "UTF8String", parse_utf8str, print_utf8str };
-const struct field_type ft_ia5str = { "IA5String", parse_utf8str, print_utf8str };
+const struct field_type ft_ia5str = { "IA5String", parse_ia5str, print_ia5str };
 const struct field_type ft_anystr = { "PrintableString in ANY", parse_anystr, print_anystr };
 const struct field_type ft_cstr = { "C String", parse_cstr, print_cstr };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
 const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr };
 const struct field_type ft_rdnseq = { "RDN Sequence", parse_rdnseq, NULL };
+const struct field_type ft_gname_type = { "GeneralName type", parse_gname_type, print_gname_type };
 const struct field_type ft_time = { "Time", parse_time, print_time };
 const struct field_type ft_gtime = { "GeneralizedTime", parse_gtime, print_gtime };
 const struct field_type ft_filetype = { "File Type", parse_filetype, print_filetype };
 const struct field_type ft_exts = { "Extensions", parse_exts, print_exts };
+const struct field_type ft_ads = { "Access Descriptions", parse_ads, NULL };
 const struct field_type ft_ip_roa = { "IP Resources (ROA)", parse_ips_roa, print_roa_ips };
 const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_cer, print_cer_ips };
 const struct field_type ft_asn_cer = { "AS Resources", parse_asns, print_asns };
@@ -1610,13 +1738,18 @@ const struct field_type ft_files = { "Snapshot Files", parse_files, print_files 
 struct field *
 __field_add(struct field *parent, char const *name)
 {
-	struct field *new;
+	struct field *old, *new;
 	size_t namelen;
 
 	new = pzalloc(sizeof(struct field));
 	new->key = name;
+	new->parent = parent;
 
 	namelen = strlen(name);
+
+	HASH_FIND(hh, parent->children, name, namelen, old);
+	if (old)
+		HASH_DEL(parent->children, old);
 	HASH_ADD_KEYPTR(hh, parent->children, name, namelen, new);
 
 	return new;
@@ -1689,6 +1822,42 @@ field_add_name(struct field *parent, char const *key, Name_t *name)
 }
 
 struct field *
+field_add_gname(struct field *parent, char const *key, GeneralName_t *gn)
+{
+	struct field *gnf;
+	struct field_type const *value_ft = NULL;
+
+	switch (gn->present) {
+	case GeneralName_PR_NOTHING:
+		break;
+	case GeneralName_PR_rfc822Name:
+	case GeneralName_PR_dNSName:
+	case GeneralName_PR_uniformResourceIdentifier:
+		value_ft = &ft_ia5str;
+		break;
+	case GeneralName_PR_iPAddress:
+		value_ft = &ft_8str;
+		break;
+	case GeneralName_PR_registeredID:
+		value_ft = &ft_oid;
+		break;
+	case GeneralName_PR_otherName:
+	case GeneralName_PR_x400Address:
+	case GeneralName_PR_directoryName:
+	case GeneralName_PR_ediPartyName:
+		// TODO Missing variants
+		panic("Not implemented yet: General variant %d", gn->present);
+	}
+
+	gnf = field_add(parent, key, &ft_obj, gn, 0);
+	field_add(gnf, "type", &ft_gname_type, gn, 0);
+	if (value_ft)
+		field_add(gnf, "value", value_ft, &gn->choice, 0);
+
+	return gnf;
+}
+
+struct field *
 field_add_algorithm(struct field *parent, char const *name,
     AlgorithmIdentifier_t *value)
 {
@@ -1726,6 +1895,18 @@ field_add_file(struct field *filelist, size_t f, struct FileAndHash *fah,
 	child->overridden = name_overridden;
 	child = field_add(numf, "hash", &ft_bitstr, &fah->hash, 0);
 	child->overridden = hash_overridden;
+}
+
+struct field *
+field_add_ad(struct field *parent, size_t adn, AccessDescription_t *ad)
+{
+	struct field *adf;
+
+	adf = field_addn(parent, adn, &ft_obj, ad, 0);
+	field_add(adf, "accessMethod", &ft_oid, &ad->accessMethod, 0);
+	field_add_gname(adf, "accessLocation", &ad->accessLocation);
+
+	return adf;
 }
 
 struct field *
