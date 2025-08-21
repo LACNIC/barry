@@ -16,63 +16,54 @@
 static void
 init_extensions_ta(struct rpki_certificate *ta, struct field *extf)
 {
-	size_t n;
-
 	pr_debug("- Initializing TA extensions");
 
 	STAILQ_INIT(&ta->exts);
 
-	n = 0;
-	exts_add_bc(&ta->exts, n++, extf);
-	exts_add_ski(&ta->exts, n++, extf);
-	exts_add_ku(&ta->exts, n++, extf);
-	exts_add_sia(&ta->exts, n++, extf);
-	exts_add_cp(&ta->exts, n++, extf);
-	exts_add_ip(&ta->exts, n++, extf);
-	exts_add_asn(&ta->exts, n++, extf);
+	exts_add_bc(&ta->exts, "bc", extf);
+	exts_add_ski(&ta->exts, "ski", extf);
+	exts_add_ku(&ta->exts, "ku", extf);
+	exts_add_sia(&ta->exts, "sia", extf);
+	exts_add_cp(&ta->exts, "cp", extf);
+	exts_add_ip(&ta->exts, "ip", extf);
+	exts_add_asn(&ta->exts, "asn", extf);
 }
 
 static void
-init_extensions_ca(struct rpki_certificate *ca, struct field *extf)
+init_extensions_ca(struct rpki_certificate *ca, struct field *extsf)
 {
-	size_t n;
-
 	pr_debug("- Initializing CA extensions");
 
 	STAILQ_INIT(&ca->exts);
 
-	n = 0;
-	exts_add_bc(&ca->exts, n++, extf);
-	exts_add_ski(&ca->exts, n++, extf);
-	exts_add_aki(&ca->exts, n++, extf);
-	exts_add_ku(&ca->exts, n++, extf);
-	exts_add_crldp(&ca->exts, n++, extf);
-	exts_add_aia(&ca->exts, n++, extf);
-	exts_add_sia(&ca->exts, n++, extf);
-	exts_add_cp(&ca->exts, n++, extf);
-	exts_add_ip(&ca->exts, n++, extf);
-	exts_add_asn(&ca->exts, n++, extf);
+	exts_add_bc(&ca->exts, "bc", extsf);
+	exts_add_ski(&ca->exts, "ski", extsf);
+	exts_add_aki(&ca->exts, "aki", extsf);
+	exts_add_ku(&ca->exts, "ku", extsf);
+	exts_add_crldp(&ca->exts, "crldp", extsf);
+	exts_add_aia(&ca->exts, "aia", extsf);
+	exts_add_sia(&ca->exts, "sia", extsf);
+	exts_add_cp(&ca->exts, "cp", extsf);
+	exts_add_ip(&ca->exts, "ip", extsf);
+	exts_add_asn(&ca->exts, "asn", extsf);
 }
 
 static void
 init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 {
-	size_t n;
-
 	pr_debug("- Initializing EE extensions");
 
 	STAILQ_INIT(&ee->exts);
 
-	n = 0;
-	exts_add_ski(&ee->exts, n++, extf);
-	exts_add_aki(&ee->exts, n++, extf);
-	exts_add_ku(&ee->exts, n++, extf);
-	exts_add_crldp(&ee->exts, n++, extf);
-	exts_add_aia(&ee->exts, n++, extf);
-	exts_add_sia(&ee->exts, n++, extf);
-	exts_add_cp(&ee->exts, n++, extf);
-	exts_add_ip(&ee->exts, n++, extf);
-	exts_add_asn(&ee->exts, n++, extf);
+	exts_add_ski(&ee->exts, "ski", extf);
+	exts_add_aki(&ee->exts, "aki", extf);
+	exts_add_ku(&ee->exts, "ku", extf);
+	exts_add_crldp(&ee->exts, "crldp", extf);
+	exts_add_aia(&ee->exts, "aia", extf);
+	exts_add_sia(&ee->exts, "sia", extf);
+	exts_add_cp(&ee->exts, "cp", extf);
+	exts_add_ip(&ee->exts, "ip", extf);
+	exts_add_asn(&ee->exts, "asn", extf);
 }
 
 struct rpki_certificate *
@@ -94,7 +85,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	TBSCertificate_t *tbs;
 	struct field *tbsf;
 	struct field *valf;
-	struct field *extf;
+	struct field *extsf;
 
 	cer->meta = meta;
 	rppf = field_add(meta->fields, "rpp", &ft_obj, &cer->rpp, 0);
@@ -133,11 +124,11 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	/* tbs->subjectUniqueID: TODO not implemented yet */
 
 	tbs->extensions = NULL;
-	extf = field_add(tbsf, "extensions", &ft_exts, &cer->exts, 0);
+	extsf = field_add(tbsf, "extensions", &ft_exts, &cer->exts, 0);
 	switch (type) {
-	case CT_TA:	init_extensions_ta(cer, extf);		break;
-	case CT_CA:	init_extensions_ca(cer, extf);		break;
-	case CT_EE:	init_extensions_ee(cer, extf);		break;
+	case CT_TA:	init_extensions_ta(cer, extsf);		break;
+	case CT_CA:	init_extensions_ca(cer, extsf);		break;
+	case CT_EE:	init_extensions_ee(cer, extsf);		break;
 	}
 
 	init_oid(&cer->obj.signatureAlgorithm.algorithm, NID_sha256WithRSAEncryption);
@@ -191,20 +182,14 @@ finish_sia(SubjectInfoAccessSyntax_t *sia, struct rpki_certificate *cer,
 }
 
 static void
-finish_sia_fields(struct field *extsf, unsigned int extn,
-    SubjectInfoAccessSyntax_t *sia)
+finish_sia_fields(struct field *extsf, SubjectInfoAccessSyntax_t *sia)
 {
 	struct field *idf;
-	struct field *numf;
 	int a;
 
 	idf = fields_find(extsf, "sia.extnValue");
-	numf = fields_find(fields_find_n(extsf, extn), "extnValue");
-
-	for (a = 0; a < sia->list.count; a++) {
+	for (a = 0; a < sia->list.count; a++)
 		field_add_ad(idf, a, sia->list.array[a]);
-		field_add_ad(numf, a, sia->list.array[a]);
-	}
 }
 
 static void
@@ -212,12 +197,10 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
     char const *so_uri)
 {
 	struct ext_list_node *ext;
-	unsigned int extn;
 	struct field *fld;
 
 	pr_debug("- Autofilling extensions");
 
-	extn = 0;
 	fld = fields_find(cer->meta->fields, "tbsCertificate.extensions");
 	if (!fld)
 		panic("Certificate lacks a 'tbsCertificate.extensions' field.");
@@ -229,54 +212,52 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 			break;
 
 		case EXT_SKI:
-			if (!EXT_FIELD_SET(fld, "ski", extn, ))
+			if (!fields_overridden(fld, "ski.extnValue"))
 				ext_finish_ski(&ext->v.ski, &cer->SPKI);
 			break;
 
 		case EXT_AKI:
-			if (!EXT_FIELD_SET(fld, "aki", extn, ".keyIdentifier"))
+			if (!fields_overridden(fld, "aki.extnValue.keyIdentifier"))
 				finish_aki(&ext->v.aki, cer);
 			break;
 
 		case EXT_KU:
-			if (!EXT_FIELD_SET(fld, "ku", extn, ))
+			if (!fields_overridden(fld, "ku.extnValue"))
 				ext_finish_ku(&ext->v.ku, type);
 			break;
 
 		case EXT_CRLDP:
-			if (!EXT_FIELD_SET(fld, "crldp", extn, ))
+			if (!fields_overridden(fld, "crldp.extnValue"))
 				finish_crldp(&ext->v.crldp, cer);
 			break;
 
 		case EXT_AIA:
-			if (!EXT_FIELD_SET(fld, "aia", extn, ))
+			if (!fields_overridden(fld, "aia.extnValue"))
 				finish_aia(&ext->v.aia, cer);
 			break;
 
 		case EXT_SIA:
-			if (!EXT_FIELD_SET(fld, "sia", extn, )) {
+			if (!fields_overridden(fld, "sia.extnValue")) {
 				finish_sia(&ext->v.sia, cer, type, so_uri);
-				finish_sia_fields(fld, extn, &ext->v.sia);
+				finish_sia_fields(fld, &ext->v.sia);
 			}
 			break;
 
 		case EXT_CP:
-			if (!EXT_FIELD_SET(fld, "cp", extn, ))
+			if (!fields_overridden(fld, "cp.extnValue"))
 				ext_finish_cp(&ext->v.cp);
 			break;
 
 		case EXT_IP:
-			if (!EXT_FIELD_SET(fld, "ip", extn, ))
+			if (!fields_overridden(fld, "ip.extnValue"))
 				ext_finish_ip(&ext->v.ip);
 			break;
 
 		case EXT_ASN:
-			if (!EXT_FIELD_SET(fld, "asn", extn, ".asnum"))
+			if (!fields_overridden(fld, "asn.extnValue.asnum"))
 				ext_finish_asn(&ext->v.asn);
 			break;
 		}
-
-		extn++;
 	}
 
 	ext_compile(&cer->exts, &cer->obj.tbsCertificate.extensions);

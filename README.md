@@ -462,27 +462,36 @@ tbsCertificate.extensions.asn.extnValue.asnum = [ 0x1234, 0x5678 ]
 tbsCertificate.extensions.asn.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
 ```
 
-If you want a different extension list, override it. Assignments are handled sequentially:
+If you want a different extension list, override it:
 
 ```
-# Override the OID of the default 6th extension
-tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
-
-# Drop the default extensions, create a new list
-# (The 1.2.3.4.5 OID dies as well)
+# Replaces the extension list with an IP extension (type "ip", name "ip")
+# and an ASN extension (type "asn", name "asn").
 tbsCertificate.extensions = [ ip, asn ]
 
-# Override the OID of the first extension
+# The "ip" label now refers to the first extension (because that's the one named "ip" now),
+# not the (now nonexistent) 6th or 9th.
 tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 ```
 
-You can also refer to extensions by (zero-based) index, which might be useful if you declare multiple of the same type:
+You can customize the extension names by declaring the `extensions` object as a map. This is useful if you want to list multiple extensions of the same type:
 
 ```
-tbsCertificate.extensions = [ ip, asn, ip, bc, ip, asn ]
+tbsCertificate.extensions = {
+	# <name> = <type>
+	red = ip,
+	blue = asn,
+	yellow = ip,
+	purple = bc,
+	orange = ip,
+	green = asn
+}
+
 # Overrides the OID of the third ip extension
-tbsCertificate.extensions.4.extnID = 1.2.3.4.5
+tbsCertificate.extensions.orange.extnID = 1.2.3.4.5
 ```
+
+Whether declared as a set or map, the final list will contain the extensions in the same order in which they were declared.
 
 ### IP Resources
 

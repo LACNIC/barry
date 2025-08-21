@@ -129,10 +129,10 @@ check_output_contains "tutorial-name" \
 	"ca1.cer,tbsCertificate.subject.rdnSequence.1.2.value,PrintableString in ANY,eee"
 
 check_output_contains "tutorial-ext" \
-	"ta.cer,tbsCertificate.extensions,Extensions,\"\[ bc, ski, ku, sia, cp, ip, asn \]\"" \
-	"ca1.cer,tbsCertificate.extensions,Extensions,\"\[ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn \]\"" \
-	"roa1.roa,content.certificates.0.tbsCertificate.extensions,Extensions,\"\[ ski, aki, ku, crldp, aia, sia, cp, ip, asn \]\"" \
-	"ta.crl,tbsCertList.crlExtensions,Extensions,\"\[ aki, crln \]\"" \
+	"ta.cer,tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, ku=ku, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
+	"ca1.cer,tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
+	"roa1.roa,content.certificates.0.tbsCertificate.extensions,Extensions,\"{ ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
+	"ta.crl,tbsCertList.crlExtensions,Extensions,\"{ aki=aki, crln=crln }\"" \
 	"ca1.cer,tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.28 (sbgp-ipAddrBlockv2)" \
 	"ca1.cer,tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
 	"ca1.cer,tbsCertificate.extensions.ip.extnValue,IP Resources (Certificate),\"\[ \[ 192.0.2.0/24 \], \[ 2001:db8::/96 \] \]\"" \
@@ -140,10 +140,10 @@ check_output_contains "tutorial-ext" \
 	"ca1.cer,tbsCertificate.extensions.asn.critical,BOOLEAN,true" \
 	"ca1.cer,tbsCertificate.extensions.asn.extnValue.asnum,AS Resources,\"\[ 0x1234, 0x5678 \]\"" \
 	"ca1.cer,tbsCertificate.extensions.asn.extnValue.rdi,AS Resources,\"\[ 0x9ABC, 0xDEF0 \]\"" \
-	"ca2.cer,tbsCertificate.extensions,Extensions,\"\[ ip, asn \]\"" \
-	"ca2.cer,tbsCertificate.extensions.0.extnID,OBJECT IDENTIFIER,1.2.3.4.5" \
-	"ca3.cer,tbsCertificate.extensions,Extensions,\"\[ ip, asn, ip, bc, ip, asn \]\"" \
-	"ca3.cer,tbsCertificate.extensions.4.extnID,OBJECT IDENTIFIER,1.2.3.4.5"
+	"ca2.cer,tbsCertificate.extensions,Extensions,\"{ ip=ip, asn=asn }\"" \
+	"ca2.cer,tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.2.3.4.5" \
+	"ca3.cer,tbsCertificate.extensions,Extensions,\"{ red=ip, blue=asn, yellow=ip, purple=bc, orange=ip, green=asn }\"" \
+	"ca3.cer,tbsCertificate.extensions.orange.extnID,OBJECT IDENTIFIER,1.2.3.4.5"
 
 check_output_contains "tutorial-ip" \
 	"roa1.roa,content.encapContentInfo.eContent.ipAddrBlocks,IP Resources (ROA),\"\[ \[ 192.0.2.0/24, 203.0.113.0/32 \], \[ 2001:db8::/40-48 \] \]\""

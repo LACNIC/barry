@@ -43,11 +43,13 @@ enum ext_type {
 };
 
 struct ext_list_node {
+	enum ext_type type;
+	const asn_TYPE_descriptor_t *td;
+	char *name;
+
 	OBJECT_IDENTIFIER_t extnID;
 	BOOLEAN_t critical;
 
-	enum ext_type type;
-	const asn_TYPE_descriptor_t *td;
 	union {
 		BasicConstraints_t bc;
 		SubjectKeyIdentifier_t ski;
@@ -67,17 +69,17 @@ struct ext_list_node {
 
 STAILQ_HEAD(extensions, ext_list_node);
 
-void exts_add_bc(struct extensions *, size_t, struct field *);
-void exts_add_ski(struct extensions *, size_t, struct field *);
-void exts_add_aki(struct extensions *, size_t, struct field *);
-void exts_add_ku(struct extensions *, size_t, struct field *);
-void exts_add_crldp(struct extensions *, size_t, struct field *);
-void exts_add_aia(struct extensions *, size_t, struct field *);
-void exts_add_sia(struct extensions *, size_t, struct field *);
-void exts_add_cp(struct extensions *, size_t, struct field *);
-void exts_add_ip(struct extensions *, size_t, struct field *);
-void exts_add_asn(struct extensions *, size_t, struct field *);
-void exts_add_crln(struct extensions *, size_t, struct field *);
+void exts_add_bc(struct extensions *, char const *, struct field *);
+void exts_add_ski(struct extensions *, char const *, struct field *);
+void exts_add_aki(struct extensions *, char const *, struct field *);
+void exts_add_ku(struct extensions *, char const *, struct field *);
+void exts_add_crldp(struct extensions *, char const *, struct field *);
+void exts_add_aia(struct extensions *, char const *, struct field *);
+void exts_add_sia(struct extensions *, char const *, struct field *);
+void exts_add_cp(struct extensions *, char const *, struct field *);
+void exts_add_ip(struct extensions *, char const *, struct field *);
+void exts_add_asn(struct extensions *, char const *, struct field *);
+void exts_add_crln(struct extensions *, char const *, struct field *);
 
 void ext_finish_ski(SubjectKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
 void ext_finish_aki(AuthorityKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
@@ -90,10 +92,6 @@ void ext_finish_sia_ee(SubjectInfoAccessSyntax_t *, char const *);
 void ext_finish_cp(CertificatePolicies_t *);
 void ext_finish_ip(IPAddrBlocks_t *);
 void ext_finish_asn(ASIdentifiers_t *);
-
-bool ext_field_set(struct field *, char const *, unsigned int, char const *);
-#define EXT_FIELD_SET(fields, ext, extn, suffix) \
-	ext_field_set(fields, ext, extn, "extnValue" suffix)
 
 void ext_compile(struct extensions *, Extensions_t **);
 

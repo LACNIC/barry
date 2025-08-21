@@ -15,10 +15,16 @@ tbsCertificate.extensions.asn.extnValue.asnum = [ 0x1234, 0x5678 ]
 tbsCertificate.extensions.asn.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
 
 [node: ca2.cer]
-tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 tbsCertificate.extensions = [ ip, asn ]
 tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 
 [node: ca3.cer]
-tbsCertificate.extensions = [ ip, asn, ip, bc, ip, asn ]
-tbsCertificate.extensions.4.extnID = 1.2.3.4.5
+tbsCertificate.extensions = {
+	red = ip,
+	blue = asn,
+	yellow = ip,
+	purple = bc,
+	orange = ip,
+	green = asn
+}
+tbsCertificate.extensions.orange.extnID = 1.2.3.4.5

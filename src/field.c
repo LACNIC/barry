@@ -45,6 +45,7 @@ static error_msg const BAD_IP = "Unparseable IP address";
 static error_msg const NEED_STRING = "Expected a string value";
 static error_msg const NEED_SET = "Expected a set/array value ([brackets])";
 static error_msg const NEED_MAP = "Expected a map value ({braces})";
+static error_msg const NEED_SET_OR_MAP = "Expected a set/array ([brackets]) or map ({braces})";
 static error_msg const BAD_ASN = "Expected an array of AS identifiers or 'inherit'";
 
 static error_msg
@@ -854,12 +855,6 @@ parse_gtime(struct field *fields, struct kv_value *src, void *dst)
 	return NULL;
 }
 
-static bool
-node_is_str(struct kv_node *node, char const *name)
-{
-	return strcmp(node->value.v.str, name) == 0;
-}
-
 static error_msg
 parse_filetype(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
 {
@@ -885,55 +880,76 @@ print_filetype(struct dynamic_string *dstr, void *val)
 }
 
 static error_msg
+add_ext(char const *type, char const *name,
+    struct extensions *exts, struct field *fields)
+{
+	if (strcmp(type, "bc") == 0)
+		exts_add_bc(exts, name, fields);
+	else if (strcmp(type, "ski") == 0)
+		exts_add_ski(exts, name, fields);
+	else if (strcmp(type, "aki") == 0)
+		exts_add_aki(exts, name, fields);
+	else if (strcmp(type, "ku") == 0)
+		exts_add_ku(exts, name, fields);
+	else if (strcmp(type, "crldp") == 0)
+		exts_add_crldp(exts, name, fields);
+	else if (strcmp(type, "aia") == 0)
+		exts_add_aia(exts, name, fields);
+	else if (strcmp(type, "sia") == 0)
+		exts_add_sia(exts, name, fields);
+	else if (strcmp(type, "cp") == 0)
+		exts_add_cp(exts, name, fields);
+	else if (strcmp(type, "ip") == 0)
+		exts_add_ip(exts, name, fields);
+	else if (strcmp(type, "asn") == 0)
+		exts_add_asn(exts, name, fields);
+	else if (strcmp(type, "crln") == 0)
+		exts_add_crln(exts, name, fields);
+	else
+		return "Unknown extension type";
+
+	return NULL;
+}
+
+static error_msg
 parse_exts(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
 {
 	struct extensions *dst_exts;
-	struct kv_node *src_ext;
-	size_t e;
+	struct kv_node *node;
+	struct keyval *kv;
+	error_msg error;
 
-	if (src_exts->type != VALT_SET)
+	if (src_exts->type != VALT_SET && src_exts->type != VALT_MAP)
 		return NEED_SET;
 
 	fields->children = NULL;
 
-	e = 0;
-	STAILQ_FOREACH(src_ext, &src_exts->v.set, hook)
-		e++;
-
 	dst_exts = _dst_exts;
 	STAILQ_INIT(dst_exts);
 
-	e = 0;
-	STAILQ_FOREACH(src_ext, &src_exts->v.set, hook) {
-		if (src_ext->value.type != VALT_STR)
-			return NEED_STRING;
-
-		if (node_is_str(src_ext, "bc"))
-			exts_add_bc(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "ski"))
-			exts_add_ski(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "aki"))
-			exts_add_aki(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "ku"))
-			exts_add_ku(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "crldp"))
-			exts_add_crldp(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "aia"))
-			exts_add_aia(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "sia"))
-			exts_add_sia(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "cp"))
-			exts_add_cp(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "ip"))
-			exts_add_ip(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "asn"))
-			exts_add_asn(dst_exts, e, fields);
-		else if (node_is_str(src_ext, "crln"))
-			exts_add_crln(dst_exts, e, fields);
-		else
-			return "Unknown extension type";
-
-		e++;
+	switch (src_exts->type) {
+	case VALT_SET:
+		STAILQ_FOREACH(node, &src_exts->v.set, hook) {
+			if (node->value.type != VALT_STR)
+				return NEED_STRING;
+			error = add_ext(node->value.v.str, node->value.v.str,
+			    dst_exts, fields);
+			if (error)
+				return error;
+		}
+		break;
+	case VALT_MAP:
+		STAILQ_FOREACH(kv, &src_exts->v.map, hook) {
+			if (kv->value.type != VALT_STR)
+				return NEED_STRING;
+			error = add_ext(kv->value.v.str, kv->key,
+			    dst_exts, fields);
+			if (error)
+				return error;
+		}
+		break;
+	default:
+		return NEED_SET_OR_MAP;
 	}
 
 	return NULL;
@@ -944,31 +960,31 @@ print_exts(struct dynamic_string *dstr, void *_exts)
 {
 	struct extensions *exts = _exts;
 	struct ext_list_node *ext;
-	char const *name;
+	char const *type;
 
-	dstr_append(dstr, "[ ");
+	dstr_append(dstr, "{ ");
 	STAILQ_FOREACH(ext, exts, hook) {
-		name = NULL;
+		type = NULL;
 		switch (ext->type) {
-		case EXT_BC:	name = "bc";		break;
-		case EXT_SKI:	name = "ski";		break;
-		case EXT_AKI:	name = "aki";		break;
-		case EXT_KU:	name = "ku";		break;
-//		case EXT_EKU:	name = "eku";		break;
-		case EXT_CRLDP:	name = "crldp";		break;
-		case EXT_AIA:	name = "aia";		break;
-		case EXT_SIA:	name = "sia";		break;
-		case EXT_CP:	name = "cp";		break;
-		case EXT_IP:	name = "ip";		break;
-		case EXT_ASN:	name = "asn";		break;
-		case EXT_CRLN:	name = "crln";		break;
+		case EXT_BC:	type = "bc";		break;
+		case EXT_SKI:	type = "ski";		break;
+		case EXT_AKI:	type = "aki";		break;
+		case EXT_KU:	type = "ku";		break;
+//		case EXT_EKU:	type = "eku";		break;
+		case EXT_CRLDP:	type = "crldp";		break;
+		case EXT_AIA:	type = "aia";		break;
+		case EXT_SIA:	type = "sia";		break;
+		case EXT_CP:	type = "cp";		break;
+		case EXT_IP:	type = "ip";		break;
+		case EXT_ASN:	type = "asn";		break;
+		case EXT_CRLN:	type = "crln";		break;
 		}
-		dstr_append(dstr, "%s", name);
 
+		dstr_append(dstr, "%s=%s", ext->name, type);
 		if (STAILQ_NEXT(ext, hook) != NULL)
 			dstr_append(dstr, ", ");
 	}
-	dstr_append(dstr, " ]");
+	dstr_append(dstr, " }");
 }
 
 struct ip_list_node {

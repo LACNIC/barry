@@ -15,15 +15,12 @@
 static void
 init_extensions_crl(struct rpki_crl *crl, struct field *extf)
 {
-	size_t n;
-
 	pr_debug("- Initializing CRL extensions");
 
 	STAILQ_INIT(&crl->exts);
 
-	n = 0;
-	exts_add_aki(&crl->exts, n++, extf);
-	exts_add_crln(&crl->exts, n++, extf);
+	exts_add_aki(&crl->exts, "aki", extf);
+	exts_add_crln(&crl->exts, "crln", extf);
 }
 
 struct rpki_crl *
@@ -111,20 +108,16 @@ static void
 finish_extensions(struct rpki_crl *crl)
 {
 	struct ext_list_node *ext;
-	unsigned int extn;
 	struct field *fld;
 
-	extn = 0;
 	fld = fields_find(crl->meta->fields, "tbsCertList.crlExtensions");
 	if (!fld)
 		panic("CRL lacks a 'tbsCertList.crlExtensions' field.");
 
 	STAILQ_FOREACH(ext, &crl->exts, hook) {
 		if (ext->type == EXT_AKI)
-			if (!EXT_FIELD_SET(fld, "aki", extn, ".keyIdentifier"))
+			if (!fields_overridden(fld, "aki.extnValue.keyIdentifier"))
 				finish_aki(&ext->v.aki, crl);
-
-		extn++;
 	}
 
 	ext_compile(&crl->exts, &crl->obj.tbsCertList.crlExtensions);
