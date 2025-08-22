@@ -42,8 +42,6 @@ struct field {
 	size_t size;
 	/* Value already applied to @address? */
 	bool overridden;
-	/* Hide field during print? */
-	bool invisible;
 
 	struct field *parent;
 	/* Tree children (hash table) */

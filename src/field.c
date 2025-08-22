@@ -1771,28 +1771,15 @@ __field_add(struct field *parent, char const *name)
 	return new;
 }
 
-static void
-n2str(size_t n, char *str)
-{
-	int written;
-
-	written = snprintf(str, 20, "%zu", n);
-	if (written < 0 || written >= 20)
-		panic("snprintf(%zu): %d", n, written);
-}
+#define n2str(n, str) psnprintf(str, 20, "%zu", n)
 
 struct field *
 field_addn(struct field *parent, size_t n,
     struct field_type const *type, void *address, size_t size)
 {
 	char buf[20];
-	struct field *result;
-
 	n2str(n, buf);
-
-	result = field_add(parent, pstrdup(buf), type, address, size);
-	/* result->invisible = true; */
-	return result;
+	return field_add(parent, pstrdup(buf), type, address, size);
 }
 
 struct field *
@@ -2019,9 +2006,6 @@ __fields_print(struct field const *field, char *key, size_t key_offset)
 	unsigned char **address;
 	struct dynamic_string dstr = { 0 };
 
-	if (field->invisible)
-		return;
-
 	strcpy(key + key_offset, field->key);
 
 	if (field->type && field->type->print) {
@@ -2063,8 +2047,6 @@ __fields_print_csv(char const *name, struct field const *field,
 	unsigned char **address;
 	struct dynamic_string dstr = { 0 };
 
-	if (field->invisible)
-		return;
 	strcpy(key + key_offset, field->key);
 
 	if (field->type && field->type->print) {
