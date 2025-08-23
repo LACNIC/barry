@@ -655,7 +655,7 @@ notif_getsert(struct rpki_tree *tree, char const *uri)
 	if (uri == NULL)
 		return NULL;
 
-	pr_trace("Upserting Notification %s", uri);
+	pr_trace("Getserting Notification %s", uri);
 
 	urlen = strlen(uri);
 	HASH_FIND(hh, tree->notifications, uri, urlen, notif);

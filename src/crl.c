@@ -108,15 +108,18 @@ static void
 finish_extensions(struct rpki_crl *crl)
 {
 	struct ext_list_node *ext;
-	struct field *fld;
+	struct field *extsf;
+	struct field *extnValuef;
 
-	fld = fields_find(crl->meta->fields, "tbsCertList.crlExtensions");
-	if (!fld)
+	extsf = fields_find(crl->meta->fields, "tbsCertList.crlExtensions");
+	if (!extsf)
 		panic("CRL lacks a 'tbsCertList.crlExtensions' field.");
 
 	STAILQ_FOREACH(ext, &crl->exts, hook) {
+		extnValuef = fields_find(fields_find(extsf, ext->name), "extnValue");
+
 		if (ext->type == EXT_AKI)
-			if (!fields_overridden(fld, "aki.extnValue.keyIdentifier"))
+			if (!fields_overridden(extnValuef, "keyIdentifier"))
 				finish_aki(&ext->v.aki, crl);
 	}
 

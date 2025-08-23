@@ -23,7 +23,7 @@ init_extensions_ta(struct rpki_certificate *ta, struct field *extf)
 	exts_add_bc(&ta->exts, "bc", extf);
 	exts_add_ski(&ta->exts, "ski", extf);
 	exts_add_ku(&ta->exts, "ku", extf);
-	exts_add_sia(&ta->exts, "sia", extf);
+	exts_add_sia(&ta->exts, "sia", extf, sia_ca_defaults);
 	exts_add_cp(&ta->exts, "cp", extf);
 	exts_add_ip(&ta->exts, "ip", extf);
 	exts_add_asn(&ta->exts, "asn", extf);
@@ -42,7 +42,7 @@ init_extensions_ca(struct rpki_certificate *ca, struct field *extsf)
 	exts_add_ku(&ca->exts, "ku", extsf);
 	exts_add_crldp(&ca->exts, "crldp", extsf);
 	exts_add_aia(&ca->exts, "aia", extsf);
-	exts_add_sia(&ca->exts, "sia", extsf);
+	exts_add_sia(&ca->exts, "sia", extsf, sia_ca_defaults);
 	exts_add_cp(&ca->exts, "cp", extsf);
 	exts_add_ip(&ca->exts, "ip", extsf);
 	exts_add_asn(&ca->exts, "asn", extsf);
@@ -60,7 +60,7 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 	exts_add_ku(&ee->exts, "ku", extf);
 	exts_add_crldp(&ee->exts, "crldp", extf);
 	exts_add_aia(&ee->exts, "aia", extf);
-	exts_add_sia(&ee->exts, "sia", extf);
+	exts_add_sia(&ee->exts, "sia", extf, sia_ee_defaults);
 	exts_add_cp(&ee->exts, "cp", extf);
 	exts_add_ip(&ee->exts, "ip", extf);
 	exts_add_asn(&ee->exts, "asn", extf);
@@ -156,40 +156,12 @@ finish_crldp(CRLDistributionPoints_t *crldp, struct rpki_certificate *cer)
 }
 
 static void
-finish_aia(AuthorityInfoAccessSyntax_t *aia, struct rpki_certificate *cer)
+finish_aia(AuthorityInfoAccessSyntax_t *aia, struct field *extnValuef,
+    struct rpki_certificate *cer)
 {
 	if (!cer->meta->parent)
 		panic("Certificate needs a default AIA, but lacks a parent");
-	ext_finish_aia(aia, cer->meta->parent->meta->uri);
-}
-
-static void
-finish_sia(SubjectInfoAccessSyntax_t *sia, struct rpki_certificate *cer,
-    enum cer_type type, char const *so_uri)
-{
-	switch (type) {
-	case CT_TA:
-	case CT_CA:
-		ext_finish_sia_ca(sia,
-		    cer->rpp.caRepository,
-		    cer->rpp.rpkiManifest,
-		    cer->rpp.rpkiNotify);
-		break;
-	case CT_EE:
-		ext_finish_sia_ee(sia, so_uri);
-		break;
-	}
-}
-
-static void
-finish_sia_fields(struct field *extsf, SubjectInfoAccessSyntax_t *sia)
-{
-	struct field *idf;
-	int a;
-
-	idf = fields_find(extsf, "sia.extnValue");
-	for (a = 0; a < sia->list.count; a++)
-		field_add_ad(idf, a, sia->list.array[a]);
+	ext_finish_aia(aia, extnValuef, cer->meta->parent->meta->uri);
 }
 
 static void
@@ -197,64 +169,63 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
     char const *so_uri)
 {
 	struct ext_list_node *ext;
-	struct field *fld;
+	struct field *extsf;
+	struct field *extnValuef;
 
 	pr_debug("- Autofilling extensions");
 
-	fld = fields_find(cer->meta->fields, "tbsCertificate.extensions");
-	if (!fld)
+	extsf = fields_find(cer->meta->fields, "tbsCertificate.extensions");
+	if (!extsf)
 		panic("Certificate lacks a 'tbsCertificate.extensions' field.");
 
 	STAILQ_FOREACH(ext, &cer->exts, hook) {
+		extnValuef = fields_find(fields_find(extsf, ext->name), "extnValue");
+
 		switch (ext->type) {
 		case EXT_BC:
 		case EXT_CRLN:
 			break;
 
 		case EXT_SKI:
-			if (!fields_overridden(fld, "ski.extnValue"))
+			if (!fields_overridden(extnValuef, NULL))
 				ext_finish_ski(&ext->v.ski, &cer->SPKI);
 			break;
 
 		case EXT_AKI:
-			if (!fields_overridden(fld, "aki.extnValue.keyIdentifier"))
+			if (!fields_overridden(extnValuef, "keyIdentifier"))
 				finish_aki(&ext->v.aki, cer);
 			break;
 
 		case EXT_KU:
-			if (!fields_overridden(fld, "ku.extnValue"))
+			if (!fields_overridden(extnValuef, NULL))
 				ext_finish_ku(&ext->v.ku, type);
 			break;
 
 		case EXT_CRLDP:
-			if (!fields_overridden(fld, "crldp.extnValue"))
+			if (!fields_overridden(extnValuef, NULL))
 				finish_crldp(&ext->v.crldp, cer);
 			break;
 
 		case EXT_AIA:
-			if (!fields_overridden(fld, "aia.extnValue"))
-				finish_aia(&ext->v.aia, cer);
+			finish_aia(&ext->v.aia, extnValuef, cer);
 			break;
 
 		case EXT_SIA:
-			if (!fields_overridden(fld, "sia.extnValue")) {
-				finish_sia(&ext->v.sia, cer, type, so_uri);
-				finish_sia_fields(fld, &ext->v.sia);
-			}
+			ext_finish_sia(&ext->v.sia, extnValuef, cer, so_uri);
 			break;
 
 		case EXT_CP:
-			if (!fields_overridden(fld, "cp.extnValue"))
+			if (!fields_overridden(extnValuef, NULL))
 				ext_finish_cp(&ext->v.cp);
 			break;
 
 		case EXT_IP:
-			if (!fields_overridden(fld, "ip.extnValue"))
+			if (!fields_overridden(extnValuef, NULL))
 				ext_finish_ip(&ext->v.ip);
 			break;
 
 		case EXT_ASN:
-			if (!fields_overridden(fld, "asn.extnValue.asnum"))
+			if (!fields_overridden(extnValuef, "asnum"))
 				ext_finish_asn(&ext->v.asn);
 			break;
 		}

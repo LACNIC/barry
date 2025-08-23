@@ -1,13 +1,15 @@
 #include "ext.h"
 
 #include "asn1.h"
+#include "cer.h"
 #include "libcrypto.h"
 #include "oid.h"
 
 struct ext_list_node *
 add_extension(struct extensions *exts,
-    enum ext_type type, const asn_TYPE_descriptor_t *td, char const *name,
-    int nid, bool critical)
+    enum ext_type type, const asn_TYPE_descriptor_t *td,
+    char const *name, int nid,
+    bool critical)
 {
 	struct ext_list_node *ext;
 
@@ -138,42 +140,99 @@ exts_add_crldp(struct extensions *exts, char const *name, struct field *extsf)
 	add_crldp_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
-static void
-add_aia_fields(struct field *parent, struct ext_list_node *ext)
+static struct field *
+add_ia_fields(struct field *parent, struct ext_list_node *ext, void *extobj)
 {
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
-//	"extnValue", &ext->v.aia, 0	TODO not implemented yet
+	return field_add(parent, "extnValue", &ft_ads, extobj, 0);
+}
+
+static void
+init_ad(AccessDescription_t *ad, struct field *extnValuef,
+    int nid, char const *name)
+{
+	struct field *adf;
+
+	init_oid(&ad->accessMethod, nid);
+	ad->accessLocation.present = GeneralName_PR_uniformResourceIdentifier;
+
+	adf = field_add(extnValuef, name, &ft_obj, ad, 0);
+	field_add(adf, "accessMethod", &ft_oid, &ad->accessMethod, 0);
+	field_add_gname(adf, "accessLocation", &ad->accessLocation);
 }
 
 void
 exts_add_aia(struct extensions *exts, char const *name, struct field *extsf)
 {
 	struct ext_list_node *ext;
+	struct field *aiaf;
+	struct field *extnValuef;
 
-	ext = add_extension(exts, EXT_AIA, &asn_DEF_AuthorityInfoAccessSyntax,
-	    name, NID_info_access, false);
+	ext = add_extension(exts,
+	    EXT_AIA, &asn_DEF_AuthorityInfoAccessSyntax,
+	    name, NID_info_access,
+	    false);
+	INIT_ASN1_ARRAY(&ext->v.aia.list, 1, AccessDescription_t);
 
-	add_aia_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
+	aiaf = field_add(extsf, name, &ft_obj, &ext->v, 0);
+	extnValuef = add_ia_fields(aiaf, ext, &ext->v.aia);
+
+	init_ad(ext->v.aia.list.array[0], extnValuef, NID_ad_ca_issuers, "0");
 }
 
-static void
-add_sia_fields(struct field *parent, struct ext_list_node *ext)
+int
+sia_ca_defaults(SubjectInfoAccessSyntax_t *sia, struct field *evf)
 {
-	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
-	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
-	field_add(parent, "extnValue", &ft_ads, &ext->v.sia, 0);
+	extern char const *rrdp_uri;
+
+	if (sia == NULL)
+		goto end;
+
+	init_ad(sia->list.array[0], evf, NID_caRepository, "0");
+	init_ad(sia->list.array[1], evf, NID_rpkiManifest, "1");
+	// TODO (test) check no default rpkiNotify is created if --rrdp-uri is missing
+	if (rrdp_uri)
+		init_ad(sia->list.array[2], evf, NID_rpkiNotify, "2");
+end:	return rrdp_uri ? 3 : 2;
+}
+
+int
+sia_ee_defaults(SubjectInfoAccessSyntax_t *sia, struct field *evf)
+{
+	if (sia == NULL)
+		return 1;
+
+	init_ad(sia->list.array[0], evf, NID_signedObject, "0");
+	return 1;
+}
+
+int
+sia_empty_defaults(SubjectInfoAccessSyntax_t *sia, struct field *evf)
+{
+	return 0;
 }
 
 void
-exts_add_sia(struct extensions *exts, char const *name, struct field *extsf)
+exts_add_sia(struct extensions *exts, char const *name, struct field *extsf,
+    sia_defaults defaults)
 {
 	struct ext_list_node *ext;
+	int adn;
+	struct field *siaf;
+	struct field *extnValuef;
 
-	ext = add_extension(exts, EXT_SIA, &asn_DEF_SubjectInfoAccessSyntax,
-	    name, NID_sinfo_access, false);
+	ext = add_extension(exts,
+	    EXT_SIA, &asn_DEF_SubjectInfoAccessSyntax,
+	    name, NID_sinfo_access,
+	    false);
+	adn = defaults(NULL, NULL);
+	INIT_ASN1_ARRAY(&ext->v.sia.list, adn, AccessDescription_t);
 
-	add_sia_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
+	siaf = field_add(extsf, name, &ft_obj, &ext->v, 0);
+	extnValuef = add_ia_fields(siaf, ext, &ext->v.sia);
+
+	defaults(&ext->v.sia, extnValuef);
 }
 
 static void
@@ -319,47 +378,83 @@ ext_finish_crldp(CRLDistributionPoints_t *crldp, char const *url)
 	finish_gn_uri(dpn->choice.fullName.list.array[0], url);
 }
 
-static void
-finish_ad(AccessDescription_t *ad, int nid, char const *value)
+static bool
+is_accessLocation_overridden(struct field *extnValuef, size_t extn,
+    AccessDescription_t *ad)
 {
-	init_oid(&ad->accessMethod, nid);
-	finish_gn_uri(&ad->accessLocation, value);
+	struct field *extnf;
+
+	extnf = fields_find_n(extnValuef, extn);
+	if (fields_overridden(extnf, "accessLocation.value"))
+		return true;
+
+	if (ad->accessLocation.present == GeneralName_PR_NOTHING)
+		return false;
+	if (ad->accessLocation.present != GeneralName_PR_uniformResourceIdentifier)
+		/*
+		 * Type overridden but value unset.
+		 * No idea what the user wants, but it more or less
+		 * means the value is also overridden.
+		 */
+		return true;
+
+	return false;
 }
 
 void
-ext_finish_aia(AuthorityInfoAccessSyntax_t *aia, char const *url)
+ext_finish_aia(AuthorityInfoAccessSyntax_t *aia, struct field *extnValuef,
+    char const *caIssuers)
 {
+	AccessDescription_t *ad;
+	int i;
+
 	pr_trace("Autocompleting AIA");
-	INIT_ASN1_ARRAY(&aia->list, 1, AccessDescription_t);
-	finish_ad(aia->list.array[0], NID_ad_ca_issuers, url);
+
+	if (!caIssuers)
+		return;
+
+	for (i = 0; i < aia->list.count; i++) {
+		ad = aia->list.array[i];
+
+		if (is_accessLocation_overridden(extnValuef, i, ad))
+			continue;
+
+		if (oid_is_caIssuers(&ad->accessMethod))
+			finish_gn_uri(&ad->accessLocation, caIssuers);
+	}
 }
 
 void
-ext_finish_sia_ca(SubjectInfoAccessSyntax_t *sia, char const *repo,
-    char const *mft, char const *notif)
+ext_finish_sia(SubjectInfoAccessSyntax_t *sia, struct field *extnValuef,
+    struct rpki_certificate *cer, char const *so)
 {
-	unsigned int ads;
+	struct rpp *rpp;
+	AccessDescription_t *ad;
+	char const *value;
+	size_t i;
 
-	pr_trace("Autocompleting SIA (CA variant)");
+	pr_trace("Autocompleting SIA");
 
-	ads = (repo ? 1 : 0) + (mft ? 1 : 0) + (notif ? 1 : 0);
-	INIT_ASN1_ARRAY(&sia->list, ads, AccessDescription_t);
+	rpp = cer ? &cer->rpp : NULL;
 
-	ads = 0;
-	if (repo)
-		finish_ad(sia->list.array[ads++], NID_caRepository, repo);
-	if (mft)
-		finish_ad(sia->list.array[ads++], NID_rpkiManifest, mft);
-	if (notif)
-		finish_ad(sia->list.array[ads++], NID_rpkiNotify, notif);
-}
+	for (i = 0; i < sia->list.count; i++) {
+		ad = sia->list.array[i];
 
-void
-ext_finish_sia_ee(SubjectInfoAccessSyntax_t *sia, char const *so)
-{
-	pr_trace("Autocompleting AIA (EE variant)");
-	INIT_ASN1_ARRAY(&sia->list, 1, AccessDescription_t);
-	finish_ad(sia->list.array[0], NID_signedObject, so);
+		if (is_accessLocation_overridden(extnValuef, i, ad))
+			continue;
+
+		value = NULL;
+		if (oid_is_caRepository(&ad->accessMethod))
+			value = rpp ? rpp->caRepository : NULL;
+		else if (oid_is_rpkiManifest(&ad->accessMethod))
+			value = rpp ? rpp->rpkiManifest : NULL;
+		else if (oid_is_rpkiNotify(&ad->accessMethod))
+			value = rpp ? rpp->rpkiNotify : NULL;
+		else if (oid_is_signedObject(&ad->accessMethod))
+			value = so;
+		if (value)
+			finish_gn_uri(&ad->accessLocation, value);
+	}
 }
 
 void

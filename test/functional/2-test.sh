@@ -60,6 +60,7 @@ check_output_contains() {
 			echo "ERR: Barry returned nonzero in test '$TEST_RD': $RETVAL"
 			echo "     (See $OUTPUT_FILE)"
 			FAILS=$((FAILS+1))
+			return
 		fi
 	fi
 
@@ -286,6 +287,126 @@ check_output_contains "gname" \
 	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
 	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
 	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,separate"
+
+check_output_contains "sia1" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1/1.mft" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/B.mft"
+
+check_output_contains "sia2" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.2.3.4" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,1.2.4.6" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,iPAddress" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,OCTET STRING," \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://aaaaaa" \
+	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://bbbbbb" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.2.840.113549.1.1.11 (sha256WithRSAEncryption)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,2.16.840.1.101.3.4.2.1 (sha256)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,"
+
+check_output_contains "sia3" \
+	"A.cer,tbsCertificate.extensions,Extensions,\"{ aia=aia, sia=sia }\"" \
+	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1/1.mft" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions,Extensions,\"{ aia=aia, sia=sia }\"" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/B.mft" \
+	"C.crl,tbsCertList.crlExtensions,Extensions,\"{ aia=aia, sia=sia }\"" \
+	"C.crl,tbsCertList.crlExtensions.aia.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.1 (Authority Information Access)" \
+	"C.crl,tbsCertList.crlExtensions.aia.critical,BOOLEAN,false" \
+	"C.crl,tbsCertList.crlExtensions.sia.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.11 (Subject Information Access)" \
+	"C.crl,tbsCertList.crlExtensions.sia.critical,BOOLEAN,false"
+
+check_output_contains "sia4" \
+	"A.cer,tbsCertificate.extensions,Extensions,\"{ aia1=aia, sia1=sia, sia2=sia, aia2=aia }\"" \
+	"A.cer,tbsCertificate.extensions.aia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"A.cer,tbsCertificate.extensions.aia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.aia1.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"A.cer,tbsCertificate.extensions.aia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,tbsCertificate.extensions.aia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.aia1.extnValue.1.accessLocation.value,IA5String," \
+	"A.cer,tbsCertificate.extensions.sia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,tbsCertificate.extensions.sia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia1.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1/1.mft" \
+	"A.cer,tbsCertificate.extensions.sia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"A.cer,tbsCertificate.extensions.sia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia1.extnValue.1.accessLocation.value,IA5String," \
+	"A.cer,tbsCertificate.extensions.sia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"A.cer,tbsCertificate.extensions.sia2.extnValue.0.accessLocation.type,GeneralName type,iPAddress" \
+	"A.cer,tbsCertificate.extensions.sia2.extnValue.0.accessLocation.value,OCTET STRING," \
+	"A.cer,tbsCertificate.extensions.sia2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"A.cer,tbsCertificate.extensions.sia2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.sia2.extnValue.1.accessLocation.value,IA5String,type defaults to uniformResourceIdentifier" \
+	"A.cer,tbsCertificate.extensions.aia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"A.cer,tbsCertificate.extensions.aia2.extnValue.0.accessLocation.type,GeneralName type,rfc822Name" \
+	"A.cer,tbsCertificate.extensions.aia2.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,content.certificates.0.tbsCertificate.extensions,Extensions,\"{ sia1=sia, sia2=sia, aia=aia }\"" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/B.mft" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.value,IA5String,IA5String" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessLocation.value,IA5String," \
+	"C.crl,tbsCertList.crlExtensions,Extensions,\"{ 1=sia, 2=sia, 3=aia }\"" \
+	"C.crl,tbsCertList.crlExtensions.1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"C.crl,tbsCertList.crlExtensions.1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"C.crl,tbsCertList.crlExtensions.1.extnValue.0.accessLocation.value,IA5String," \
+	"C.crl,tbsCertList.crlExtensions.1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"C.crl,tbsCertList.crlExtensions.1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"C.crl,tbsCertList.crlExtensions.1.extnValue.1.accessLocation.value,IA5String," \
+	"C.crl,tbsCertList.crlExtensions.2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"C.crl,tbsCertList.crlExtensions.2.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
+	"C.crl,tbsCertList.crlExtensions.2.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,<absent>" \
+	"C.crl,tbsCertList.crlExtensions.2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"C.crl,tbsCertList.crlExtensions.2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"C.crl,tbsCertList.crlExtensions.2.extnValue.1.accessLocation.value,IA5String,striiiiiiing" \
+	"C.crl,tbsCertList.crlExtensions.3.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"C.crl,tbsCertList.crlExtensions.3.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
+	"C.crl,tbsCertList.crlExtensions.3.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,1.4.8.16"
 
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

@@ -739,6 +739,7 @@ parse_gname_type(struct field *fields, struct kv_value *src, void *dst)
 	gname->present = present;
 	memset(&gname->choice, 0, sizeof(gname->choice));
 	field_add(fields->parent, "value", ft, &gname->choice, 0);
+
 	return NULL;
 }
 
@@ -879,6 +880,27 @@ print_filetype(struct dynamic_string *dstr, void *val)
 	dstr_append(dstr, "%s", str);
 }
 
+static sia_defaults
+get_sia_defaults(struct field *field)
+{
+	/*
+	 * Note: Hack (fallacious heuristic).
+	 * We don't have a good way to find out the type of object we're
+	 * building an SIA for.
+	 * Relying on the topmost field name is sufficient but not future-proof.
+	 */
+
+	while (field->parent->key != NULL)
+		field = field->parent;
+
+	if (strcmp(field->key, "tbsCertificate") == 0)
+		return sia_ca_defaults;
+	else if (strcmp(field->key, "content") == 0)
+		return sia_ee_defaults;
+
+	return sia_empty_defaults; /* CRL is known to fall through here */
+}
+
 static error_msg
 add_ext(char const *type, char const *name,
     struct extensions *exts, struct field *fields)
@@ -896,7 +918,7 @@ add_ext(char const *type, char const *name,
 	else if (strcmp(type, "aia") == 0)
 		exts_add_aia(exts, name, fields);
 	else if (strcmp(type, "sia") == 0)
-		exts_add_sia(exts, name, fields);
+		exts_add_sia(exts, name, fields, get_sia_defaults(fields));
 	else if (strcmp(type, "cp") == 0)
 		exts_add_cp(exts, name, fields);
 	else if (strcmp(type, "ip") == 0)
@@ -1020,6 +1042,8 @@ parse_ads(struct field *fields, struct kv_value *src, void *dst)
 	a = 0;
 	STAILQ_FOREACH(src_node, &src->v.set, hook) {
 		dst_ad = sia->list.array[a];
+		dst_ad->accessLocation.present = GeneralName_PR_uniformResourceIdentifier;
+
 		adf = field_add_ad(fields, a, dst_ad);
 		error = parse_obj(adf, &src_node->value, dst_ad);
 		if (error)
@@ -1919,6 +1943,10 @@ fields_find(struct field *root, char const *key)
 	char const *dot;
 	size_t keylen;
 
+	if (root == NULL)
+		return NULL;
+	if (key == NULL)
+		return root;
 	parent = root;
 
 	do {

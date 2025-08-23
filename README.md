@@ -623,7 +623,6 @@ Add Github issues:
 	- Certificate/CRL extensions
 		- AKI authorityCertIssuer
 		- CRLDP extnValue
-		- AIA extnValue
 		- CP extnValue
 	- Manifests, ROAs
 		- signedAttrs
