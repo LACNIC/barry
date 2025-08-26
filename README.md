@@ -163,7 +163,7 @@ ta.cer
 obj.content.encapContentInfo.eContent.version = 2
 ```
 
-Basically, you can override fields from the objects by appending an "attributes" section to the RD. Enclose the name of the file in brackets (as a header), then override needed values one line at a time. You can do this for all the declared files in the tree. The keys of the fields are dot-stringified versions of their official names from the [RFC ASN.1 definitions](https://github.com/NICMx/libasn1fort/tree/main/asn1) (plus an "`obj.`" prefix), though there are additional keys we'll discuss later.
+Basically, you can override fields from the objects by appending an "attributes" section to the RD. Enclose the name of the file in brackets (as a header), then override needed values, key-value style. You can do this for all the declared files in the tree. The keys of the fields are dot-stringified versions of their official names from the [RFC ASN.1 definitions](https://github.com/NICMx/libasn1fort/tree/main/asn1) (plus an "`obj.`" prefix), though there are additional keys we'll discuss later.
 
 Processing that file should result in a repository that might be rejected by a current validator:
 
@@ -232,7 +232,15 @@ The key-value section is a JSON-adjacent hierarchy. Here is an example in which 
 }
 ```
 
-It differs from JSON in several ways:
+> For clarity, here are some directions:
+> 
+> - [`tbsCertificate`](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L261)
+> - [`validity`](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L270)
+> - [`notBefore`, `notAfter`](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L285-L286)
+> 
+> See [Extensions](#extensions) and [IP Resources](#ip-resources) for the remaining fields.
+
+The format differs from JSON in several ways:
 
 1. You can comment out the remainder of a line by issuing the `#` character outside of a string,
 2. as you can see above, the assignment reserved character is `=` (not `:`),
@@ -507,6 +515,8 @@ obj.content.encapContentInfo.eContent.ipAddrBlocks = [
 
 List as many as you need. `barry` will automatically detect IP version and drop each entry to the corresponding `ROAIPAddressFamily`.
 
+> At present, all certificates and ROAs contain `192.0.2.0/24` as their only default IP resource. **This is going to change in the future**.
+
 ### fileList
 
 > TODO this section is probably outdated
@@ -595,7 +605,7 @@ rpp.notification = https://lettuce/rrdp/notification.xml
 - `tomato`'s snapshot will contain `B1.roa` and `B2.cer`.
 - `lettuce`'s snapshot will contain `B2a.roa`.
 
-> Note: If the object is the TA, its default `rpp.notification` is `[RRDP-URI]/snapshot.xml`. Otherwise, its default is inherited from its parent.
+> Note: If the object is the TA, its default `rpp.notification` is `[RRDP-URI]/snapshot.xml`. Otherwise, it has no notification.
 
 > Note: `rpp.notification` is also copied to the certificate's `rpkiNotify` (in its SIA extension), though [that can also be overridden](test/functional/rd/gname.rd).
 
