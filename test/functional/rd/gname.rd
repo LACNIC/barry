@@ -4,7 +4,7 @@ ta.cer
 	C.cer
 
 [node: A.cer]
-tbsCertificate.extensions.sia.extnValue = [
+obj.tbsCertificate.extensions.sia.extnValue = [
 	{
 		accessMethod = 1.3.6.1.5.5.7.48.10,
 		accessLocation.type = rfc822Name,
@@ -21,19 +21,19 @@ tbsCertificate.extensions.sia.extnValue = [
 ]
 
 [node: B.cer]
-tbsCertificate.extensions.sia.extnValue = [{
+obj.tbsCertificate.extensions.sia.extnValue = [{
 	accessMethod = 1.3.6.1.5.5.7.48.10,
 	accessLocation.type = rfc822Name,
 	accessLocation.value = "yeah sure",
 }]
-tbsCertificate.extensions.sia.extnValue.0.accessMethod = 1.3.6.1.5.5.7.48.13
-tbsCertificate.extensions.sia.extnValue.0.accessLocation.type = dNSName
+obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod = 1.3.6.1.5.5.7.48.13
+obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type = dNSName
 
 [node: C.cer]
-tbsCertificate.extensions.sia.extnValue = [{
+obj.tbsCertificate.extensions.sia.extnValue = [{
 	accessMethod = 1.3.6.1.5.5.7.48.10,
 	accessLocation.type = rfc822Name,
 	accessLocation.value = "yeah sure",
 }]
-tbsCertificate.extensions.sia.extnValue.0.accessLocation.type = dNSName
-tbsCertificate.extensions.sia.extnValue.0.accessLocation.value = "separate"
+obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type = dNSName
+obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value = "separate"

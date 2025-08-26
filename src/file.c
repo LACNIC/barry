@@ -40,6 +40,13 @@ join_paths(char const *base, char const *filename)
 	return result;
 }
 
+char *
+remove_extension(char const *filename)
+{
+	char const *dot = strchr(filename, '.');
+	return dot ? pstrndup(filename, dot - filename) : pstrdup(filename);
+}
+
 /* Does not care if the path already exists. */
 void
 exec_mkdir(char *path)

@@ -2,7 +2,7 @@ ta.cer
 	ca1.cer
 
 [node: ca1.cer]
-tbsCertificate.subject.rdnSequence = [
+obj.tbsCertificate.subject.rdnSequence = [
 	[ # RelativeDistinguishedName 1
 		{ # AttributeTypeAndValue 1
 			type = 2.5.4.3,   # commonName

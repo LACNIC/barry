@@ -10,40 +10,40 @@ ta.cer
 # INTEGER
 
 [node: 1.cer]
-tbsCertificate.version = 4660
+obj.tbsCertificate.version = 4660
 [node: 2.cer]
-tbsCertificate.version = 0x1234
+obj.tbsCertificate.version = 0x1234
 [node: 3.cer]
-tbsCertificate.version = 0b0001001000110100
+obj.tbsCertificate.version = 0b0001001000110100
 
 # BOOLEAN
 
 [node: 1.cer]
-tbsCertificate.extensions.bc.critical = 9999
+obj.tbsCertificate.extensions.bc.critical = 9999
 
 # OCTET STRING
 
 [node: ta.mft]
-content.signerInfos.0.signature = 4660
+obj.content.signerInfos.0.signature = 4660
 
 # BIT STRING
 
 [node: 1.cer]
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1234
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1234
 
 # ANY
 
 [node: 1.cer]
-tbsCertificate.signature.parameters = 0b0001001000110100
+obj.tbsCertificate.signature.parameters = 0b0001001000110100
 
 # "Arrays"
 
 [node: 2.cer]
-tbsCertificate.signature.parameters = 0x123456
+obj.tbsCertificate.signature.parameters = 0x123456
 [node: 3.cer]
-tbsCertificate.signature.parameters = "0b_0001:0010_0011,0100 0101 0110"
+obj.tbsCertificate.signature.parameters = "0b_0001:0010_0011,0100 0101 0110"
 [node: 4.cer]
-tbsCertificate.signature.parameters = "0x
+obj.tbsCertificate.signature.parameters = "0x
 	00a1 00a2 00a3 00a4 00a5 00a6 00a7 00a8
 	80b1 80b2 80b3 80b4 80b5 80b6 80b7 80b8
 	A0c1 A0c2 A0c3 A0c4 A0c5 00c6 A0c7 A0c8
@@ -53,24 +53,24 @@ tbsCertificate.signature.parameters = "0x
 # DER-encoding
 
 [node: 4.cer]
-tbsCertificate.version = 0x00000001
+obj.tbsCertificate.version = 0x00000001
 [node: 5.cer]
-tbsCertificate.signature.parameters = 0x00000001
+obj.tbsCertificate.signature.parameters = 0x00000001
 
 # Prefix lengths
 
 [node: 2.cer]
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b:11:11:10
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b:11:11:10
 [node: 3.cer]
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0xF8/6
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0xF8/6
 [node: 4.cer]
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b11111/6
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b11111/6
 
 # Padding
 
 [node: 5.cer]
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1000000000000000000000000000000000
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1000000000000000000000000000000000
 [node: 6.cer]
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x10/136
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x10/136
 [node: 5.cer]
-tbsCertificate.version = 0x01/1000
+obj.tbsCertificate.version = 0x01/1000

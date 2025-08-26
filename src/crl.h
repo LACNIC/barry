@@ -10,13 +10,14 @@ struct rpki_crl {
 
 	CertificateList_t obj;
 	struct extensions exts;
+
+	struct field *objf;
 };
 
-struct rpki_crl *crl_new(struct rpki_object *);
-void crl_generate_paths(struct rpki_crl *);
+struct rpki_crl *crl_new(struct rpki_tree_node *);
 void crl_finish(struct rpki_crl *);
 void crl_write(struct rpki_crl *);
-void crl_print_md(struct rpki_crl *);
-void crl_print_csv(struct rpki_crl *);
+
+struct rpki_certificate *crl_parent(struct rpki_crl *);
 
 #endif /* SRC_CRL_H_ */

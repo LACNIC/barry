@@ -6,7 +6,7 @@
 #include "oid.h"
 
 struct signed_object *
-roa_new(struct rpki_object *meta)
+roa_new(struct rpki_tree_node *node)
 {
 	static const uint8_t IPV4[2] = { 0, 1 };
 	/* static const uint8_t IPV6[2] = { 0, 2 }; */
@@ -18,7 +18,7 @@ roa_new(struct rpki_object *meta)
 	struct ROAIPAddressFamily *riaf;
 	ROAIPAddress_t *ria;
 
-	so = signed_object_new(meta, NID_id_ct_routeOriginAuthz, &eContent);
+	so = signed_object_new(node, NID_id_ct_routeOriginAuthz, &eContent);
 	roa = &so->obj.roa;
 
 	roa->version = intmax2INTEGER(0);
@@ -43,12 +43,6 @@ roa_new(struct rpki_object *meta)
 }
 
 void
-roa_generate_paths(struct signed_object *so)
-{
-	/* Empty */
-}
-
-void
 roa_finish(struct signed_object *so)
 {
 	signed_object_finish(so, &asn_DEF_RouteOriginAttestation);
@@ -58,16 +52,4 @@ void
 roa_write(struct signed_object *so)
 {
 	asn1_write(so->meta->path, &asn_DEF_ContentInfo, &so->ci);
-}
-
-void
-roa_print_md(struct signed_object *so)
-{
-	printf("- Type: ROA\n");
-}
-
-void
-roa_print_csv(struct signed_object *so)
-{
-	so_print_csv(so);
 }

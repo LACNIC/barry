@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# If $1 exists, only tests involving a matching RD will be run.
+ACCEPT_RD="$1"
+
 # We normally want to test the latest patch; compile that.
 cd ../..
 make > /dev/null
@@ -47,6 +50,10 @@ check_output_contains() {
 	# $2-$n: Regular expression that describes the line that should be
 	# present in the test output
 
+	if [ ! -z "$ACCEPT_RD" -a "$TEST_RD" != "$ACCEPT_RD" ]; then
+		return
+	fi
+
 	OUTPUT_FILE="sandbox/output/$TEST_RD.log"
 	if [ ! -f "$OUTPUT_FILE" ]; then
 		$BARRY $BASIC_ARGS				\
@@ -85,92 +92,127 @@ FAILS=0
 HEXNUM="0x[0-9A-F][0-9A-F]*"
 
 check_output_contains "tutorial-num" \
-	"1.cer,tbsCertificate.version,INTEGER,0x1234" \
-	"2.cer,tbsCertificate.version,INTEGER,0x1234" \
-	"3.cer,tbsCertificate.version,INTEGER,0x1234" \
-	"1.cer,tbsCertificate.extensions.bc.critical,BOOLEAN,true" \
-	"ta.mft,content.signerInfos.0.signature,OCTET STRING,0x1234" \
-	"1.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1234" \
-	"1.cer,tbsCertificate.signature.parameters,ANY,0x1234" \
-	"2.cer,tbsCertificate.signature.parameters,ANY,0x123456" \
-	"3.cer,tbsCertificate.signature.parameters,ANY,0x123456" \
-	"4.cer,tbsCertificate.signature.parameters,ANY,0x00A100A200A300A400A500A600A700A880B180B280B380B480B580B680B780B8A0C1A0C2A0C3A0C4A0C500C6A0C7A0C8F0D1F0D2F0D3F0D4F0D5F0D6F0D7F0" \
-	"4.cer,tbsCertificate.version,INTEGER,0x00000001" \
-	"5.cer,tbsCertificate.signature.parameters,ANY,0x00000001" \
-	"2.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
-	"3.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
-	"4.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
-	"5.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1000000000000000000000000000000000" \
-	"6.cer,tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1000000000000000000000000000000000" \
-	"5.cer,tbsCertificate.version,INTEGER,0x0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+	"1.cer,obj.tbsCertificate.version,INTEGER,0x1234" \
+	"2.cer,obj.tbsCertificate.version,INTEGER,0x1234" \
+	"3.cer,obj.tbsCertificate.version,INTEGER,0x1234" \
+	"1.cer,obj.tbsCertificate.extensions.bc.critical,BOOLEAN,true" \
+	"ta.mft,obj.content.signerInfos.0.signature,OCTET STRING,0x1234" \
+	"1.cer,obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1234" \
+	"1.cer,obj.tbsCertificate.signature.parameters,ANY,0x1234" \
+	"2.cer,obj.tbsCertificate.signature.parameters,ANY,0x123456" \
+	"3.cer,obj.tbsCertificate.signature.parameters,ANY,0x123456" \
+	"4.cer,obj.tbsCertificate.signature.parameters,ANY,0x00A100A200A300A400A500A600A700A880B180B280B380B480B580B680B780B8A0C1A0C2A0C3A0C4A0C500C6A0C7A0C8F0D1F0D2F0D3F0D4F0D5F0D6F0D7F0" \
+	"4.cer,obj.tbsCertificate.version,INTEGER,0x00000001" \
+	"5.cer,obj.tbsCertificate.signature.parameters,ANY,0x00000001" \
+	"2.cer,obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
+	"3.cer,obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
+	"4.cer,obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0xF8/6" \
+	"5.cer,obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1000000000000000000000000000000000" \
+	"6.cer,obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x1000000000000000000000000000000000" \
+	"5.cer,obj.tbsCertificate.version,INTEGER,0x0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
 check_output_contains "tutorial-bool" \
-	"ta.cer,tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
-	"ta.cer,tbsCertificate.extensions.asn.critical,BOOLEAN,true" \
-	"ta.cer,tbsCertificate.extensions.ski.critical,BOOLEAN,false"
+	"ta.cer,obj.tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
+	"ta.cer,obj.tbsCertificate.extensions.asn.critical,BOOLEAN,true" \
+	"ta.cer,obj.tbsCertificate.extensions.ski.critical,BOOLEAN,false"
 
 check_output_contains "tutorial-oid" \
-	"roa1.roa,content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.26 (id-ct-rpkiManifest)"
+	"roa1.roa,obj.content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.26 (id-ct-rpkiManifest)"
 
 check_output_contains "tutorial-date" \
-	"ta.cer,tbsCertificate.validity.notBefore,Time,2025-07-15T19:39:38Z"
+	"ta.cer,obj.tbsCertificate.validity.notBefore,Time,2025-07-15T19:39:38Z"
 
 check_output_contains "tutorial-name" \
-	"ta.cer,tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
-	"ta.cer,tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,ta.cer" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,aaa" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.0.1.type,OBJECT IDENTIFIER,2.5.4.5 (serialNumber)" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.0.1.value,PrintableString in ANY,bbb" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.1.0.type,OBJECT IDENTIFIER,2.5.4.4 (surname)" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.1.0.value,PrintableString in ANY,ccc" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.1.1.type,OBJECT IDENTIFIER,2.5.4.42 (givenName)" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.1.1.value,PrintableString in ANY,ddd" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.1.2.type,OBJECT IDENTIFIER,2.5.4.43 (initials)" \
-	"ca1.cer,tbsCertificate.subject.rdnSequence.1.2.value,PrintableString in ANY,eee"
+	"ta.cer,obj.tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
+	"ta.cer,obj.tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,ta.cer" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,aaa" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.0.1.type,OBJECT IDENTIFIER,2.5.4.5 (serialNumber)" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.0.1.value,PrintableString in ANY,bbb" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.1.0.type,OBJECT IDENTIFIER,2.5.4.4 (surname)" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.1.0.value,PrintableString in ANY,ccc" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.1.1.type,OBJECT IDENTIFIER,2.5.4.42 (givenName)" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.1.1.value,PrintableString in ANY,ddd" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.1.2.type,OBJECT IDENTIFIER,2.5.4.43 (initials)" \
+	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.1.2.value,PrintableString in ANY,eee"
 
 check_output_contains "tutorial-ext" \
-	"ta.cer,tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, ku=ku, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
-	"ca1.cer,tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
-	"roa1.roa,content.certificates.0.tbsCertificate.extensions,Extensions,\"{ ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
-	"ta.crl,tbsCertList.crlExtensions,Extensions,\"{ aki=aki, crln=crln }\"" \
-	"ca1.cer,tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.28 (sbgp-ipAddrBlockv2)" \
-	"ca1.cer,tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
-	"ca1.cer,tbsCertificate.extensions.ip.extnValue,IP Resources (Certificate),\"\[ \[ 192.0.2.0/24 \], \[ 2001:db8::/96 \] \]\"" \
-	"ca1.cer,tbsCertificate.extensions.asn.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.29 (sbgp-autonomousSysNumv2)" \
-	"ca1.cer,tbsCertificate.extensions.asn.critical,BOOLEAN,true" \
-	"ca1.cer,tbsCertificate.extensions.asn.extnValue.asnum,AS Resources,\"\[ 0x1234, 0x5678 \]\"" \
-	"ca1.cer,tbsCertificate.extensions.asn.extnValue.rdi,AS Resources,\"\[ 0x9ABC, 0xDEF0 \]\"" \
-	"ca2.cer,tbsCertificate.extensions,Extensions,\"{ ip=ip, asn=asn }\"" \
-	"ca2.cer,tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.2.3.4.5" \
-	"ca3.cer,tbsCertificate.extensions,Extensions,\"{ red=ip, blue=asn, yellow=ip, purple=bc, orange=ip, green=asn }\"" \
-	"ca3.cer,tbsCertificate.extensions.orange.extnID,OBJECT IDENTIFIER,1.2.3.4.5"
+	"ta.cer,obj.tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, ku=ku, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
+	"ca1.cer,obj.tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
+	"roa1.roa,obj.content.certificates.0.tbsCertificate.extensions,Extensions,\"{ ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
+	"ta.crl,obj.tbsCertList.crlExtensions,Extensions,\"{ aki=aki, crln=crln }\"" \
+	"ca1.cer,obj.tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.28 (sbgp-ipAddrBlockv2)" \
+	"ca1.cer,obj.tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
+	"ca1.cer,obj.tbsCertificate.extensions.ip.extnValue,IP Resources (Certificate),\"\[ \[ 192.0.2.0/24 \], \[ 2001:db8::/96 \] \]\"" \
+	"ca1.cer,obj.tbsCertificate.extensions.asn.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.29 (sbgp-autonomousSysNumv2)" \
+	"ca1.cer,obj.tbsCertificate.extensions.asn.critical,BOOLEAN,true" \
+	"ca1.cer,obj.tbsCertificate.extensions.asn.extnValue.asnum,AS Resources,\"\[ 0x1234, 0x5678 \]\"" \
+	"ca1.cer,obj.tbsCertificate.extensions.asn.extnValue.rdi,AS Resources,\"\[ 0x9ABC, 0xDEF0 \]\"" \
+	"ca2.cer,obj.tbsCertificate.extensions,Extensions,\"{ ip=ip, asn=asn }\"" \
+	"ca2.cer,obj.tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.2.3.4.5" \
+	"ca3.cer,obj.tbsCertificate.extensions,Extensions,\"{ red=ip, blue=asn, yellow=ip, purple=bc, orange=ip, green=asn }\"" \
+	"ca3.cer,obj.tbsCertificate.extensions.orange.extnID,OBJECT IDENTIFIER,1.2.3.4.5"
 
 check_output_contains "tutorial-ip" \
-	"roa1.roa,content.encapContentInfo.eContent.ipAddrBlocks,IP Resources (ROA),\"\[ \[ 192.0.2.0/24, 203.0.113.0/32 \], \[ 2001:db8::/40-48 \] \]\""
+	"roa1.roa,obj.content.encapContentInfo.eContent.ipAddrBlocks,IP Resources (ROA),\"\[ \[ 192.0.2.0/24, 203.0.113.0/32 \], \[ 2001:db8::/40-48 \] \]\""
 
-check_output_contains "root-only-signature" "ta\\.cer,signature,BIT STRING,0x010203"
-check_output_contains "root-only" "ta\\.cer,signature,BIT STRING,$HEXNUM"
-check_output_contains "root-only-signature-crl" "0\\.crl,signature,BIT STRING,0x010203"
-check_output_contains "root-only" "0\\.crl,signature,BIT STRING,$HEXNUM"
+check_output_contains "tutorial-rrdp1" \
+	"ta.cer,rpp.notification,C String,https://potato/rrdp/notification.xml" \
+	"A.cer,rpp.notification,C String,https://potato/rrdp/notification.xml" \
+	"B.cer,rpp.notification,C String,https://tomato/rrdp/notification.xml" \
+	"B2.cer,rpp.notification,C String,https://lettuce/rrdp/notification.xml" \
+	"https://potato/rrdp/notification.xml,snapshot.files,Snapshot Files,\"\[ A.cer, A1.roa, A2.roa, A.mft, A.crl, B.cer, ta.mft, ta.crl \]\"" \
+	"https://tomato/rrdp/notification.xml,snapshot.files,Snapshot Files,\"\[ B1.roa, B2.cer, B.mft, B.crl \]\"" \
+	"https://lettuce/rrdp/notification.xml,snapshot.files,Snapshot Files,\"\[ B2a.roa, B2.mft, B2.crl \]\""
+check_output_contains "tutorial-rrdp2" \
+	"ta.cer,rpp.notification,C String,https://potato/rrdp/notification.xml" \
+	"A.cer,rpp.notification,C String,https://potato/rrdp/notification.xml" \
+	"B.cer,rpp.notification,C String,https://tomato/rrdp/notification.xml" \
+	"B2.cer,rpp.notification,C String,https://lettuce/rrdp/notification.xml" \
+	"https://potato/rrdp/notification.xml,snapshot.files,Snapshot Files,\"\[ A.cer, A1.roa, A2.roa, A.mft, A.crl, B.cer, ta.mft, ta.crl \]\"" \
+	"https://tomato/rrdp/notification.xml,snapshot.files,Snapshot Files,\"\[ ta.cer, A1.roa, A1.roa, B2a.roa \]\"" \
+	"https://lettuce/rrdp/notification.xml,snapshot.files,Snapshot Files,\"\[ B2a.roa, B2.mft, B2.crl \]\""
+
+check_output_contains "root-only-signature" "ta\\.cer,obj.signature,BIT STRING,0x010203"
+check_output_contains "root-only" "ta\\.cer,obj.signature,BIT STRING,$HEXNUM"
+check_output_contains "root-only-signature-crl" "0\\.crl,obj.signature,BIT STRING,0x010203"
+check_output_contains "root-only" "ta\\.crl,obj.signature,BIT STRING,$HEXNUM"
 
 check_output_contains "type" \
 	"ta.cer,type,File Type,cer" \
-	"ta.cer,tbsCertificate.version,INTEGER,0x02" \
+	"ta.cer,obj.tbsCertificate.version,INTEGER,0x02" \
 	"roa.roa,type,File Type,cer" \
-	"roa.roa,tbsCertificate.version,INTEGER,0x02" \
+	"roa.roa,obj.tbsCertificate.version,INTEGER,0x02" \
 	"certificate.cer,type,File Type,roa" \
-	"certificate.cer,content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.24 (id-ct-routeOriginAuthz)" \
+	"certificate.cer,obj.content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.24 (id-ct-routeOriginAuthz)" \
 	"crl.crl,type,File Type,mft" \
-	"crl.crl,content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.26 (id-ct-rpkiManifest)" \
+	"crl.crl,obj.content.encapContentInfo.eContentType,OBJECT IDENTIFIER,1.2.840.113549.1.9.16.1.26 (id-ct-rpkiManifest)" \
 	"manifest.mft,type,File Type,crl" \
-	"manifest.mft,tbsCertList.version,INTEGER,0x01"
+	"manifest.mft,obj.tbsCertList.version,INTEGER,0x01"
 
-FILELIST="content\\.encapContentInfo\\.eContent\\.fileList"
+check_output_contains "rpp" \
+	"ta.cer,uri,C String,https://abc" \
+	"ta.cer,path,C String,custom/rpp-test/ta" \
+	"ta.cer,rpp.uri,C String,rsync://caRepo/rpp-ta" \
+	"ta.cer,rpp.path,C String,custom/rpp-test/rpp-ta" \
+	"ta.cer,rpp.notification,C String,https://rpkiNotif" \
+	"A.cer,uri,C String,rsync://caRepo/rpp-ta/A.cer" \
+	"A.cer,path,C String,custom/rpp-test/rpp-ta/A.cer" \
+	"A.cer,rpp.uri,C String,rsync://localhost:8873/rpki/A" \
+	"A.cer,rpp.path,C String,A" \
+	"A.cer,rpp.notification,C String,https://rpkiNotif" \
+	"B.crl,uri,C String,rsync://caRepo/rpp-ta/B.crl" \
+	"B.crl,path,C String,custom/rpp-test/rpp-ta/B.crl" \
+	"C.mft,uri,C String,rsync://caRepo/rpp-ta/C.mft" \
+	"C.mft,path,C String,custom/rpp-test/rpp-ta/C.mft" \
+	"D.roa,uri,C String,rsync://caRepo/rpp-ta/D.roa" \
+	"D.roa,path,C String,custom/rpp-test/rpp-ta/D.roa"
+
+FILELIST="obj\\.content\\.encapContentInfo\\.eContent\\.fileList"
 check_output_contains "root-only" \
-	"0\\.mft,$FILELIST,File List,{ 0\\.crl=$HEXNUM }" \
-	"0\\.mft,$FILELIST\\.0\\.file,IA5String,0\\.crl" \
-	"0\\.mft,$FILELIST\\.0\\.hash,BIT STRING,$HEXNUM"
+	"ta\\.mft,$FILELIST,File List,{ ta\\.crl=$HEXNUM }" \
+	"ta\\.mft,$FILELIST\\.0\\.file,IA5String,ta\\.crl" \
+	"ta\\.mft,$FILELIST\\.0\\.hash,BIT STRING,$HEXNUM"
 check_output_contains "filelist-str" \
 	"0\\.mft,$FILELIST,File List,\"{ =0, =0, =0 }\"" \
 	"0\\.mft,$FILELIST\\.0\\.file,IA5String," \
@@ -225,188 +267,188 @@ check_output_contains "tutorial-filelist-default" \
 check_output_contains "tutorial-filelist-default-explicit" \
 	"mft\\.mft,$FILELIST,File List,\"{ crl\\.crl=$HEXNUM, A\\.cer=$HEXNUM, B\\.cer=$HEXNUM }\""
 check_output_contains "tutorial-filelist-crl-omitted" \
-	"mft\\.mft,$FILELIST,File List,\"{ A\\.cer=$HEXNUM, B\\.cer=$HEXNUM, 0\\.crl=$HEXNUM }\""
+	"mft\\.mft,$FILELIST,File List,\"{ A\\.cer=$HEXNUM, B\\.cer=$HEXNUM, ta\\.crl=$HEXNUM }\""
 check_output_contains "tutorial-filelist-overrides-isolated" \
 	"mft\\.mft,$FILELIST,File List,\"{ crl\\.crl=$HEXNUM, A\\.cer=0x010203, potatoes=0 }\""
 check_output_contains "tutorial-filelist-overrides-full" \
 	"mft\\.mft,$FILELIST,File List,\"{ A\\.cer=0x010203, nonexistent\\.cer=0x040506, mft\\.mft=0x112233, foobar=0x55555555555555 }\""
 
 check_output_contains "eContent" \
-	"0\\.mft,content\\.encapContentInfo\\.eContent,ANY,0xAABBCC"
+	"0\\.mft,obj.content\\.encapContentInfo\\.eContent,ANY,0xAABBCC"
 
 check_output_contains "obj0" \
-	"ta\\.cer,tbsCertificate\\.version,INTEGER,0x04" \
-	"ta\\.cer,tbsCertificate\\.serialNumber,INTEGER,0x05" \
-	"ta\\.cer,tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
-	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
+	"ta\\.cer,obj.tbsCertificate\\.version,INTEGER,0x04" \
+	"ta\\.cer,obj.tbsCertificate\\.serialNumber,INTEGER,0x05" \
+	"ta\\.cer,obj.tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
+	"ta\\.cer,obj.tbsCertificate\\.signature\\.parameters,ANY,0x0607"
 check_output_contains "obj1" \
-	"ta\\.cer,tbsCertificate\\.version,INTEGER,0x04" \
-	"ta\\.cer,tbsCertificate\\.serialNumber,INTEGER,0x05" \
-	"ta\\.cer,tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
-	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
+	"ta\\.cer,obj.tbsCertificate\\.version,INTEGER,0x04" \
+	"ta\\.cer,obj.tbsCertificate\\.serialNumber,INTEGER,0x05" \
+	"ta\\.cer,obj.tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
+	"ta\\.cer,obj.tbsCertificate\\.signature\\.parameters,ANY,0x0607"
 check_output_contains "obj2" \
-	"ta\\.cer,tbsCertificate\\.version,INTEGER,0x04" \
-	"ta\\.cer,tbsCertificate\\.serialNumber,INTEGER,0x05" \
-	"ta\\.cer,tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
-	"ta\\.cer,tbsCertificate\\.signature\\.parameters,ANY,0x0607"
+	"ta\\.cer,obj.tbsCertificate\\.version,INTEGER,0x04" \
+	"ta\\.cer,obj.tbsCertificate\\.serialNumber,INTEGER,0x05" \
+	"ta\\.cer,obj.tbsCertificate\\.signature\\.algorithm,OBJECT IDENTIFIER,1\\.2\\.3\\.4" \
+	"ta\\.cer,obj.tbsCertificate\\.signature\\.parameters,ANY,0x0607"
 
 check_output_contains "notification-1" \
-	"https://localhost:8080/rpki/notification-1.xml,path,C String,sandbox/rrdp/notification-1.xml" \
+	"https://localhost:8080/rpki/notification-1.xml,path,C String,notification-1.xml" \
 	"https://localhost:8080/rpki/notification-1.xml,snapshot.uri,C String,https://localhost:8080/rpki/notification-1.xml.snapshot" \
-	"https://localhost:8080/rpki/notification-1.xml,snapshot.path,C String,sandbox/rrdp/notification-1.xml.snapshot" \
-	"https://localhost:8080/rpki/notification-1.xml,snapshot.files,Snapshot Files,\"\[ 0.crl, 0.mft \]\""
+	"https://localhost:8080/rpki/notification-1.xml,snapshot.path,C String,notification-1.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-1.xml,snapshot.files,Snapshot Files,\"\[ ta.mft, ta.crl \]\""
 check_output_contains "notification-2" \
-	"https://localhost:8080/rpki/notification-2.xml,path,C String,sandbox/rrdp/notification-2.xml" \
+	"https://localhost:8080/rpki/notification-2.xml,path,C String,notification-2.xml" \
 	"https://localhost:8080/rpki/notification-2.xml,snapshot.uri,C String,https://localhost:8080/rpki/notification-2.xml.snapshot" \
-	"https://localhost:8080/rpki/notification-2.xml,snapshot.path,C String,sandbox/rrdp/notification-2.xml.snapshot" \
-	"https://localhost:8080/rpki/notification-2.xml,snapshot.files,Snapshot Files,\"\[ A.cer, A.roa, 1.crl, B.cer, 2.crl, 0.crl, 1.mft, 2.mft, 0.mft \]\""
+	"https://localhost:8080/rpki/notification-2.xml,snapshot.path,C String,notification-2.xml.snapshot" \
+	"https://localhost:8080/rpki/notification-2.xml,snapshot.files,Snapshot Files,\"\[ A.cer, A.roa, A.mft, A.crl, B.cer, B.mft, B.crl, ta.mft, ta.crl \]\""
 
 check_output_contains "root-only" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/0.mft" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"ta.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml"
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta/ta.mft" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml"
 check_output_contains "gname" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,rfc822Name" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,yeah sure" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,iPAddress" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,OCTET STRING,0x010203" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,registeredID" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"B.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"B.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
-	"B.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String," \
-	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
-	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
-	"C.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,separate"
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,rfc822Name" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,yeah sure" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,iPAddress" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,OCTET STRING,0x010203" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,registeredID" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"B.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"B.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
+	"B.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String," \
+	"C.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"C.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
+	"C.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,separate"
 
 check_output_contains "sia1" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1/1.mft" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/B.mft"
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/A" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/A/A.mft" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta/B.mft"
 
 check_output_contains "sia2" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.2.3.4" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,1.2.4.6" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,iPAddress" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,OCTET STRING," \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://aaaaaa" \
-	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
-	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://bbbbbb" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.2.840.113549.1.1.11 (sha256WithRSAEncryption)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String," \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,2.16.840.1.101.3.4.2.1 (sha256)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,"
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.2.3.4" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,1.2.4.6" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,iPAddress" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,OCTET STRING," \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://aaaaaa" \
+	"A.cer,obj.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"A.cer,obj.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://bbbbbb" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.2.840.113549.1.1.11 (sha256WithRSAEncryption)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,2.16.840.1.101.3.4.2.1 (sha256)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,"
 
 check_output_contains "sia3" \
-	"A.cer,tbsCertificate.extensions,Extensions,\"{ aia=aia, sia=sia }\"" \
-	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
-	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1/1.mft" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions,Extensions,\"{ aia=aia, sia=sia }\"" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/B.mft" \
-	"C.crl,tbsCertList.crlExtensions,Extensions,\"{ aia=aia, sia=sia }\"" \
-	"C.crl,tbsCertList.crlExtensions.aia.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.1 (Authority Information Access)" \
-	"C.crl,tbsCertList.crlExtensions.aia.critical,BOOLEAN,false" \
-	"C.crl,tbsCertList.crlExtensions.sia.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.11 (Subject Information Access)" \
-	"C.crl,tbsCertList.crlExtensions.sia.critical,BOOLEAN,false"
+	"A.cer,obj.tbsCertificate.extensions,Extensions,\"{ aia=aia, sia=sia }\"" \
+	"A.cer,obj.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"A.cer,obj.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/A" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/A/A.mft" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8080/rpki/notification.xml" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions,Extensions,\"{ aia=aia, sia=sia }\"" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta/B.mft" \
+	"C.crl,obj.tbsCertList.crlExtensions,Extensions,\"{ aia=aia, sia=sia }\"" \
+	"C.crl,obj.tbsCertList.crlExtensions.aia.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.1 (Authority Information Access)" \
+	"C.crl,obj.tbsCertList.crlExtensions.aia.critical,BOOLEAN,false" \
+	"C.crl,obj.tbsCertList.crlExtensions.sia.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.11 (Subject Information Access)" \
+	"C.crl,obj.tbsCertList.crlExtensions.sia.critical,BOOLEAN,false"
 
 check_output_contains "sia4" \
-	"A.cer,tbsCertificate.extensions,Extensions,\"{ aia1=aia, sia1=sia, sia2=sia, aia2=aia }\"" \
-	"A.cer,tbsCertificate.extensions.aia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
-	"A.cer,tbsCertificate.extensions.aia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.aia1.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
-	"A.cer,tbsCertificate.extensions.aia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"A.cer,tbsCertificate.extensions.aia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.aia1.extnValue.1.accessLocation.value,IA5String," \
-	"A.cer,tbsCertificate.extensions.sia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
-	"A.cer,tbsCertificate.extensions.sia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia1.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp1/1.mft" \
-	"A.cer,tbsCertificate.extensions.sia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
-	"A.cer,tbsCertificate.extensions.sia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia1.extnValue.1.accessLocation.value,IA5String," \
-	"A.cer,tbsCertificate.extensions.sia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
-	"A.cer,tbsCertificate.extensions.sia2.extnValue.0.accessLocation.type,GeneralName type,iPAddress" \
-	"A.cer,tbsCertificate.extensions.sia2.extnValue.0.accessLocation.value,OCTET STRING," \
-	"A.cer,tbsCertificate.extensions.sia2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
-	"A.cer,tbsCertificate.extensions.sia2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.sia2.extnValue.1.accessLocation.value,IA5String,type defaults to uniformResourceIdentifier" \
-	"A.cer,tbsCertificate.extensions.aia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
-	"A.cer,tbsCertificate.extensions.aia2.extnValue.0.accessLocation.type,GeneralName type,rfc822Name" \
-	"A.cer,tbsCertificate.extensions.aia2.extnValue.0.accessLocation.value,IA5String," \
-	"B.mft,content.certificates.0.tbsCertificate.extensions,Extensions,\"{ sia1=sia, sia2=sia, aia=aia }\"" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.value,IA5String," \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/rpp0/B.mft" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.value,IA5String," \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.value,IA5String,IA5String" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"B.mft,content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessLocation.value,IA5String," \
-	"C.crl,tbsCertList.crlExtensions,Extensions,\"{ 1=sia, 2=sia, 3=aia }\"" \
-	"C.crl,tbsCertList.crlExtensions.1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"C.crl,tbsCertList.crlExtensions.1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"C.crl,tbsCertList.crlExtensions.1.extnValue.0.accessLocation.value,IA5String," \
-	"C.crl,tbsCertList.crlExtensions.1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
-	"C.crl,tbsCertList.crlExtensions.1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"C.crl,tbsCertList.crlExtensions.1.extnValue.1.accessLocation.value,IA5String," \
-	"C.crl,tbsCertList.crlExtensions.2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
-	"C.crl,tbsCertList.crlExtensions.2.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
-	"C.crl,tbsCertList.crlExtensions.2.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,<absent>" \
-	"C.crl,tbsCertList.crlExtensions.2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
-	"C.crl,tbsCertList.crlExtensions.2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"C.crl,tbsCertList.crlExtensions.2.extnValue.1.accessLocation.value,IA5String,striiiiiiing" \
-	"C.crl,tbsCertList.crlExtensions.3.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
-	"C.crl,tbsCertList.crlExtensions.3.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
-	"C.crl,tbsCertList.crlExtensions.3.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,1.4.8.16"
+	"A.cer,obj.tbsCertificate.extensions,Extensions,\"{ aia1=aia, sia1=sia, sia2=sia, aia2=aia }\"" \
+	"A.cer,obj.tbsCertificate.extensions.aia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"A.cer,obj.tbsCertificate.extensions.aia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.aia1.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"A.cer,obj.tbsCertificate.extensions.aia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"A.cer,obj.tbsCertificate.extensions.aia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.aia1.extnValue.1.accessLocation.value,IA5String," \
+	"A.cer,obj.tbsCertificate.extensions.sia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
+	"A.cer,obj.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/A/A.mft" \
+	"A.cer,obj.tbsCertificate.extensions.sia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"A.cer,obj.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.value,IA5String," \
+	"A.cer,obj.tbsCertificate.extensions.sia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"A.cer,obj.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.type,GeneralName type,iPAddress" \
+	"A.cer,obj.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.value,OCTET STRING," \
+	"A.cer,obj.tbsCertificate.extensions.sia2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"A.cer,obj.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.value,IA5String,type defaults to uniformResourceIdentifier" \
+	"A.cer,obj.tbsCertificate.extensions.aia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"A.cer,obj.tbsCertificate.extensions.aia2.extnValue.0.accessLocation.type,GeneralName type,rfc822Name" \
+	"A.cer,obj.tbsCertificate.extensions.aia2.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions,Extensions,\"{ sia1=sia, sia2=sia, aia=aia }\"" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia1.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia1.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta/B.mft" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.type,GeneralName type,dNSName" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia2.extnValue.0.accessLocation.value,IA5String," \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia2.extnValue.1.accessLocation.value,IA5String,IA5String" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta.cer" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.1.accessLocation.value,IA5String," \
+	"C.crl,obj.tbsCertList.crlExtensions,Extensions,\"{ 1=sia, 2=sia, 3=aia }\"" \
+	"C.crl,obj.tbsCertList.crlExtensions.1.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"C.crl,obj.tbsCertList.crlExtensions.1.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"C.crl,obj.tbsCertList.crlExtensions.1.extnValue.0.accessLocation.value,IA5String," \
+	"C.crl,obj.tbsCertList.crlExtensions.1.extnValue.1.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
+	"C.crl,obj.tbsCertList.crlExtensions.1.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"C.crl,obj.tbsCertList.crlExtensions.1.extnValue.1.accessLocation.value,IA5String," \
+	"C.crl,obj.tbsCertList.crlExtensions.2.extnValue.0.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"C.crl,obj.tbsCertList.crlExtensions.2.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
+	"C.crl,obj.tbsCertList.crlExtensions.2.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,<absent>" \
+	"C.crl,obj.tbsCertList.crlExtensions.2.extnValue.1.accessMethod,OBJECT IDENTIFIER,<absent>" \
+	"C.crl,obj.tbsCertList.crlExtensions.2.extnValue.1.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
+	"C.crl,obj.tbsCertList.crlExtensions.2.extnValue.1.accessLocation.value,IA5String,striiiiiiing" \
+	"C.crl,obj.tbsCertList.crlExtensions.3.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
+	"C.crl,obj.tbsCertList.crlExtensions.3.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
+	"C.crl,obj.tbsCertList.crlExtensions.3.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,1.4.8.16"
 
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

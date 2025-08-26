@@ -445,11 +445,11 @@ ext_finish_sia(SubjectInfoAccessSyntax_t *sia, struct field *extnValuef,
 
 		value = NULL;
 		if (oid_is_caRepository(&ad->accessMethod))
-			value = rpp ? rpp->caRepository : NULL;
+			value = rpp ? rpp->uri : NULL;
 		else if (oid_is_rpkiManifest(&ad->accessMethod))
-			value = rpp ? rpp->rpkiManifest : NULL;
+			value = cer_rpkiManifest(cer);
 		else if (oid_is_rpkiNotify(&ad->accessMethod))
-			value = rpp ? rpp->rpkiNotify : NULL;
+			value = rpp ? rpp->notification : NULL;
 		else if (oid_is_signedObject(&ad->accessMethod))
 			value = so;
 		if (value)

@@ -1,9 +1,9 @@
 #ifndef SRC_RPKI_OBJECT_H_
 #define SRC_RPKI_OBJECT_H_
 
-struct rpki_certificate;
 struct rpki_tree;
-struct field;
+struct rpki_tree_node;
+struct rpki_certificate;
 
 struct rpki_object {
 	char *uri;
@@ -11,12 +11,9 @@ struct rpki_object {
 	char *name;
 
 	struct rpki_tree *tree;
-	struct rpki_certificate *parent;
-
-	/* All the tweakable fields in the object */
-	struct field *fields;
+	struct rpki_tree_node *node;
 };
 
-void meta_print_csv(struct rpki_object *);
+struct rpki_certificate *meta_parent(struct rpki_object *);
 
 #endif /* SRC_RPKI_OBJECT_H_ */

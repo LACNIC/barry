@@ -1,16 +1,17 @@
 #include "rpki_object.h"
 
-#include "cer.h"
-#include "csv.h"
+#include "print.h"
+#include "rpki_tree.h"
 
-void
-meta_print_csv(struct rpki_object *meta)
+struct rpki_certificate *
+meta_parent(struct rpki_object *meta)
 {
-	struct rpki_certificate *parent;
+	struct rpki_tree_node *parent;
 
-	csv_print3(meta, "uri", meta->uri);
-	csv_print3(meta, "path", meta->path);
-
-	parent = meta->parent;
-	csv_print3(meta, "parent", parent ? parent->meta->name : "");
+	parent = meta->node->parent;
+	if (parent == NULL)
+		return NULL;
+	if (parent->type != FT_TA && parent->type != FT_CER)
+		panic("%s's parent is not a certificate.", meta->name);
+	return parent->obj;
 }

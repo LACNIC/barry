@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 char *join_paths(char const *, char const *);
+char *remove_extension(char const *);
 
 void exec_mkdir(char *);
 void exec_mkdir_p(char const *, bool);

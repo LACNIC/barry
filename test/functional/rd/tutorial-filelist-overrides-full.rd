@@ -5,7 +5,7 @@ ta.cer
 	B.cer
 
 [node: mft.mft]
-content.encapContentInfo.eContent.fileList = {
+obj.content.encapContentInfo.eContent.fileList = {
 	A.cer           = 0x010203,
 	nonexistent.cer = 0x040506,
 	mft.mft         = 0x112233,

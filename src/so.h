@@ -29,11 +29,12 @@ struct signed_object {
 	struct rpki_certificate ee;
 	struct rpki_object ee_meta;
 	SignerInfo_t si;
+
+	struct field *objf;
 };
 
-struct signed_object *signed_object_new(struct rpki_object *, int,
+struct signed_object *signed_object_new(struct rpki_tree_node *, int,
     struct field **);
 void signed_object_finish(struct signed_object *, asn_TYPE_descriptor_t *);
-void so_print_csv(struct signed_object *);
 
 #endif /* SRC_SO_H_ */

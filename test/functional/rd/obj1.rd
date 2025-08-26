@@ -1,7 +1,7 @@
 ta.cer
 
 [node: ta.cer]
-tbsCertificate = {
+obj.tbsCertificate = {
 	version = 0x04,
 	serialNumber = 0x05,
 	signature = {

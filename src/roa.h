@@ -6,11 +6,8 @@
 #include "keyval.h"
 #include "so.h"
 
-struct signed_object *roa_new(struct rpki_object *);
-void roa_generate_paths(struct signed_object *);
+struct signed_object *roa_new(struct rpki_tree_node *);
 void roa_finish(struct signed_object *);
 void roa_write(struct signed_object *);
-void roa_print_md(struct signed_object *);
-void roa_print_csv(struct signed_object *);
 
 #endif /* SRC_ROA_H_ */

@@ -25,6 +25,8 @@ struct rpki_tree_node {
 	enum file_type type;
 	void *obj;
 
+	/* All the tweakable fields in the object */
+	struct field *fields;
 	/* Overrides by the user */
 	struct keyvals props;
 
@@ -89,7 +91,7 @@ void rpkitree_add(
 
 void rpkitree_print(struct rpki_tree *);
 
-struct rrdp_notification *notif_getsert(struct rpki_tree *, char const *);
+struct rrdp_notification *notif_getsert(struct rpki_tree *, char *);
 void notif_add_file(struct rrdp_notification *, char *);
 void __notif_add_file(char const *, struct rrdp_files *, char *);
 

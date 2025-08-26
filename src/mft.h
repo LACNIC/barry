@@ -8,11 +8,7 @@
 #include "so.h"
 
 struct signed_object *mft_new(struct rpki_tree_node *);
-void mft_generate_paths(struct signed_object *);
-void mft_fix_filelist_crl(struct signed_object *, char const *);
 void mft_finish(struct signed_object *, struct rpki_tree_node *);
 void mft_write(struct signed_object *);
-void mft_print_md(struct signed_object *);
-void mft_print_csv(struct signed_object *);
 
 #endif /* SRC_MFT_H_ */

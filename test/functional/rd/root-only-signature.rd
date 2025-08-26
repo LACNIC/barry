@@ -1,4 +1,4 @@
 ta.cer
 
 [node: ta.cer]
-signature = 0x010203
+obj.signature = 0x010203

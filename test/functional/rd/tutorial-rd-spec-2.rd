@@ -2,7 +2,7 @@ ta.cer
 
 [node: ta.cer]
 # This line is a comment <-- 1
-tbsCertificate = { # <-- 4
+obj.tbsCertificate = { # <-- 4, 5
 	validity = {
 		notBefore = 2025-06-01T00:00:00Z, # <-- 4 (x2)
 		notAfter = 2026-06-01T00:00:00Z

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "file.h"
 #include "libcrypto.h"
 #include "print.h"
 
@@ -30,6 +31,8 @@ write_open(char const *path)
 {
 	int error;
 	int fd;
+
+	exec_mkdir_p(path, false);
 
 	if (unlink(path)) {
 		error = errno;
@@ -66,10 +69,13 @@ void
 rrdp_save_snapshot(char const *path, struct rrdp_type const *type,
     struct rrdp_entry_file *files, unsigned int count)
 {
+	extern char const *rsync_path;
+
 	int fd;
 	unsigned int tabbing;
 	unsigned int f;
 	struct rrdp_entry_file *file;
+	char *file_path;
 
 	fd = write_open(path);
 
@@ -87,7 +93,11 @@ rrdp_save_snapshot(char const *path, struct rrdp_type const *type,
 		if (file->hash)
 			dprintf(fd, "\n%*chash=\"%s\"", tabbing, ' ', file->hash);
 		dprintf(fd, ">\n");
-		base64_into_fd(file->path, fd);
+
+		file_path = join_paths(rsync_path, file->path);
+		base64_into_fd(file_path, fd);
+		free(file_path);
+
 		dprintf(fd, "  </%s>\n", file->type->name);
 	}
 

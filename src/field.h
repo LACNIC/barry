@@ -73,7 +73,6 @@ extern const struct field_type ft_ip_cer;
 extern const struct field_type ft_asn_cer;
 extern const struct field_type ft_revoked;
 extern const struct field_type ft_filelist;
-extern const struct field_type ft_notif;
 extern const struct field_type ft_files;
 
 struct field *field_add(struct field *, char const *, struct field_type const *,

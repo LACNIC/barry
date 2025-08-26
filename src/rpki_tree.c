@@ -490,7 +490,8 @@ read_tree(struct rd_parse_context *ctx)
 			current = pzalloc(sizeof(struct rpki_tree_node));
 			current->meta.name = tkn.str;
 			current->meta.tree = ctx->result;
-			current->meta.fields = pzalloc(sizeof(struct field));
+			current->meta.node = current;
+			current->fields = pzalloc(sizeof(struct field));
 			current->indent = indent;
 			STAILQ_INIT(&current->props);
 
@@ -614,10 +615,9 @@ rpkitree_print(struct rpki_tree *tree)
 }
 
 static void
-default_paths(struct rrdp_notification *notif, char const *notif_uri)
+default_paths(struct rrdp_notification *notif, char *notif_uri)
 {
 	extern char const *rrdp_uri; /* --rrdp-uri */
-	extern char const *rrdp_path; /* --rrdp-path */
 	size_t rrdp_uri_len;
 
 	notif->uri = pstrdup(notif_uri);
@@ -627,7 +627,9 @@ default_paths(struct rrdp_notification *notif, char const *notif_uri)
 	if (strncmp(notif_uri, rrdp_uri, rrdp_uri_len) != 0)
 		return; /* The user will have to override the paths */
 
-	notif->path = join_paths(rrdp_path, notif_uri + rrdp_uri_len);
+	notif->path = notif_uri + rrdp_uri_len;
+	while (*notif->path == '/')
+		notif->path++;
 	notif->snapshot.path = concat(notif->path, ".snapshot");
 }
 
@@ -647,7 +649,7 @@ init_notif_fields(struct rrdp_notification *notif)
 }
 
 struct rrdp_notification *
-notif_getsert(struct rpki_tree *tree, char const *uri)
+notif_getsert(struct rpki_tree *tree, char *uri)
 {
 	struct rrdp_notification *notif;
 	size_t urlen;
@@ -664,6 +666,7 @@ notif_getsert(struct rpki_tree *tree, char const *uri)
 		default_paths(notif, uri);
 		STAILQ_INIT(&notif->snapshot.files);
 		init_notif_fields(notif);
+		STAILQ_INIT(&notif->props);
 		HASH_ADD_KEYPTR(hh, tree->notifications, notif->uri, urlen,
 		    notif);
 	}

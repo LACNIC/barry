@@ -243,136 +243,93 @@ init_type(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 }
 
 static void
-init_parent(struct rpki_tree_node *node)
-{
-	struct rpki_tree_node *parent;
-
-	parent = node->parent;
-	if (parent == NULL)
-		return;
-	if (parent->type == FT_TA || parent->type == FT_CER) {
-		node->meta.parent = parent->obj;
-		return;
-	}
-
-	panic("%s's parent is not a certificate.", node->meta.name);
-}
-
-static void
 init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Initializing: %s", node->meta.name);
 
-	init_parent(node);
-	field_add(node->meta.fields, "type", &ft_filetype, &node->type, 0);
+	field_add(node->fields, "type", &ft_filetype, &node->type, 0);
+	field_add(node->fields, "uri", &ft_cstr, &node->meta.uri, 0);
+	field_add(node->fields, "path", &ft_cstr, &node->meta.path, 0);
 
 	switch (node->type) {
 	case FT_TA:
-		node->obj = cer_new(&node->meta, CT_TA);
+		node->obj = cer_new(node, CT_TA);
 		break;
 	case FT_CER:
-		node->obj = cer_new(&node->meta, CT_CA);
+		node->obj = cer_new(node, CT_CA);
 		break;
 	case FT_CRL:
-		node->obj = crl_new(&node->meta);
+		node->obj = crl_new(node);
 		break;
 	case FT_MFT:
 		node->obj = mft_new(node);
 		break;
 	case FT_ROA:
-		node->obj = roa_new(&node->meta);
+		node->obj = roa_new(node);
 		break;
 	default:
 		panic("Unknown file type: %s", node->meta.name);
 	}
-}
-
-static void
-autogenerate_uri_and_path(struct rpki_tree_node *node)
-{
-	node->meta.uri = generate_uri(node->meta.parent, node->meta.name);
-	pr_debug("- uri: %s", node->meta.uri);
-
-	node->meta.path = generate_path(node->meta.parent, node->meta.name);
-	pr_debug("- path: %s", node->meta.path);
 }
 
 static void
 generate_paths(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
+	struct rpki_object *meta = &node->meta;
+
 	pr_debug("Generating paths: %s", node->meta.name);
 
-	autogenerate_uri_and_path(node);
-
-	switch (node->type) {
-	case FT_TA:
-	case FT_CER:
-		cer_generate_paths(node->obj);
-		break;
-	case FT_CRL:
-		crl_generate_paths(node->obj);
-		break;
-	case FT_MFT:
-		mft_generate_paths(node->obj);
-		break;
-	case FT_ROA:
-		roa_generate_paths(node->obj);
-		break;
-	default:
-		panic("Unknown file type: %s", node->meta.name);
+	if (!fields_overridden(node->fields, "uri")) {
+		meta->uri = generate_uri(meta_parent(meta), meta->name);
+		pr_debug("- uri: %s", meta->uri);
 	}
+
+	if (!fields_overridden(node->fields, "path")) {
+		meta->path = generate_path(meta_parent(meta), meta->name);
+		pr_debug("- path: %s", meta->path);
+	}
+
+	if (node->type == FT_TA || node->type == FT_CER)
+		cer_finish_rpp(node->obj);
 }
 
-static struct rpki_tree_node *
-create_missing_node(struct rpki_tree *tree, char *url,
-    struct rpki_certificate *ca)
+static void
+create_missing_node(struct rpki_tree *tree, struct rpki_tree_node *parent,
+    enum file_type type, char const *extension)
 {
 	struct rpki_tree_node *child;
-	char *slash;
+	char *extless;
 
 	child = pzalloc(sizeof(struct rpki_tree_node));
-	slash = strrchr(url, '/');
-	child->meta.name = slash ? (slash + 1) : url;
+
+	extless = remove_extension(parent->meta.name);
+	child->meta.name = concat(extless, extension);
+	free(extless);
+
 	child->meta.tree = tree;
-	child->meta.parent = ca;
-	child->meta.fields = pzalloc(sizeof(struct field));
+	child->meta.node = child;
+	child->type = type;
+	child->fields = pzalloc(sizeof(struct field));
+	child->parent = parent;
 
-	autogenerate_uri_and_path(child);
-
-	return child;
+	rpkitree_add(tree, parent, child);
 }
 
 static void
 add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
     void *arg)
 {
-	struct rpki_tree_node *mft, *crl;
-	struct rpki_certificate *ca;
-
 	if (parent->type != FT_CER && parent->type != FT_TA)
 		return;
-	ca = parent->obj;
 
-	mft = find_child(parent, FT_MFT);
-	if (!mft) {
-		pr_debug("Need to create %s's Manifest", ca->rpp.caRepository);
-		mft = create_missing_node(tree, ca->rpp.rpkiManifest, ca);
-		mft->type = FT_MFT;
-		mft->parent = parent; /* Needed by mft_new() */
-		mft->obj = mft_new(mft);
-		mft_generate_paths(mft->obj);
-		rpkitree_add(tree, parent, mft);
+	if (find_child(parent, FT_MFT) == NULL) {
+		pr_debug("Need to create %s's child Manifest", parent->meta.name);
+		create_missing_node(tree, parent, FT_MFT, ".mft");
 	}
 
 	if (find_child(parent, FT_CRL) == NULL) {
-		pr_debug("Need to create %s's CRL", ca->rpp.caRepository);
-		crl = create_missing_node(tree, ca->rpp.crldp, ca);
-		crl->type = FT_CRL;
-		crl->obj = crl_new(&crl->meta);
-		crl_generate_paths(crl->obj);
-		rpkitree_add(tree, parent, crl);
-
-		mft_fix_filelist_crl(mft->obj, crl->meta.name);
+		pr_debug("Need to create %s's child CRL", parent->meta.name);
+		create_missing_node(tree, parent, FT_CRL, ".crl");
 	}
 }
 
@@ -380,7 +337,18 @@ static void
 apply_keyvals(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
 	pr_debug("Applying keyvals: %s", node->meta.name);
-	fields_apply_keyvals(node->meta.fields, &node->props);
+	fields_apply_keyvals(node->fields, &node->props);
+}
+
+void
+apply_notification_fields(struct rpki_tree *tree)
+{
+	struct rrdp_notification *notif, *tmp;
+
+	HASH_ITER(hh, tree->notifications, notif, tmp) {
+		pr_debug("Applying keyvals: %s", notif->uri);
+		fields_apply_keyvals(notif->fields, &notif->props);
+	}
 }
 
 static void
@@ -451,6 +419,29 @@ write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	mft_write(node->obj);
 }
 
+void
+build_notif_filelists(struct rpki_tree *tree, struct rpki_tree_node *node,
+    void *arg)
+{
+	struct rpki_tree_node *ancestor;
+	struct rpki_certificate *cer;
+	struct rrdp_notification *notif;
+
+	ancestor = node;
+	while ((ancestor = ancestor->parent) != NULL) {
+		if (ancestor->type != FT_TA && ancestor->type != FT_CER)
+			continue;
+
+		cer = ancestor->obj;
+		if (cer->rpp.notification) {
+			notif = notif_getsert(tree, cer->rpp.notification);
+			if (!fields_overridden(notif->fields, "snapshot.files"))
+				notif_add_file(notif, node->meta.name);
+			return;
+		}
+	}
+}
+
 static void
 write_rrdp(struct rpki_tree *tree)
 {
@@ -460,6 +451,10 @@ write_rrdp(struct rpki_tree *tree)
 	struct rrdp_entry_file *req;
 	size_t namelen;
 	struct rpki_tree_node *node;
+	char *notif_path;
+	char *snapshot_path;
+
+	rpkitree_pre_order(tree, build_notif_filelists, NULL);
 
 	HASH_ITER(hh, tree->notifications, notif, tmp) {
 		if (STAILQ_EMPTY(&notif->snapshot.files))
@@ -505,12 +500,19 @@ write_rrdp(struct rpki_tree *tree)
 			req[f].uri = node->meta.uri;
 			req[f].path = node->meta.path;
 //			files[f].hash = sha256_file_str(node->meta.path);
+
 			f++;
 		}
 
-		rrdp_save_snapshot(notif->snapshot.path, &SNAPSHOT, req, f);
-		rrdp_save_notification(notif->path, notif->snapshot.uri,
-		    sha256_file_str(notif->snapshot.path));
+		notif_path = join_paths(rrdp_path, notif->path);
+		snapshot_path = join_paths(rrdp_path, notif->snapshot.path);
+
+		rrdp_save_snapshot(snapshot_path, &SNAPSHOT, req, f);
+		rrdp_save_notification(notif_path, notif->snapshot.uri,
+		    sha256_file_str(snapshot_path));
+
+		free(snapshot_path);
+		free(notif_path);
 
 //		for (f = 0; f < count; f++)
 //			free(files[f].hash);
@@ -531,31 +533,7 @@ print_repository_md(struct rpki_tree *tree)
 	printf("# Files\n\n");
 	HASH_ITER(ghook, tree->nodes, node, tmp) {
 		printf("## %s\n\n", node->meta.name);
-
-		printf("- URI: %s\n", node->meta.uri);
-		printf("- path: %s\n", node->meta.path);
-
-		switch (node->type) {
-		case FT_TA:
-		case FT_CER:
-			cer_print_md(node->obj);
-			break;
-		case FT_CRL:
-			crl_print_md(node->obj);
-			break;
-		case FT_MFT:
-			mft_print_md(node->obj);
-			break;
-		case FT_ROA:
-			roa_print_md(node->obj);
-			break;
-		default:
-			pr_err("Unknown file type: %s", node->meta.name);
-		}
-
-		printf("\n");
-		fields_print_md(node->meta.fields);
-
+		fields_print_md(node->fields);
 		printf("\n");
 	}
 }
@@ -566,25 +544,8 @@ print_repository_csv(struct rpki_tree *tree)
 	struct rpki_tree_node *node, *tmp1;
 	struct rrdp_notification *notif, *tmp2;
 
-	HASH_ITER(ghook, tree->nodes, node, tmp1) {
-		switch (node->type) {
-		case FT_TA:
-		case FT_CER:
-			cer_print_csv(node->obj);
-			break;
-		case FT_CRL:
-			crl_print_csv(node->obj);
-			break;
-		case FT_MFT:
-			mft_print_csv(node->obj);
-			break;
-		case FT_ROA:
-			roa_print_csv(node->obj);
-			break;
-		default:
-			pr_err("Unknown file type: %s", node->meta.name);
-		}
-	}
+	HASH_ITER(ghook, tree->nodes, node, tmp1)
+		fields_print_csv(node->fields, node->meta.name);
 
 	HASH_ITER(hh, tree->notifications, notif, tmp2)
 		if (!STAILQ_EMPTY(&notif->snapshot.files))
@@ -617,20 +578,21 @@ main(int argc, char **argv)
 	rpkitree_pre_order(&tree, init_type, NULL);
 	pr_debug("Done.\n");
 
-	pr_debug("Instancing generic RPKI objects...");
-	rpkitree_pre_order(&tree, init_object, NULL);
-	pr_debug("Done.\n");
-
-	pr_debug("Generating default paths...");
-	rpkitree_pre_order(&tree, generate_paths, NULL);
-	pr_debug("Done.\n");
-
 	pr_debug("Adding missing CRLs and Manifests...");
 	rpkitree_pre_order(&tree, add_missing_objs, NULL);
 	pr_debug("Done.\n");
 
+	pr_debug("Instancing generic RPKI objects...");
+	rpkitree_pre_order(&tree, init_object, NULL);
+	pr_debug("Done.\n");
+
 	pr_debug("Applying keyvals...");
 	rpkitree_pre_order(&tree, apply_keyvals, NULL);
+	apply_notification_fields(&tree);
+	pr_debug("Done.\n");
+
+	pr_debug("Generating default paths...");
+	rpkitree_pre_order(&tree, generate_paths, NULL);
 	pr_debug("Done.\n");
 
 	pr_debug("Post-processing (except manifests)...");
@@ -638,7 +600,6 @@ main(int argc, char **argv)
 	pr_debug("Done.\n");
 
 	pr_debug("Writing files (except manifests)...");
-	exec_mkdir_p(rsync_path, true);
 	rpkitree_pre_order(&tree, write_not_mfts, NULL);
 	// XXX assuming type cer
 	tal_write(tree.root->obj, tal_path);

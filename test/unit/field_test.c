@@ -4,6 +4,8 @@
 
 /* Mocks */
 
+char const *rsync_path;
+char const *rrdp_uri;
 Time_t default_now;
 Time_t default_later;
 GeneralizedTime_t default_gnow;
@@ -12,14 +14,8 @@ GeneralizedTime_t default_glater;
 char const *keys_path = NULL;
 unsigned int verbosity = 0;
 
-struct rrdp_notification *
-notif_getsert(struct rpki_tree *tree, char const *uri)
-{
-	ck_abort_msg("%s() called!", __func__);
-}
-
-void
-exec_mkdir_p(char const *_path, bool include_last)
+char const *
+cer_rpkiManifest(struct rpki_certificate *cer)
 {
 	ck_abort_msg("%s() called!", __func__);
 }

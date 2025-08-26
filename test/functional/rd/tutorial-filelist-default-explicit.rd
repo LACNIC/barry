@@ -5,7 +5,7 @@ ta.cer
 	B.cer
 
 [node: mft.mft]
-content.encapContentInfo.eContent.fileList = {
+obj.content.encapContentInfo.eContent.fileList = {
 	# <File name> = <Hash>
 	crl.crl = 0x14A9B4039E1EDC10C1314C435828B418417E8B152CD173696B776EF24D9A9E41,
 	A.cer   = 0x5EBFE949DAB77A1AED18BC7EDE86C0F4CC784A2227385E6F04461EE85BD7F2C9,

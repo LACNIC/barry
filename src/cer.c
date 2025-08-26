@@ -67,12 +67,19 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 }
 
 struct rpki_certificate *
-cer_new(struct rpki_object *meta, enum cer_type type)
+cer_new(struct rpki_tree_node *node, enum cer_type type)
 {
 	struct rpki_certificate *cer;
 
 	cer = pzalloc(sizeof(struct rpki_certificate));
-	cer_init(cer, meta, type);
+
+	cer->rppf = field_add(node->fields, "rpp", &ft_obj, &cer->rpp, 0);
+	field_add(cer->rppf, "uri", &ft_cstr, &cer->rpp.uri, 0);
+	field_add(cer->rppf, "path", &ft_cstr, &cer->rpp.path, 0);
+	field_add(cer->rppf, "notification", &ft_cstr, &cer->rpp.notification, 0);
+	cer->objf = field_add(node->fields, "obj", &ft_obj, &cer->obj, 0);
+
+	cer_init(cer, &node->meta, type);
 
 	return cer;
 }
@@ -81,19 +88,16 @@ void
 cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
     enum cer_type type)
 {
-	struct field *rppf;
 	TBSCertificate_t *tbs;
 	struct field *tbsf;
 	struct field *valf;
 	struct field *extsf;
 
 	cer->meta = meta;
-	rppf = field_add(meta->fields, "rpp", &ft_obj, &cer->rpp, 0);
-	field_add(rppf, "rpkiNotify", &ft_notif, cer, 0);
 	cer->keys = keys_new();
 
 	tbs = &cer->obj.tbsCertificate;
-	tbsf = field_add(meta->fields, "tbsCertificate", &ft_obj, tbs, 0);
+	tbsf = field_add(cer->objf, "tbsCertificate", &ft_obj, tbs, 0);
 
 	tbs->version = intmax2INTEGER(2);
 	field_add(tbsf, "version", &ft_int, &tbs->version, sizeof(Version_t));
@@ -133,35 +137,41 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 
 	init_oid(&cer->obj.signatureAlgorithm.algorithm, NID_sha256WithRSAEncryption);
 	cer->obj.signatureAlgorithm.parameters = create_null();
-	field_add_algorithm(meta->fields, "signatureAlgorithm", &cer->obj.signatureAlgorithm);
+	field_add_algorithm(cer->objf, "signatureAlgorithm", &cer->obj.signatureAlgorithm);
 
 	/* cer->signature: Postpone (needs all other fields ready) */
-	field_add(meta->fields, "signature", &ft_bitstr, &cer->obj.signature, 0);
+	field_add(cer->objf, "signature", &ft_bitstr, &cer->obj.signature, 0);
 }
 
 static void
 finish_aki(AuthorityKeyIdentifier_t *aki, struct rpki_certificate *cer)
 {
-	if (!cer->meta->parent)
+	struct rpki_certificate *parent;
+
+	parent = cer_parent(cer);
+	if (!parent)
 		panic("Certificate needs a default AKI, but lacks a parent");
-	ext_finish_aki(aki, &cer->meta->parent->SPKI);
+	ext_finish_aki(aki, &parent->SPKI);
 }
 
 static void
 finish_crldp(CRLDistributionPoints_t *crldp, struct rpki_certificate *cer)
 {
-	if (!cer->meta->parent)
+	if (!cer_parent(cer))
 		panic("Certificate needs a default CRLDP, but lacks a parent");
-	ext_finish_crldp(crldp, cer->meta->parent->rpp.crldp);
+	ext_finish_crldp(crldp, cer_crldp(cer));
 }
 
 static void
 finish_aia(AuthorityInfoAccessSyntax_t *aia, struct field *extnValuef,
     struct rpki_certificate *cer)
 {
-	if (!cer->meta->parent)
+	struct rpki_certificate *parent;
+
+	parent = cer_parent(cer);
+	if (!parent)
 		panic("Certificate needs a default AIA, but lacks a parent");
-	ext_finish_aia(aia, extnValuef, cer->meta->parent->meta->uri);
+	ext_finish_aia(aia, extnValuef, parent->meta->uri);
 }
 
 static void
@@ -174,7 +184,7 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 
 	pr_debug("- Autofilling extensions");
 
-	extsf = fields_find(cer->meta->fields, "tbsCertificate.extensions");
+	extsf = fields_find(cer->objf, "tbsCertificate.extensions");
 	if (!extsf)
 		panic("Certificate lacks a 'tbsCertificate.extensions' field.");
 
@@ -239,7 +249,7 @@ update_signature(struct rpki_certificate *cer, EVP_PKEY *keys)
 {
 	SignatureValue_t signature;
 
-	if (fields_overridden(cer->meta->fields, "signature")) {
+	if (fields_overridden(cer->objf, "signature")) {
 		pr_debug("- Skipping signature");
 		return;
 	}
@@ -252,9 +262,35 @@ update_signature(struct rpki_certificate *cer, EVP_PKEY *keys)
 }
 
 void
-cer_generate_paths(struct rpki_certificate *cer)
+cer_finish_rpp(struct rpki_certificate *cer)
 {
-	cer->rpp = rpp_new(cer);
+	extern char const *rsync_uri;
+	extern char const *rrdp_uri;
+
+	char *extless;
+	struct rpki_certificate *parent;
+
+	extless = remove_extension(cer->meta->name);
+
+	if (!fields_overridden(cer->rppf, "uri")) {
+		cer->rpp.uri = join_paths(rsync_uri, extless);
+		pr_debug("- rpp.uri: %s", cer->rpp.uri);
+	}
+
+	if (!fields_overridden(cer->rppf, "path")) {
+		cer->rpp.path = pstrdup(extless);
+		pr_debug("- rpp.path: %s", cer->rpp.path);
+	}
+
+	if (!fields_overridden(cer->rppf, "notification")) {
+		parent = cer_parent(cer);
+		cer->rpp.notification = (parent == NULL)
+		    ? join_paths(rrdp_uri, "notification.xml")
+		    : parent->rpp.notification;
+		pr_debug("- rpp.notification: %s", cer->rpp.notification);
+	}
+
+	free(extless);
 }
 
 void
@@ -268,86 +304,76 @@ cer_finish_ta(struct rpki_certificate *ta)
 	update_signature(ta, ta->keys);
 }
 
-static void
-finish_rpp(struct rpki_certificate *cer, char *obj_name)
-{
-	struct rrdp_notification *notif;
-
-	if (fields_overridden(cer->meta->fields, "rpp.rpkiNotify"))
-		return;
-
-	pr_debug("- Autofilling rpkiNotify");
-
-	cer->rpp.rpkiNotify = cer->meta->parent->rpp.rpkiNotify;
-	if (cer->rpp.rpkiNotify == NULL) {
-		pr_trace("There's no rpkiNotify to inherit.");
-		return;
-	}
-
-	notif = notif_getsert(cer->meta->tree, cer->rpp.rpkiNotify);
-	notif_add_file(notif, obj_name);
-}
-
 void
 cer_finish_ca(struct rpki_certificate *ca)
 {
-	if (ca->meta->parent == NULL)
+	struct rpki_certificate *parent;
+
+	parent = cer_parent(ca);
+	if (parent == NULL)
 		panic("CA '%s' has no parent.", ca->meta->name);
+
 	if (ca->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ca->obj.tbsCertificate.issuer,
-		    ca->meta->parent->meta->name);
+		init_name(&ca->obj.tbsCertificate.issuer, parent->meta->name);
 	}
-	finish_rpp(ca, ca->meta->name);
 	finish_extensions(ca, CT_CA, NULL);
-	update_signature(ca, ca->meta->parent->keys);
+	update_signature(ca, parent->keys);
 }
 
 void
 cer_finish_ee(struct rpki_certificate *ee, struct rpki_object *so)
 {
-	if (ee->meta->parent == NULL)
+	struct rpki_certificate *parent;
+
+	parent = cer_parent(ee);
+	if (parent == NULL)
 		panic("EE '%s' has no parent.", ee->meta->name);
 
 	if (ee->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ee->obj.tbsCertificate.issuer,
-		    ee->meta->parent->meta->name);
+		init_name(&ee->obj.tbsCertificate.issuer, parent->meta->name);
 	}
-	finish_rpp(ee, so->name);
 	finish_extensions(ee, CT_EE, so->uri);
-	update_signature(ee, ee->meta->parent->keys);
+	update_signature(ee, parent->keys);
 }
 
 void
 cer_write(struct rpki_certificate *cer)
 {
 	asn1_write(cer->meta->path, &asn_DEF_Certificate, &cer->obj);
-	exec_mkdir(cer->rpp.path);
 }
 
-void
-cer_print_md(struct rpki_certificate *cer)
+struct rpki_certificate *
+cer_parent(struct rpki_certificate *cer)
 {
-	printf("- Type: Certificate\n");
-	printf("- RPP:\n");
-	printf("\t- caRepository: %s\n", cer->rpp.caRepository);
-	printf("\t- rpkiManifest: %s\n", cer->rpp.rpkiManifest);
-	printf("\t- crldp       : %s\n", cer->rpp.crldp);
-	printf("\t- rpkiNotify  : %s\n", cer->rpp.rpkiNotify);
-	printf("\t- Path        : %s\n", cer->rpp.path);
+	return meta_parent(cer->meta);
 }
 
-void
-cer_print_csv(struct rpki_certificate *cer)
+char const *
+cer_rpkiManifest(struct rpki_certificate *cer)
 {
-	meta_print_csv(cer->meta);
+	struct rpki_tree_node *child, *tmp;
 
-	csv_print3(cer->meta, "caRepository", cer->rpp.caRepository);
-	csv_print3(cer->meta, "rpkiManifest", cer->rpp.rpkiManifest);
-	csv_print3(cer->meta, "crldp", cer->rpp.crldp);
-	csv_print3(cer->meta, "rpkiNotify", cer->rpp.rpkiNotify);
-	csv_print3(cer->meta, "rpp", cer->rpp.path);
+	HASH_ITER(phook, cer->meta->node->children, child, tmp)
+		if (child->type == FT_MFT)
+			return child->meta.uri;
 
-	fields_print_csv(cer->meta->fields, cer->meta->name);
+	return NULL;
+}
+
+char const *
+cer_crldp(struct rpki_certificate *cer)
+{
+	struct rpki_tree_node *parent, *child, *tmp;
+
+	parent = cer->meta->node->parent;
+	if (!parent)
+		return NULL;
+
+	HASH_ITER(phook, parent->children, child, tmp)
+		if (child->type == FT_CRL)
+			return child->meta.uri;
+
+	return NULL;
 }

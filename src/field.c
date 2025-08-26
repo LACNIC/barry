@@ -890,7 +890,7 @@ get_sia_defaults(struct field *field)
 	 * Relying on the topmost field name is sufficient but not future-proof.
 	 */
 
-	while (field->parent->key != NULL)
+	while (strcmp(field->parent->key, "obj") != 0)
 		field = field->parent;
 
 	if (strcmp(field->key, "tbsCertificate") == 0)
@@ -1690,28 +1690,6 @@ print_filelist(struct dynamic_string *dstr, void *arg)
 }
 
 static error_msg
-parse_notif(struct field *rootf, struct kv_value *src, void *arg)
-{
-	struct rpki_certificate *cer = arg;
-
-	if (src->type != VALT_STR)
-		return NEED_STRING;
-
-	cer->rpp.rpkiNotify = pstrdup(src->v.str);
-	notif_getsert(cer->meta->tree, cer->rpp.rpkiNotify);
-
-	return NULL;
-}
-
-static void
-print_notif(struct dynamic_string *dstr, void *arg)
-{
-	struct rpki_certificate *cer = arg;
-	if (cer->rpp.rpkiNotify != NULL)
-		dstr_append(dstr, "%s", cer->rpp.rpkiNotify);
-}
-
-static error_msg
 parse_files(struct field *rootf, struct kv_value *src, void *dst)
 {
 	struct kv_node *node;
@@ -1772,7 +1750,6 @@ const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_ce
 const struct field_type ft_asn_cer = { "AS Resources", parse_asns, print_asns };
 const struct field_type ft_revoked = { "Revoked Certificates", parse_revoked_list, print_revokeds };
 const struct field_type ft_filelist = { "File List", parse_filelist, print_filelist };
-const struct field_type ft_notif = { "Notification", parse_notif, print_notif };
 const struct field_type ft_files = { "Snapshot Files", parse_files, print_files };
 
 struct field *

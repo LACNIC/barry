@@ -20,6 +20,7 @@ field_test_SOURCES += ../../src/alloc.c ../../src/alloc.h
 field_test_SOURCES += ../../src/asn1.c ../../src/asn1.h
 field_test_SOURCES += ../../src/csv.c ../../src/csv.h
 field_test_SOURCES += ../../src/ext.c ../../src/ext.h
+field_test_SOURCES += ../../src/file.c ../../src/file.h
 field_test_SOURCES += ../../src/libcrypto.c ../../src/libcrypto.h
 field_test_SOURCES += ../../src/oid.c ../../src/oid.h
 field_test_SOURCES += ../../src/str.c ../../src/str.h

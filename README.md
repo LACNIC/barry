@@ -88,25 +88,25 @@ It'll make a bunch of assumptions and output the following file hierarchy:
 
 ./rsync/ta.cer
 
-./rsync/rpp0/ca1.cer	# "RPP" stands for "Repository Publication Point."
-./rsync/rpp0/ca2.cer	# They're numbered monotonically.
-./rsync/rpp0/ca3.cer	# Hence, "rpp0" is always the TA's RPP.
-./rsync/rpp0/0.crl
-./rsync/rpp0/0.mft
+./rsync/ta/ca1.cer	# The default name of each Repository Publication Point
+./rsync/ta/ca2.cer	# is the name of its CA's certificate, minus extension.
+./rsync/ta/ca3.cer
+./rsync/ta/ta.crl	# CRLs & Manifests are spawned and also named automatically after the parent.
+./rsync/ta/ta.mft	# You can declare them in the tree if you don't want this.
 
-./rsync/rpp1/roa1A.roa
-./rsync/rpp1/roa1B.roa
-./rsync/rpp1/1.crl	# CRLs & Manifests are spawned and named automatically.
-./rsync/rpp1/1.mft	# You can declare them in the tree if you don't want this.
+./rsync/ca1/roa1A.roa
+./rsync/ca1/roa1B.roa
+./rsync/ca1/ca1.crl
+./rsync/ca1/ca1.mft
 
-./rsync/rpp2/roa2.roa
-./rsync/rpp2/2.crl
-./rsync/rpp2/2.mft
+./rsync/ca2/roa2.roa
+./rsync/ca2/ca2.crl
+./rsync/ca2/ca2.mft
 
-./rsync/rpp3/roa3A.roa
-./rsync/rpp3/roa3B.roa
-./rsync/rpp3/3.crl
-./rsync/rpp3/3.mft
+./rsync/ca3/roa3A.roa
+./rsync/ca3/roa3B.roa
+./rsync/ca3/ca3.crl
+./rsync/ca3/ca3.mft
 ```
 
 Serve them via rsync, and you've built yourself a "validateable" Repository Instance (assuming your RP can be configured to allow requests to localhost):
@@ -160,10 +160,10 @@ ta.cer
 	roa.roa
 
 [node: roa.roa]
-content.encapContentInfo.eContent.version = 2
+obj.content.encapContentInfo.eContent.version = 2
 ```
 
-Basically, you can override fields from the objects by appending an "attributes" section to the RD. Enclose the name of the file in brackets (as a header), then override needed values one line at a time. You can do this for all the declared files in the tree. The keys of the fields are dot-stringified versions of their official names from the [RFC ASN.1 definitions](https://github.com/NICMx/libasn1fort/tree/main/asn1), though there are additional keys we'll discuss later.
+Basically, you can override fields from the objects by appending an "attributes" section to the RD. Enclose the name of the file in brackets (as a header), then override needed values one line at a time. You can do this for all the declared files in the tree. The keys of the fields are dot-stringified versions of their official names from the [RFC ASN.1 definitions](https://github.com/NICMx/libasn1fort/tree/main/asn1) (plus an "`obj.`" prefix), though there are additional keys we'll discuss later.
 
 Processing that file should result in a repository that might be rejected by a current validator:
 
@@ -172,12 +172,12 @@ $ rm -rf rsync/
 $ barry bad.repo
 $ find rsync/ -type f	# Just to see them
 rsync/ta.cer
-rsync/rpp0/roa.roa
-rsync/rpp0/0.crl
-rsync/rpp0/0.mft
+rsync/ta/roa.roa
+rsync/ta/ta.crl
+rsync/ta/ta.mft
 $ fort --mode=standalone --tal=bad.tal --validation-log.enabled --validation-log.level=info --log.level=info
 ...
-Jul 14 13:26:41 ERR [Validation]: rsync://localhost:8873/rpki/rpp0/roa.roa: ROA's version (2) is nonzero.
+Jul 14 13:26:41 ERR [Validation]: rsync://localhost:8873/rpki/ta/roa.roa: ROA's version (2) is nonzero.
 ...
 Jul 14 13:26:41 INF: Validation finished:
 Jul 14 13:26:41 INF: - Valid ROAs: 0
@@ -192,10 +192,10 @@ By default, `barry` tries to keep quiet. Add `-p (markdown|csv)` to print the ob
 
 ```bash
 $ echo "ta.cer" > minimal.repo
-$ barry -p markdown minimal.repo > tree.md
+$ barry -p csv minimal.repo > tree.csv
 ```
 
-[This](sample/tree.md) would be `tree.md`.
+[This](sample/tree.csv) would be `tree.csv`.
 
 Incidentally, this is an okay way to find all the available keys for a given file type.
 
@@ -214,17 +214,19 @@ The key-value section is a JSON-adjacent hierarchy. Here is an example in which 
 
 ```
 [node: ta.cer]
-"tbsCertificate" = {
-	"validity" = {
-		"notBefore" = "2025-06-01T00:00:00Z",
-		"notAfter" = "2026-06-01T00:00:00Z"
-	},
-	"extensions" = {
-		"ip" = { 
-			"extnValue" = [
-				"192.0.2.0/24-28",
-				"2001:db8::/64"
-			]
+"obj" = {
+	"tbsCertificate" = {
+		"validity" = {
+			"notBefore" = "2025-06-01T00:00:00Z",
+			"notAfter" = "2026-06-01T00:00:00Z"
+		},
+		"extensions" = {
+			"ip" = { 
+				"extnValue" = [
+					"192.0.2.0/24-28",
+					"2001:db8::/64"
+				]
+			}
 		}
 	}
 }
@@ -244,7 +246,7 @@ Hence, the example above is equivalent to
 ```
 [node: ta.cer]
 # This line is a comment <-- 1
-tbsCertificate = { # <-- 4
+obj.tbsCertificate = { # <-- 4, 5
 	validity = {
 		notBefore = 2025-06-01T00:00:00Z, # <-- 4 (x2)
 		notAfter = 2026-06-01T00:00:00Z
@@ -260,9 +262,9 @@ Which is also equivalent to
 
 ```
 [node: ta.cer]
-tbsCertificate.validity.notBefore = 2025-06-01T00:00:00Z
-tbsCertificate.validity.notAfter = 2026-06-01T00:00:00Z
-tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24-28, 2001:db8::/64 ]
+obj.tbsCertificate.validity.notBefore = 2025-06-01T00:00:00Z
+obj.tbsCertificate.validity.notAfter = 2026-06-01T00:00:00Z
+obj.tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24-28, 2001:db8::/64 ]
 ```
 
 (See [Numerics](#numerics) below for an example of 6.)
@@ -275,33 +277,33 @@ Because of their numeric natures, `INTEGER`, `BOOLEAN`s, `OCTET STRING`s, `BIT S
 
 ```
 # INTEGER
-tbsCertificate.version = 4660
-tbsCertificate.version = 0x1234
-tbsCertificate.version = 0b0001001000110100
+obj.tbsCertificate.version = 4660
+obj.tbsCertificate.version = 0x1234
+obj.tbsCertificate.version = 0b0001001000110100
 
 # BOOLEAN
-tbsCertificate.extensions.bc.critical = 9999
+obj.tbsCertificate.extensions.bc.critical = 9999
 
 # OCTET STRING
-content.signerInfos.0.signature = 4660
+obj.content.signerInfos.0.signature = 4660
 
 # BIT STRING
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1234
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1234
 
 # ANY
-tbsCertificate.signature.parameters = 0b0001001000110100
+obj.tbsCertificate.signature.parameters = 0b0001001000110100
 ```
 
 Hexadecimals and binaries are simultaneously integers and byte arrays. They can be very long, and you get one byte every two hexadecimal digits or eight binary ones:
 
 ```
 # Array: { 0x12, 0x34, 0x56 }
-tbsCertificate.signature.parameters = 0x123456
+obj.tbsCertificate.signature.parameters = 0x123456
 # BTW: You can use colons or underscores as visual separators.
 # If you quote the number, you can also use whitespace.
-tbsCertificate.signature.parameters = "0b_0001:0010_0011,0100 0101 0110"
+obj.tbsCertificate.signature.parameters = "0b_0001:0010_0011,0100 0101 0110"
 # Note, quoted strings are allowed to span several lines.
-tbsCertificate.signature.parameters = "0x
+obj.tbsCertificate.signature.parameters = "0x
 	00a1 00a2 00a3 00a4 00a5 00a6 00a7 00a8
 	80b1 80b2 80b3 80b4 80b5 80b6 80b7 80b8
 	A0c1 A0c2 A0c3 A0c4 A0c5 00c6 A0c7 A0c8
@@ -314,19 +316,19 @@ Also notice, this is the human-readable value. It later gets DER-encoded, which 
 ```
 # This INTEGER Becomes { 2, 1, 1 } when encoded.
 # (2 = INTEGER type, 1 = length, 1 = value, leading zeroes excluded)
-tbsCertificate.version = 0x00000001
+obj.tbsCertificate.version = 0x00000001
 # This ANY actually encodes into { 0, 0, 0, 1 }.
-tbsCertificate.signature.parameters = 0x00000001
+obj.tbsCertificate.signature.parameters = 0x00000001
 ```
 
 If you want a `BIT STRING` whose bit count is not a multiple of 8, use hexadecimal or binary format, then a prefix length (which behaves pretty much like in IP addresses). The following three are equivalent:
 
 ```
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b:11:11:10
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b:11:11:10
 # The /6 chops off the last two bits
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0xF8/6
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0xF8/6
 # The /6 actually adds a zero, because there are only 5 digits
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b11111/6
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b11111/6
 ```
 
 (Please note that prefixing swaps the anchoring of the number! As an `INTEGER`, `0x1234` equals `0x001234`, but `0x1234/24` equals `0x123400`.)
@@ -334,15 +336,15 @@ tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0b11111/6
 Prefix lengths give you free padding, I guess. The following two are equivalent:
 
 ```
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1000000000000000000000000000000000
-tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x10/136
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1000000000000000000000000000000000
+obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x10/136
 ```
 
 Prefixing is actually also compatible with the other "numeric" data types, but they actually require the length to be a multiple of 8. You may abuse this to produce big numbers:
 
 ```
 # Big integer whose hexadecimal representation consists of '1' followed by 248 zeroes.
-content.encapContentInfo.eContent.version = 0x01/1000
+obj.tbsCertificate.version = 0x01/1000
 ```
 
 I haven't implemented negative `INTEGER`s yet.
@@ -352,9 +354,9 @@ I haven't implemented negative `INTEGER`s yet.
 `BOOLEAN`s are numeric data types, but they also allow case-sensitive `true` and `false`:
 
 ```
-tbsCertificate.extensions.ip.critical = 0xFF
-tbsCertificate.extensions.asn.critical = true
-tbsCertificate.extensions.ski.critical = false
+obj.tbsCertificate.extensions.ip.critical = 0xFF
+obj.tbsCertificate.extensions.asn.critical = true
+obj.tbsCertificate.extensions.ski.critical = false
 ```
 
 Despite access to the numeric parser, booleans are internally managed as `int`s. This means you cannot assign big integers to them; your numeric boolean inputs need to be constrained to the range [`INT_MIN`, `INT_MAX`]. (The values of `INT_MIN` and `INT_MAX` depend on your system.)
@@ -366,7 +368,7 @@ That said, DER defines a very limited boolean range. `false` needs to be encoded
 Only the numerical representation is supported.
 
 ```
-content.encapContentInfo.eContentType = 1.2.840.113549.1.9.16.1.26
+obj.content.encapContentInfo.eContentType = 1.2.840.113549.1.9.16.1.26
 ```
 
 ### Dates
@@ -374,7 +376,7 @@ content.encapContentInfo.eContentType = 1.2.840.113549.1.9.16.1.26
 Only the `%Y-%m-%dT%H:%M:%SZ` format is supported right now.
 
 ```
-tbsCertificate.validity.notBefore = 2025-07-15T19:39:38Z
+obj.tbsCertificate.validity.notBefore = 2025-07-15T19:39:38Z
 ```
 
 Applies to both `Time`s and `GeneralizedTime`s. Notice the UTC+0 enforcement.
@@ -384,7 +386,7 @@ Applies to both `Time`s and `GeneralizedTime`s. Notice the UTC+0 enforcement.
 Names consist of a [single choice](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L240-L241) (`rdnSequence`) consisting of [arrays](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L243) of [arrays of `AttributeNameAndValue`s](https://github.com/NICMx/libasn1fort/blob/main/asn1/rfc5280-a.1.asn1#L247). Formally, an overly-populated certificate name `subject` might look like this:
 
 ```
-tbsCertificate.subject.rdnSequence = [
+obj.tbsCertificate.subject.rdnSequence = [
 	[ # RelativeDistinguishedName 1
 		{ # AttributeTypeAndValue 1
 			type = 2.5.4.3,   # commonName
@@ -420,18 +422,18 @@ By default, your certificates get the following extension lists:
 
 ```
 # TAs
-tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, asn ]
+obj.tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, asn ]
 
 # Regular CAs
-tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
+obj.tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
 
 # End-Entities
-content.certificates.0.tbsCertificate.extensions = [
+obj.content.certificates.0.tbsCertificate.extensions = [
 	ski, aki, ku, crldp, aia, sia, cp, ip, asn
 ]
 
 # CRLs
-tbsCertList.crlExtensions = [ aki, crln ]
+obj.tbsCertList.crlExtensions = [ aki, crln ]
 ```
 
 The presently implemented extensions are
@@ -453,13 +455,13 @@ The presently implemented extensions are
 Every extension gets an `extnID` OID, a `critical` boolean and a type-dependent `extnValue`, all editable through subfields:
 
 ```
-tbsCertificate.extensions.ip.extnID = 1.3.6.1.5.5.7.1.28
-tbsCertificate.extensions.ip.critical = true
-tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24, 2001:db8::/96 ]
-tbsCertificate.extensions.asn.extnID = 1.3.6.1.5.5.7.1.29
-tbsCertificate.extensions.asn.critical = true
-tbsCertificate.extensions.asn.extnValue.asnum = [ 0x1234, 0x5678 ]
-tbsCertificate.extensions.asn.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
+obj.tbsCertificate.extensions.ip.extnID = 1.3.6.1.5.5.7.1.28
+obj.tbsCertificate.extensions.ip.critical = true
+obj.tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24, 2001:db8::/96 ]
+obj.tbsCertificate.extensions.asn.extnID = 1.3.6.1.5.5.7.1.29
+obj.tbsCertificate.extensions.asn.critical = true
+obj.tbsCertificate.extensions.asn.extnValue.asnum = [ 0x1234, 0x5678 ]
+obj.tbsCertificate.extensions.asn.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
 ```
 
 If you want a different extension list, override it:
@@ -467,17 +469,17 @@ If you want a different extension list, override it:
 ```
 # Replaces the extension list with an IP extension (type "ip", name "ip")
 # and an ASN extension (type "asn", name "asn").
-tbsCertificate.extensions = [ ip, asn ]
+obj.tbsCertificate.extensions = [ ip, asn ]
 
 # The "ip" label now refers to the first extension (because that's the one named "ip" now),
 # not the (now nonexistent) 6th or 9th.
-tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
+obj.tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 ```
 
 You can customize the extension names by declaring the `extensions` object as a map. This is useful if you want to list multiple extensions of the same type:
 
 ```
-tbsCertificate.extensions = {
+obj.tbsCertificate.extensions = {
 	# <name> = <type>
 	red = ip,
 	blue = asn,
@@ -488,7 +490,7 @@ tbsCertificate.extensions = {
 }
 
 # Overrides the OID of the third ip extension
-tbsCertificate.extensions.orange.extnID = 1.2.3.4.5
+obj.tbsCertificate.extensions.orange.extnID = 1.2.3.4.5
 ```
 
 Whether declared as a set or map, the final list will contain the extensions in the same order in which they were declared.
@@ -496,7 +498,7 @@ Whether declared as a set or map, the final list will contain the extensions in 
 ### IP Resources
 
 ```
-content.encapContentInfo.eContent.ipAddrBlocks = [
+obj.content.encapContentInfo.eContent.ipAddrBlocks = [
 	192.0.2.0/24,
 	203.0.113.0,
 	2001:db8::/40-48
@@ -523,11 +525,11 @@ Implies (with possible hashes)
 
 ```
 [node: mft.mft]
-content.encapContentInfo.eContent.fileList = {
-	# <File name>: <Hash>
-	crl.crl: 0x14A9B4039E1EDC10C1314C435828B418417E8B152CD173696B776EF24D9A9E41,
-	A.cer:   0x5EBFE949DAB77A1AED18BC7EDE86C0F4CC784A2227385E6F04461EE85BD7F2C9,
-	B.cer:   0x237FF39E12A09160CC2B365BB155D72A25E1CF9073CD583AADAA35E2872AD104
+obj.content.encapContentInfo.eContent.fileList = {
+	# <File name> = <Hash>
+	crl.crl = 0x14A9B4039E1EDC10C1314C435828B418417E8B152CD173696B776EF24D9A9E41,
+	A.cer   = 0x5EBFE949DAB77A1AED18BC7EDE86C0F4CC784A2227385E6F04461EE85BD7F2C9,
+	B.cer   = 0x237FF39E12A09160CC2B365BB155D72A25E1CF9073CD583AADAA35E2872AD104
 }
 ```
 
@@ -537,18 +539,18 @@ Since the files are `fileList`ed in the order in which they were declared in the
 
 ```
 # Indexing is zero-based
-content.encapContentInfo.eContent.fileList.1.hash = 0x010203
-content.encapContentInfo.eContent.fileList.2.file = potatoes
+obj.content.encapContentInfo.eContent.fileList.1.hash = 0x010203
+obj.content.encapContentInfo.eContent.fileList.2.file = potatoes
 ```
 
 Or just override the entire list however you see fit:
 
 ```
-content.encapContentInfo.eContent.fileList = {
-	A.cer:           0x010203,
-	nonexistent.cer: 0x040506,
-	mft.mft:         0x112233,
-	foobar:          0x55555555555555
+obj.content.encapContentInfo.eContent.fileList = {
+	A.cer           = 0x010203,
+	nonexistent.cer = 0x040506,
+	mft.mft         = 0x112233,
+	foobar          = 0x55555555555555
 }
 ```
 
@@ -567,7 +569,7 @@ By default, all the non-TA tree files `barry` produces are snapshot'd into `<RRD
 
 > Note: If `--rrdp-uri` is an empty string, RRDP will be completely disabled. (SIAs will not contain `rpkiNotify`s and RRDP files will not be generated.) Otherwise, if `rrdp-path` is an empty string, the SIAs will contain the corresponding `rpkiNotify`s, but no RRDP XMLs will be generated.
 
-Every certificate in the tree has an additional key-value URL named `rpp.rpkiNotify`, which is normally autocomputed early in the repository building process. If you don't override anything else, all of said certificate's descendants will be snapshot'd into the `rpp.rpkiNotify` RRDP context:
+Every certificate in the tree has an additional key-value URL named `rpp.notification`, which is normally autocomputed early in the repository building process. If you don't override anything else, all of said certificate's descendants will be snapshot'd into the `rpp.notification` RRDP context:
 
 ```
 ta.cer
@@ -577,31 +579,31 @@ ta.cer
 	B.cer
 		B1.roa
 		B2.cer
-			BB1.roa
+			B2a.roa
 
 [node: ta.cer]
-rpp.rpkiNotify = https://potato/rrdp/notification.xml
+rpp.notification = https://potato/rrdp/notification.xml
 
 [node: B.cer]
-rpp.rpkiNotify = https://tomato/rrdp/notification.xml
+rpp.notification = https://tomato/rrdp/notification.xml
 
 [node: B2.cer]
-rpp.rpkiNotify = https://lettuce/rrdp/notification.xml
+rpp.notification = https://lettuce/rrdp/notification.xml
 ```
 
 - `potato`'s snapshot will contain `A.cer`, `A1.roa`, `A2.roa` and `B.cer`.
 - `tomato`'s snapshot will contain `B1.roa` and `B2.cer`.
-- `lettuce`'s snapshot will contain `BB1.roa`.
+- `lettuce`'s snapshot will contain `B2a.roa`.
 
-> Note: If the object is the TA, its default `rpp.rpkiNotify` is `[RRDP-URI]/snapshot.xml`. Otherwise, its default is inherited from its parent.
+> Note: If the object is the TA, its default `rpp.notification` is `[RRDP-URI]/snapshot.xml`. Otherwise, its default is inherited from its parent.
 
-> Note: `rpp.rpkiNotify` is also copied to the certificate's SIA extension, though [that can also be overridden](test/functional/rd/gname.rd).
+> Note: `rpp.notification` is also copied to the certificate's `rpkiNotify` (in its SIA extension), though [that can also be overridden](test/functional/rd/gname.rd).
 
 You can also induce further chaos by overriding the files actually contained by each snapshot, whether it makes sense or not:
 
 ```
-[notification: https://potato/rrdp/notification.xml]
-snapshot.files = [ ta.cer, A1.roa, A1.roa, BB1.roa ]
+[notification: https://tomato/rrdp/notification.xml]
+snapshot.files = [ ta.cer, A1.roa, A1.roa, B2a.roa ]
 ```
 
 I haven't implemented deltas yet.

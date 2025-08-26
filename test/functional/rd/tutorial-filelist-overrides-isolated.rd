@@ -5,5 +5,5 @@ ta.cer
 	B.cer
 
 [node: mft.mft]
-content.encapContentInfo.eContent.fileList.1.hash = 0x010203
-content.encapContentInfo.eContent.fileList.2.file = potatoes
+obj.content.encapContentInfo.eContent.fileList.1.hash = 0x010203
+obj.content.encapContentInfo.eContent.fileList.2.file = potatoes

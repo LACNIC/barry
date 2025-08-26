@@ -1,6 +1,6 @@
 ta.cer
 
 [node: ta.cer]
-tbsCertificate.extensions.ip.critical = 0xFF
-tbsCertificate.extensions.asn.critical = true
-tbsCertificate.extensions.ski.critical = false
+obj.tbsCertificate.extensions.ip.critical = 0xFF
+obj.tbsCertificate.extensions.asn.critical = true
+obj.tbsCertificate.extensions.ski.critical = false

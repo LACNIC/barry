@@ -48,7 +48,7 @@ finish_signed_data(struct signed_object *so, asn_TYPE_descriptor_t *td)
 	SignedData_t *sd = &so->sd;
 
 	/* Needs the SO _t */
-	if (!fields_overridden(so->meta->fields, "content.encapContentInfo.eContent")) {
+	if (!fields_overridden(so->objf, "content.encapContentInfo.eContent")) {
 		pr_debug("- Encoding the eContent");
 		sd->encapContentInfo.eContent = pzalloc(sizeof(OCTET_STRING_t));
 		der_encode_8str(td, &so->obj, sd->encapContentInfo.eContent);
@@ -125,23 +125,25 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 }
 
 struct signed_object *
-signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
+signed_object_new(struct rpki_tree_node *node, int nid, struct field **eContent)
 {
 	struct signed_object *so;
 	SignedData_t *sd;
 	struct field *sdf;
 	DigestAlgorithmIdentifier_t *dai;
 	struct field *ecif;
-	struct field *cersf, *cerf;
+	struct field *cersf;
 	struct field *sisf, *sif;
 
 	so = pzalloc(sizeof(struct signed_object));
-	so->meta = meta;
+
+	so->meta = &node->meta;
+	so->objf = field_add(node->fields, "obj", &ft_obj, so, 0);
 	sd = &so->sd;
 
 	init_oid(&so->ci.contentType, NID_pkcs7_signed);
-	field_add(meta->fields, "contentType", &ft_oid, &so->ci.contentType, 0);
-	sdf = field_add(meta->fields, "content", &ft_obj, &so->ci.content, 0);
+	field_add(so->objf, "contentType", &ft_oid, &so->ci.contentType, 0);
+	sdf = field_add(so->objf, "content", &ft_obj, &so->ci.content, 0);
 
 	init_INTEGER(&sd->version, 3);
 	field_add(sdf, "version", &ft_int, &sd->version, 0);
@@ -161,11 +163,10 @@ signed_object_new(struct rpki_object *meta, int nid, struct field **eContent)
 	sd->certificates = pzalloc(sizeof(struct CertificateSet));
 	INIT_ASN1_ARRAY(&sd->certificates->list, 1, ANY_t);
 	cersf = field_add(sdf, "certificates", NULL, NULL, 0);
-	cerf = field_add(cersf, "0", &ft_obj, &so->ee, 0);
-	so->ee_meta.name = meta->name;
-	so->ee_meta.tree = meta->tree;
-	so->ee_meta.parent = meta->parent;
-	so->ee_meta.fields = cerf;
+	so->ee.objf = field_add(cersf, "0", &ft_obj, &so->ee, 0);
+	so->ee_meta.name = so->meta->name;
+	so->ee_meta.tree = so->meta->tree;
+	so->ee_meta.node = so->meta->node;
 	cer_init(&so->ee, &so->ee_meta, CT_EE);
 
 	/* TODO crls not implemented yet */
@@ -184,11 +185,4 @@ signed_object_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 {
 	cer_finish_ee(&so->ee, so->meta);
 	finish_content_info(so, td);
-}
-
-void
-so_print_csv(struct signed_object *so)
-{
-	meta_print_csv(so->meta);
-	fields_print_csv(so->meta->fields, so->meta->name);
 }

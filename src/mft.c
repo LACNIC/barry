@@ -3,6 +3,7 @@
 #include "asn1.h"
 #include "crl.h"
 #include "field.h"
+#include "file.h"
 #include "libcrypto.h"
 #include "oid.h"
 
@@ -55,7 +56,7 @@ mft_new(struct rpki_tree_node *node)
 	Manifest_t *mft;
 	struct field *eContent, *fileList;
 
-	so = signed_object_new(&node->meta, NID_id_ct_rpkiManifest, &eContent);
+	so = signed_object_new(node, NID_id_ct_rpkiManifest, &eContent);
 	mft = &so->obj.mft;
 
 	mft->version = intmax2INTEGER(0);
@@ -77,24 +78,6 @@ mft_new(struct rpki_tree_node *node)
 	init_filelist(mft, node, fileList);
 
 	return so;
-}
-
-void
-mft_generate_paths(struct signed_object *so)
-{
-	so->meta->parent->rpp.rpkiManifest = so->meta->uri;
-}
-
-void
-mft_fix_filelist_crl(struct signed_object *mft, char const *crl_name)
-{
-	struct Manifest__fileList *file_list;
-	FileAndHash_t *file;
-
-	file_list = &mft->obj.mft.fileList;
-	file = file_list->list.array[file_list->list.count - 1];
-
-	init_8str(&file->file, crl_name);
 }
 
 bool
@@ -119,17 +102,19 @@ find_sibling(struct rpki_tree_node *siblings, IA5String_t *name)
 static void
 finish_fileList(struct signed_object *so, struct rpki_tree_node *siblings)
 {
+	extern char const *rsync_path;
+
 	Manifest_t *mft;
 	struct field *rootf;
 	int f;
 	FileAndHash_t *file;
 	struct rpki_tree_node *sibling;
+	char *path;
 	unsigned char hash[EVP_MAX_MD_SIZE];
 	unsigned int hlen;
 
 	mft = &so->obj.mft;
-	rootf = fields_find(so->meta->fields,
-	    "content.encapContentInfo.eContent.fileList");
+	rootf = fields_find(so->objf, "content.encapContentInfo.eContent.fileList");
 	if (!rootf)
 		return;
 
@@ -156,7 +141,11 @@ finish_fileList(struct signed_object *so, struct rpki_tree_node *siblings)
 		}
 
 		pr_trace("  + filelist %d: hashing", f);
-		sha256_file(sibling->meta.path, hash, &hlen);
+
+		path = join_paths(rsync_path, sibling->meta.path);
+		sha256_file(path, hash, &hlen);
+		free(path);
+
 		file->hash.buf = pzalloc(hlen);
 		memcpy(file->hash.buf, hash, hlen);
 		file->hash.size = hlen;
@@ -174,16 +163,4 @@ void
 mft_write(struct signed_object *so)
 {
 	asn1_write(so->meta->path, &asn_DEF_ContentInfo, &so->ci);
-}
-
-void
-mft_print_md(struct signed_object *so)
-{
-	printf("- Type: Manifest\n");
-}
-
-void
-mft_print_csv(struct signed_object *so)
-{
-	so_print_csv(so);
 }

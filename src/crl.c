@@ -24,7 +24,7 @@ init_extensions_crl(struct rpki_crl *crl, struct field *extf)
 }
 
 struct rpki_crl *
-crl_new(struct rpki_object *meta)
+crl_new(struct rpki_tree_node *node)
 {
 	struct rpki_crl *crl;
 	TBSCertList_t *tbs;
@@ -32,10 +32,11 @@ crl_new(struct rpki_object *meta)
 	struct field *extf;
 
 	crl = pzalloc(sizeof(struct rpki_crl));
-	crl->meta = meta;
+	crl->meta = &node->meta;
+	crl->objf = field_add(node->fields, "obj", &ft_obj, &crl->obj, 0);
 
 	tbs = &crl->obj.tbsCertList;
-	tbsf = field_add(meta->fields, "tbsCertList", &ft_obj, tbs, 0);
+	tbsf = field_add(crl->objf, "tbsCertList", &ft_obj, tbs, 0);
 
 	tbs->version = intmax2INTEGER(1);
 	field_add(tbsf, "version", &ft_int, &tbs->version, sizeof(Version_t));
@@ -65,18 +66,12 @@ crl_new(struct rpki_object *meta)
 
 	init_oid(&crl->obj.signatureAlgorithm.algorithm, NID_sha256WithRSAEncryption);
 	crl->obj.signatureAlgorithm.parameters = create_null();
-	field_add_algorithm(meta->fields, "signatureAlgorithm", &crl->obj.signatureAlgorithm);
+	field_add_algorithm(crl->objf, "signatureAlgorithm", &crl->obj.signatureAlgorithm);
 
 	/* crl->signature: Postpone (needs all other fields ready) */
-	field_add(meta->fields, "signature", &ft_bitstr, &crl->obj.signature, 0);
+	field_add(crl->objf, "signature", &ft_bitstr, &crl->obj.signature, 0);
 
 	return crl;
-}
-
-void
-crl_generate_paths(struct rpki_crl *crl)
-{
-	crl->meta->parent->rpp.crldp = crl->meta->uri;
 }
 
 static void
@@ -84,14 +79,14 @@ update_signature(struct rpki_crl *crl)
 {
 	SignatureValue_t signature;
 
-	if (fields_overridden(crl->meta->fields, "signature")) {
+	if (fields_overridden(crl->objf, "signature")) {
 		pr_debug("- Skipping signature");
 		return;
 	}
 
 	pr_debug("- Signing");
 	signature = do_sign(&crl->obj.tbsCertList, &asn_DEF_TBSCertList,
-	    crl->meta->parent->keys, false);
+	    crl_parent(crl)->keys, false);
 	crl->obj.signature.buf = signature.buf;
 	crl->obj.signature.size = signature.size;
 }
@@ -99,9 +94,12 @@ update_signature(struct rpki_crl *crl)
 static void
 finish_aki(AuthorityKeyIdentifier_t *aki, struct rpki_crl *crl)
 {
-	if (!crl->meta->parent)
+	struct rpki_certificate *parent;
+
+	parent = crl_parent(crl);
+	if (!parent)
 		panic("CRL needs a default AKI, but lacks a parent");
-	ext_finish_aki(aki, &crl->meta->parent->SPKI);
+	ext_finish_aki(aki, &parent->SPKI);
 }
 
 static void
@@ -111,7 +109,7 @@ finish_extensions(struct rpki_crl *crl)
 	struct field *extsf;
 	struct field *extnValuef;
 
-	extsf = fields_find(crl->meta->fields, "tbsCertList.crlExtensions");
+	extsf = fields_find(crl->objf, "tbsCertList.crlExtensions");
 	if (!extsf)
 		panic("CRL lacks a 'tbsCertList.crlExtensions' field.");
 
@@ -126,33 +124,14 @@ finish_extensions(struct rpki_crl *crl)
 	ext_compile(&crl->exts, &crl->obj.tbsCertList.crlExtensions);
 }
 
-static void
-finish_rrdp(struct rpki_crl *crl)
-{
-	struct rrdp_notification *notif;
-	char const *rpkiNotify;
-
-	pr_debug("- Adding CRL to the RRDP Notification");
-
-	rpkiNotify = crl->meta->parent->rpp.rpkiNotify;
-	if (rpkiNotify == NULL) {
-		pr_trace("Parent has no rpkiNotify.");
-		return;
-	}
-
-	notif = notif_getsert(crl->meta->tree, rpkiNotify);
-	notif_add_file(notif, crl->meta->name);
-}
-
 void
 crl_finish(struct rpki_crl *crl)
 {
 	if (crl->obj.tbsCertList.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
 		init_name(&crl->obj.tbsCertList.issuer,
-		    crl->meta->parent->meta->name);
+		    crl_parent(crl)->meta->name);
 	}
-	finish_rrdp(crl);
 	finish_extensions(crl);
 	update_signature(crl);
 }
@@ -163,15 +142,8 @@ crl_write(struct rpki_crl *crl)
 	asn1_write(crl->meta->path, &asn_DEF_CertificateList, &crl->obj);
 }
 
-void
-crl_print_md(struct rpki_crl *crl)
+struct rpki_certificate *
+crl_parent(struct rpki_crl *crl)
 {
-	printf("- Type: CRL\n");
-}
-
-void
-crl_print_csv(struct rpki_crl *crl)
-{
-	meta_print_csv(crl->meta);
-	fields_print_csv(crl->meta->fields, crl->meta->name);
+	return meta_parent(crl->meta);
 }
