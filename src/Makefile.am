@@ -1,4 +1,4 @@
-bin_PROGRAMS = barry
+bin_PROGRAMS = barry delta
 
 barry_SOURCES = main.c
 
@@ -31,4 +31,20 @@ barry_CFLAGS += -O2 -g
 if BACKTRACE_ENABLED
 barry_CFLAGS += -DBACKTRACE_ENABLED -rdynamic
 endif
-barry_LDADD = -lasn1fort
+barry_CFLAGS += ${XML2_CFLAGS}
+barry_LDADD = -lasn1fort ${XML2_LIBS}
+
+delta_SOURCES = delta.c delta.h
+delta_SOURCES += alloc.c alloc.h
+delta_SOURCES += asn1.c asn1.h
+delta_SOURCES += file.c file.h
+delta_SOURCES += libcrypto.c libcrypto.h
+
+delta_CFLAGS  = -Wall -Wpedantic
+delta_CFLAGS += -std=gnu11
+delta_CFLAGS += -O2 -g
+if BACKTRACE_ENABLED
+delta_CFLAGS += -DBACKTRACE_ENABLED -rdynamic
+endif
+delta_CFLAGS += ${XML2_CFLAGS}
+delta_LDADD = -lasn1fort ${XML2_LIBS}

@@ -259,13 +259,7 @@ asn1_write(char *path, const asn_TYPE_descriptor_t *td, const void *obj)
 	int fd;
 
 	path = join_paths(rsync_path, path);
-	exec_mkdir_p(path, false);
-
-	pr_trace("echo 'Beep boop' > %s", path);
-
-	fd = open(path, O_WRONLY | O_CREAT, 0640);
-	if (fd < 0)
-		panic("open(%s): %s", path, strerror(errno));
+	fd = write_open(path);
 
 	der_encode(td, obj, write_bytes, &fd);
 

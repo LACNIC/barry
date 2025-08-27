@@ -1,5 +1,6 @@
 # Binaries
 src/barry
+src/delta
 *.o
 *.test
 

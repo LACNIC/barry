@@ -3,8 +3,10 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "alloc.h"
 #include "print.h"
@@ -45,6 +47,28 @@ remove_extension(char const *filename)
 {
 	char const *dot = strrchr(filename, '.');
 	return dot ? pstrndup(filename, dot - filename) : pstrdup(filename);
+}
+
+int
+write_open(char const *path)
+{
+	int error;
+	int fd;
+
+	exec_mkdir_p(path, false);
+
+	if (unlink(path)) {
+		error = errno;
+		if (error != ENOENT)
+			panic("Cannot remove old file: %s", strerror(error));
+	}
+
+	pr_trace("echo 'Beep boop' > %s", path);
+	fd = open(path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	if (fd < 0)
+		panic("open(%s): %s", path, strerror(errno));
+
+	return fd;
 }
 
 /* Does not care if the path already exists. */

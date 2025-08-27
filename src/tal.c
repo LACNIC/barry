@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "alloc.h"
+#include "file.h"
 #include "libcrypto.h"
 #include "print.h"
 
@@ -68,19 +69,10 @@ tal_write(struct rpki_certificate *ta, char const *path)
 	int fd;
 	unsigned char *der;
 	size_t size;
-	int error;
 
 	pr_debug("Writing TAL: %s", path);
 
-	if (unlink(path)) {
-		error = errno;
-		if (error != ENOENT)
-			panic("Cannot remove old file: %s", strerror(error));
-	}
-
-	fd = open(path, O_WRONLY | O_CREAT, 0640);
-	if (fd < 0)
-		panic("open(%s): %s", path, strerror(errno));
+	fd = write_open(path);
 
 	if (write(fd, ta->meta->uri, strlen(ta->meta->uri)) < 0)
 		panic("write(1)");

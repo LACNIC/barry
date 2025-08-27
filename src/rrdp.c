@@ -26,27 +26,6 @@ struct rrdp_entry_type {
 const struct rrdp_entry_type PUBLISH = { "publish" };
 const struct rrdp_entry_type WITHDRAW = { "withdraw" };
 
-static int
-write_open(char const *path)
-{
-	int error;
-	int fd;
-
-	exec_mkdir_p(path, false);
-
-	if (unlink(path)) {
-		error = errno;
-		if (error != ENOENT)
-			panic("Cannot remove old file: %s", strerror(error));
-	}
-
-	fd = open(path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-	if (fd < 0)
-		panic("open(%s): %s", path, strerror(errno));
-
-	return fd;
-}
-
 void
 rrdp_save_notification(char const *path, char const *ss_uri, char const *ss_hash)
 {
