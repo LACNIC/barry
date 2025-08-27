@@ -1,13 +1,13 @@
 #ifndef SRC_FIELD_H_
 #define SRC_FIELD_H_
 
-#include <stdbool.h>
 #include <libasn1fort/AccessDescription.h>
 #include <libasn1fort/AlgorithmIdentifier.h>
 #include <libasn1fort/FileAndHash.h>
 #include <libasn1fort/GeneralName.h>
 #include <libasn1fort/Name.h>
 #include <libasn1fort/SubjectPublicKeyInfo.h>
+#include <stdbool.h>
 
 #include "keyval.h"
 #include "str.h"

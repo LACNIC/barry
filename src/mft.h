@@ -1,10 +1,6 @@
 #ifndef SRC_MFT_H_
 #define SRC_MFT_H_
 
-#include <libasn1fort/Manifest.h>
-#include "cer.h"
-#include "keyval.h"
-#include "rpki_tree.h"
 #include "so.h"
 
 struct signed_object *mft_new(struct rpki_tree_node *);

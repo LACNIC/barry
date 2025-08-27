@@ -1,26 +1,15 @@
 #include <errno.h>
-#include <stdio.h>
-#include <sys/queue.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <getopt.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-#include "alloc.h"
 #include "asn1.h"
-#include "cer.h"
 #include "crl.h"
 #include "file.h"
 #include "libcrypto.h"
 #include "mft.h"
-#include "print.h"
 #include "roa.h"
-#include "rpki_tree.h"
 #include "rrdp.h"
-#include "str.h"
 #include "tal.h"
 
 char const *repo_descriptor;

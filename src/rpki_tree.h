@@ -1,13 +1,8 @@
 #ifndef SRC_RPKI_TREE_H_
 #define SRC_RPKI_TREE_H_
 
-#include <stdbool.h>
-#include <libasn1fort/UTF8String.h>
-
 #include "field.h"
-#include "keyval.h"
 #include "rpki_object.h"
-#include "uthash.h"
 
 enum file_type {
 	FT_UNKNOWN = 0,

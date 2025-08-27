@@ -1,8 +1,8 @@
 #ifndef SRC_OID_H_
 #define SRC_OID_H_
 
-#include <stdbool.h>
 #include <libasn1fort/OBJECT_IDENTIFIER.h>
+#include <stdbool.h>
 
 bool oid_is_caIssuers(OBJECT_IDENTIFIER_t *);
 bool oid_is_caRepository(OBJECT_IDENTIFIER_t *);

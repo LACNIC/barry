@@ -1,8 +1,7 @@
 #ifndef SRC_STR_H_
 #define SRC_STR_H_
 
-#include <stdbool.h>
-#include <string.h>
+#include <stddef.h>
 
 char *concat(char const *, char const *);
 

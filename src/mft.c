@@ -1,11 +1,10 @@
 #include "mft.h"
 
+#include <libasn1fort/IA5String.h>
+
 #include "asn1.h"
-#include "crl.h"
-#include "field.h"
 #include "file.h"
 #include "libcrypto.h"
-#include "oid.h"
 
 static void
 init_filelist(Manifest_t *mft, struct rpki_tree_node *node, struct field *field)

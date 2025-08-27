@@ -3,17 +3,14 @@
 
 // XXX remember the vulnerability with some libasn1fort object
 
-#include <stdbool.h>
-
 #include <libasn1fort/ANY.h>
-#include <libasn1fort/BIT_STRING.h>
-#include <libasn1fort/Extension.h>
+#include <libasn1fort/GeneralizedTime.h>
 #include <libasn1fort/INTEGER.h>
 #include <libasn1fort/Name.h>
 #include <libasn1fort/OBJECT_IDENTIFIER.h>
 #include <libasn1fort/OCTET_STRING.h>
 #include <libasn1fort/Time.h>
-#include <libasn1fort/GeneralizedTime.h>
+#include <time.h>
 
 #include "alloc.h"
 #include "print.h"

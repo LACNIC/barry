@@ -1,5 +1,17 @@
 #include "ext.h"
 
+#include <libasn1fort/ASIdOrRange.h>
+#include <libasn1fort/ASIdentifierChoice.h>
+#include <libasn1fort/CertificateSerialNumber.h>
+#include <libasn1fort/DistributionPoint.h>
+#include <libasn1fort/DistributionPointName.h>
+#include <libasn1fort/Extension.h>
+#include <libasn1fort/IPAddressFamily.h>
+#include <libasn1fort/IPAddressOrRange.h>
+#include <libasn1fort/KeyIdentifier.h>
+#include <libasn1fort/PolicyInformation.h>
+#include <openssl/obj_mac.h>
+
 #include "asn1.h"
 #include "cer.h"
 #include "libcrypto.h"

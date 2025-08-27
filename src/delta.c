@@ -1,12 +1,12 @@
 #include "delta.h"
 
 #include <errno.h>
-#include <stdbool.h>
-#include <sys/queue.h>
 #include <libasn1fort/GeneralizedTime.h>
 #include <libasn1fort/Time.h>
+#include <libxml/globals.h>
 #include <libxml/xmlreader.h>
-#include <openssl/evp.h>
+#include <limits.h>
+#include <sys/queue.h>
 
 #include "alloc.h"
 #include "file.h"

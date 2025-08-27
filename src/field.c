@@ -1,35 +1,32 @@
 #include "field.h"
 
 #include <errno.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <time.h>
-#include <arpa/inet.h>
-
-#include <libasn1fort/ANY.h>
+#include <libasn1fort/ASIdOrRange.h>
+#include <libasn1fort/ASIdentifierChoice.h>
+#include <libasn1fort/AttributeTypeAndValue.h>
 #include <libasn1fort/BIT_STRING.h>
-#include <libasn1fort/INTEGER.h>
-#include <libasn1fort/OBJECT_IDENTIFIER.h>
-#include <libasn1fort/ASIdentifiers.h>
-#include <libasn1fort/Certificate.h>
-#include <libasn1fort/CertificateList.h>
-#include <libasn1fort/ContentInfo.h>
-#include <libasn1fort/Extensions.h>
-#include <libasn1fort/IPAddrBlocks.h>
-#include <libasn1fort/PrintableString.h>
-#include <libasn1fort/SignedData.h>
-#include <libasn1fort/RouteOriginAttestation.h>
+#include <libasn1fort/IPAddress.h>
+#include <libasn1fort/IPAddressFamily.h>
+#include <libasn1fort/IPAddressOrRange.h>
 #include <libasn1fort/Manifest.h>
+#include <libasn1fort/PrintableString.h>
+#include <libasn1fort/ROAIPAddress.h>
+#include <libasn1fort/ROAIPAddressFamily.h>
+#include <libasn1fort/RelativeDistinguishedName.h>
+#include <libasn1fort/RouteOriginAttestation.h>
+#include <libasn1fort/TBSCertList.h>
+#include <libasn1fort/UTCTime.h>
+#include <limits.h>
+#include <strings.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-#include "alloc.h"
 #include "asn1.h"
-#include "cer.h"
 #include "csv.h"
 #include "ext.h"
 #include "oid.h"
-#include "print.h"
 #include "rpki_tree.h"
-#include "str.h"
 
 static error_msg const HEX_EMPTY = "Hexadecimal string is empty";
 static error_msg const HEX_ODD_DIGITS = "Hexadecimal numbers need an even number of digits";

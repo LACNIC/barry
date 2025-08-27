@@ -1,21 +1,17 @@
 #include "asn1.h"
 
-#include <errno.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <openssl/objects.h>
-
 #include <libasn1fort/AttributeTypeAndValue.h>
 #include <libasn1fort/PrintableString.h>
 #include <libasn1fort/RelativeDistinguishedName.h>
+#include <libasn1fort/UTCTime.h>
+#include <libasn1fort/ber_decoder.h>
+#include <libasn1fort/der_encoder.h>
+#include <openssl/asn1.h>
+#include <openssl/obj_mac.h>
+#include <openssl/objects.h>
 
-#include "alloc.h"
+#include "field.h"
 #include "file.h"
-#include "oid.h"
-#include "print.h"
 
 #define BUFSIZE 4096
 

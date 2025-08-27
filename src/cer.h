@@ -1,12 +1,10 @@
 #ifndef SRC_CER_H_
 #define SRC_CER_H_
 
-#include <openssl/evp.h>
 #include <libasn1fort/Certificate.h>
-#include <libasn1fort/SubjectKeyIdentifier.h>
+#include <openssl/evp.h>
 
 #include "ext.h"
-#include "field.h"
 #include "rpki_tree.h"
 #include "rpp.h"
 

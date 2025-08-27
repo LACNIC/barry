@@ -1,5 +1,6 @@
 #include "keyval.h"
 
+#include <stddef.h>
 #include <string.h>
 
 /* Note: O(n). If you use this too much, probably hash table keyvals. */

@@ -1,7 +1,7 @@
 #ifndef SRC_ALLOC_H_
 #define SRC_ALLOC_H_
 
-#include <stdlib.h>
+#include <stddef.h>
 
 /* The 'p' stands for "panicky." */
 

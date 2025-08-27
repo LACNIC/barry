@@ -1,14 +1,12 @@
 #include "rpki_tree.h"
 
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "alloc.h"
-#include "file.h"
 #include "print.h"
-#include "str.h"
 
 #define BADCFG(rdr, fmt, ...) panic("Line %u: " fmt, rdr->line, ##__VA_ARGS__)
 #define UNEXPECTED_TOKEN(rdr, tkn) BADCFG(rdr, "Unexpected token: %s", tkn)

@@ -1,14 +1,14 @@
 #include "so.h"
 
-#include <libasn1fort/ANY.h>
+#include <libasn1fort/CMSAttribute.h>
 #include <libasn1fort/CMSAttributeValue.h>
+#include <libasn1fort/CertificateSet.h>
 #include <libasn1fort/DigestAlgorithmIdentifier.h>
-#include <libasn1fort/SignerInfo.h>
+#include <libasn1fort/SignedAttributes.h>
+#include <openssl/obj_mac.h>
 
 #include "asn1.h"
-#include "crl.h"
 #include "libcrypto.h"
-#include "oid.h"
 
 /* Requires the EE ready and eContentS */
 static void

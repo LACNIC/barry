@@ -1,9 +1,6 @@
 #ifndef SRC_ROA_H_
 #define SRC_ROA_H_
 
-#include <libasn1fort/RouteOriginAttestation.h>
-#include "cer.h"
-#include "keyval.h"
 #include "so.h"
 
 struct signed_object *roa_new(struct rpki_tree_node *);

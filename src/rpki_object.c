@@ -1,7 +1,7 @@
 #include "rpki_object.h"
 
+#include "cer.h"
 #include "print.h"
-#include "rpki_tree.h"
 
 struct rpki_certificate *
 meta_parent(struct rpki_object *meta)

@@ -1,17 +1,12 @@
 #include "cer.h"
 
-#include <stdbool.h>
-#include <stddef.h>
+#include <libasn1fort/TBSCertificate.h>
+#include <libasn1fort/Version.h>
+#include <openssl/obj_mac.h>
 
-#include "alloc.h"
 #include "asn1.h"
-#include "csv.h"
-#include "field.h"
 #include "file.h"
 #include "libcrypto.h"
-#include "oid.h"
-#include "print.h"
-#include "rpki_object.h"
 
 static void
 init_extensions_ta(struct rpki_certificate *ta, struct field *extf)

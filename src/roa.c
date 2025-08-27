@@ -1,9 +1,9 @@
 #include "roa.h"
 
+#include <libasn1fort/ROAIPAddress.h>
+#include <libasn1fort/ROAIPAddressFamily.h>
+
 #include "asn1.h"
-#include "field.h"
-#include "libcrypto.h"
-#include "oid.h"
 
 struct signed_object *
 roa_new(struct rpki_tree_node *node)

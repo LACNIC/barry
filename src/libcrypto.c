@@ -1,16 +1,17 @@
 #include "libcrypto.h"
 
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <openssl/encoder.h>
+#include <libasn1fort/der_encoder.h>
 #include <openssl/decoder.h>
+#include <openssl/encoder.h>
 #include <openssl/rsa.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "asn1.h"
-#include "print.h"
 
 /*
  * Base64-encodes the content of file @path,

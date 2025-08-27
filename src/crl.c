@@ -1,16 +1,11 @@
 #include "crl.h"
 
-#include <stdbool.h>
-#include <libasn1fort/CRLNumber.h>
-#include <libasn1fort/Extension.h>
-#include <libasn1fort/SignatureValue.h>
+#include <libasn1fort/TBSCertList.h>
+#include <libasn1fort/Version.h>
+#include <openssl/obj_mac.h>
 
-#include "alloc.h"
 #include "asn1.h"
-#include "ext.h"
 #include "libcrypto.h"
-#include "oid.h"
-#include "rpki_object.h"
 
 static void
 init_extensions_crl(struct rpki_crl *crl, struct field *extf)

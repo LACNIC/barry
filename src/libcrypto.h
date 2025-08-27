@@ -1,11 +1,14 @@
 #ifndef SRC_LIBCRYPTO_H_
 #define SRC_UTIL_LIBCRYPTO_H_
 
-#include <stdbool.h>
-#include <openssl/evp.h>
-
-#include <libasn1fort/SubjectPublicKeyInfo.h>
+#include <libasn1fort/OCTET_STRING.h>
 #include <libasn1fort/SignatureValue.h>
+#include <libasn1fort/SubjectPublicKeyInfo.h>
+#include <netinet/in.h>
+#include <openssl/evp.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 void base64_into_fd(char const *, int);
 

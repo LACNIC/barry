@@ -2,13 +2,12 @@
 #define SRC_SO_H_
 
 #include <libasn1fort/ContentInfo.h>
-#include <libasn1fort/SignedData.h>
-#include <libasn1fort/SignerInfo.h>
 #include <libasn1fort/Manifest.h>
 #include <libasn1fort/RouteOriginAttestation.h>
+#include <libasn1fort/SignedData.h>
+#include <libasn1fort/SignerInfo.h>
 
 #include "cer.h"
-#include "field.h"
 
 enum so_type {
 	SO_MFT,
