@@ -5,7 +5,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
 #include "alloc.h"
 #include "print.h"
@@ -33,9 +32,9 @@ join_paths(char const *base, char const *filename)
 	nresult = nbase + nfilename + 2;
 	result = pmalloc(nresult);
 
-	strncpy(result, base, nbase);
+	memcpy(result, base, nbase);
 	result[nbase] = '/';
-	strncpy(result + nbase + 1, filename, nfilename);
+	memcpy(result + nbase + 1, filename, nfilename);
 	result[nresult -1] = '\0';
 
 	return result;
@@ -51,21 +50,14 @@ remove_extension(char const *filename)
 int
 write_open(char const *path)
 {
-	int error;
 	int fd;
 
 	exec_mkdir_p(path, false);
 
-	if (unlink(path)) {
-		error = errno;
-		if (error != ENOENT)
-			panic("Cannot remove old file: %s", strerror(error));
-	}
-
 	pr_trace("echo 'Beep boop' > %s", path);
-	fd = open(path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	fd = creat(path, S_IRUSR | S_IWUSR | S_IRGRP);
 	if (fd < 0)
-		panic("open(%s): %s", path, strerror(errno));
+		panic("creat(%s): %s", path, strerror(errno));
 
 	return fd;
 }
