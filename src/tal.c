@@ -2,7 +2,7 @@
 
 #include "alloc.h"
 #include "file.h"
-#include "libcrypto.h"
+#include "keys.h"
 #include "print.h"
 
 char *

@@ -14,8 +14,8 @@
 
 #include "asn1.h"
 #include "cer.h"
-#include "libcrypto.h"
 #include "oid.h"
+#include "sha.h"
 
 struct ext_list_node *
 add_extension(struct extensions *exts,

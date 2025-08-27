@@ -4,7 +4,7 @@
 
 #include "asn1.h"
 #include "file.h"
-#include "libcrypto.h"
+#include "sha.h"
 
 static void
 init_filelist(Manifest_t *mft, struct rpki_tree_node *node, struct field *field)

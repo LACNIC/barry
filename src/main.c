@@ -6,10 +6,10 @@
 #include "asn1.h"
 #include "crl.h"
 #include "file.h"
-#include "libcrypto.h"
 #include "mft.h"
 #include "roa.h"
 #include "rrdp.h"
+#include "sha.h"
 #include "tal.h"
 
 char const *repo_descriptor;

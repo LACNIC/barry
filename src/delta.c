@@ -1,30 +1,28 @@
-#include "delta.h"
-
 #include <errno.h>
+#include <getopt.h>
 #include <libasn1fort/GeneralizedTime.h>
 #include <libasn1fort/Time.h>
 #include <libxml/globals.h>
 #include <libxml/xmlreader.h>
 #include <limits.h>
+#include <openssl/evp.h>
 #include <sys/queue.h>
 
 #include "alloc.h"
 #include "file.h"
-#include "libcrypto.h"
 #include "print.h"
+#include "sha.h"
 #include "uthash.h"
 
-/* Mocks */
-
-char const *rsync_path;
-char const *keys_path;
-Time_t default_now;
-Time_t default_later;
-GeneralizedTime_t default_gnow;
-GeneralizedTime_t default_glater;
-unsigned int verbosity;
-
-/* Real code */
+#define OPTLONG_OLD_NOTIF	"old.notification"
+#define OPTLONG_OLD_SS		"old.snapshot"
+#define OPTLONG_NEW_NOTIF	"new.notification"
+#define OPTLONG_NEW_SS		"new.snapshot"
+#define OPTLONG_OUT_NOTIF	"output.notification"
+#define OPTLONG_OUT_DELTA_URI	"output.delta.uri"
+#define OPTLONG_OUT_DELTA_PATH	"output.delta.path"
+#define OPTLONG_VERBOSE		"verbose"
+#define OPTLONG_HELP		"help"
 
 #define HASHSIZE 32
 
@@ -85,6 +83,86 @@ struct deltas {
 	struct delta *ht;
 };
 
+/* old set */
+static char const *notif1_path;
+static char const *ss1_path;
+
+/* new set */
+static char const *notif2_path;
+static char const *ss2_path;
+
+/* modified set */
+static char const *notif3_path;
+static char const *delta_uri;
+static char const *delta_path;
+
+unsigned int verbosity;
+
+static void
+print_help(void)
+{
+	printf("Usage: barry-delta --" OPTLONG_OLD_NOTIF "=<Path>\n");
+	printf("		   --" OPTLONG_OLD_SS "=<Path>\n");
+	printf("		   --" OPTLONG_NEW_NOTIF "=<Path>\n");
+	printf("		   --" OPTLONG_NEW_SS "=<Path>\n");
+	printf("		   --" OPTLONG_OUT_NOTIF "=<Path>\n");
+	printf("		   --" OPTLONG_OUT_DELTA_URI "=<URI>\n");
+	printf("		   --" OPTLONG_OUT_DELTA_PATH "=<Path>\n");
+	printf("		   [--" OPTLONG_VERBOSE " [--" OPTLONG_VERBOSE "]]\n");
+	printf("		   [--" OPTLONG_HELP "]\n");
+}
+
+static void
+parse_options(int argc, char **argv)
+{
+	static struct option opts[] = {
+		{ OPTLONG_OLD_NOTIF,            required_argument, 0, 1024 },
+		{ OPTLONG_OLD_SS,               required_argument, 0, 1025 },
+		{ OPTLONG_NEW_NOTIF,            required_argument, 0, 1026 },
+		{ OPTLONG_NEW_SS,               required_argument, 0, 1027 },
+		{ OPTLONG_OUT_NOTIF,            required_argument, 0, 1028 },
+		{ OPTLONG_OUT_DELTA_URI,        required_argument, 0, 1029 },
+		{ OPTLONG_OUT_DELTA_PATH,       required_argument, 0, 1030 },
+		{ OPTLONG_VERBOSE,              no_argument,       0, 'v' },
+		{ OPTLONG_HELP,                 no_argument,       0, 'h' },
+		{ 0 }
+	};
+	int opt;
+
+	while ((opt = getopt_long(argc, argv, "vh", opts, NULL)) != -1) {
+		switch (opt) {
+		case 1024:	notif1_path = optarg;	break;
+		case 1025:	ss1_path = optarg;	break;
+		case 1026:	notif2_path = optarg;	break;
+		case 1027:	ss2_path = optarg;	break;
+		case 1028:	notif3_path = optarg;	break;
+		case 1029:	delta_uri = optarg;	break;
+		case 1030:	delta_path = optarg;	break;
+		case 'v':	verbosity++;		break;
+		case 'h':	print_help();		exit(EXIT_SUCCESS);
+		case '?':	print_help();		exit(EXIT_FAILURE);
+		}
+	}
+
+	if (!notif1_path || !ss1_path ||
+	    !notif2_path || !ss2_path ||
+	    !notif3_path || !delta_uri || !delta_path) {
+		print_help();
+		printf("(Notice: All the paths and URIs are mandatory)\n");
+		exit(EXIT_FAILURE);
+	}
+
+	pr_debug("Configuration:");
+	pr_debug("   --" OPTLONG_OLD_NOTIF "    = %s", notif1_path);
+	pr_debug("   --" OPTLONG_OLD_SS "        = %s", ss1_path);
+	pr_debug("   --" OPTLONG_NEW_NOTIF "    = %s", notif2_path);
+	pr_debug("   --" OPTLONG_NEW_SS "        = %s", ss2_path);
+	pr_debug("   --" OPTLONG_OUT_NOTIF " = %s", notif3_path);
+	pr_debug("   --" OPTLONG_OUT_DELTA_URI "    = %s", delta_uri);
+	pr_debug("   --" OPTLONG_OUT_DELTA_PATH "   = %s", delta_path);
+	pr_debug("   --" OPTLONG_VERBOSE "             = %u", verbosity);
+	pr_debug("");
+}
 
 static void
 print_sha256(int fd, unsigned char *sha)
@@ -337,7 +415,7 @@ compute_deltas(struct snapshot *ss1, struct snapshot *ss2,
 			add_delta(deltas, DT_WITHDRAW, pub1);
 		}
 		else if (memcmp(pub1->hash, pub2->hash, HASHSIZE) != 0) {
-			pr_debug("%s hash mismatch; adding publish", pub1->uri);
+			pr_debug("%s has a different hash; adding publish", pub1->uri);
 			add_delta(deltas, DT_MODIFY, pub1);
 		}
 	}
@@ -447,18 +525,18 @@ write_notification(char const *path, struct notification *new,
 	close(fd);
 }
 
-void
-compute_delta(
-    char const *notif1_path, char const *ss1_path,	/* old set */
-    char const *notif2_path, char const *ss2_path,	/* new set */
-    char const *notif3_path,				/* modified set */
-    char const *delta_uri, char const *delta_path	/* added delta */
-) {
+int
+main(int argc, char **argv)
+{
 	struct notification notif1 = { 0 };
 	struct notification notif2 = { 0 };
 	struct snapshot ss1 = { 0 };
 	struct snapshot ss2 = { 0 };
 	struct deltas deltas = { 0 };
+
+	register_signal_handlers();
+
+	parse_options(argc, argv);
 
 	parse_notification(notif1_path, &notif1);
 	parse_notification(notif2_path, &notif2);
@@ -469,15 +547,4 @@ compute_delta(
 	compute_deltas(&ss1, &ss2, &deltas);
 	write_deltas(delta_path, ss1_path, ss2_path, &deltas);
 	write_notification(notif3_path, &notif2, delta_uri, delta_path);
-}
-
-int
-main(int argc, char **argv)
-{
-	compute_delta(
-	    "rrdp1/notification.xml", "rrdp1/notification.xml.snapshot",
-	    "rrdp2/notification.xml", "rrdp2/notification.xml.snapshot",
-	    "rrdp3/notification.xml",
-	    "https://localhost:8080/rpki/delta.xml", "rrdp3/delta.xml"
-	);
 }

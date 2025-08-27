@@ -5,7 +5,7 @@
 #include <openssl/obj_mac.h>
 
 #include "asn1.h"
-#include "libcrypto.h"
+#include "signature.h"
 
 static void
 init_extensions_crl(struct rpki_crl *crl, struct field *extf)

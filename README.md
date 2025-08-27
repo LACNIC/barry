@@ -616,7 +616,96 @@ You can also induce further chaos by overriding the files actually contained by 
 snapshot.files = [ ta.cer, A1.roa, A1.roa, B2a.roa ]
 ```
 
-I haven't implemented deltas yet.
+## Tutorial: RRDP Deltas
+
+To create deltas, produce two repositories, then feed the resulting RRDP files to the separate program `barry-delta`.
+
+Suppose RD `old.repo` contains the first version of the repository:
+
+```
+ta.cer
+	ca1.cer
+		roa1A.roa
+		roa1B.roa
+	ca2.cer
+		roa2.roa
+
+[node: ta.cer]
+rpp.notification = https://your-server.net/rrdp/notif.xml
+
+[notification: https://your-server.net/rrdp/notif.xml]
+path = notif.xml
+snapshot.uri = https://your-server.net/rrdp/snapshot.xml
+snapshot.path = snapshot.xml
+```
+
+RD `new.repo` contains a subsequent version of the same repository:
+
+```
+ta.cer
+	ca1.cer
+		roa1A.roa
+		roa1C.roa
+	ca2.cer
+		roa2.roa
+
+[node: ta.cer]
+rpp.notification = https://your-server.net/rrdp/notif.xml
+
+[notification: https://your-server.net/rrdp/notif.xml]
+path = notif.xml
+snapshot.uri = https://your-server.net/rrdp/snapshot.xml
+snapshot.path = snapshot.xml
+```
+
+First, compile both repositories into separate directories:
+
+```sh
+mkdir -p keys/
+for i in $(seq 0 8); do
+	openssl genrsa -out "keys/$i.pem" 2048
+done
+# Consistent shared keys and dates ensure hashes and signatures
+# do not change if they don't have to
+COMMON_ARGS="--keys keys/ --now 2025-01-01T00:00:00Z --later 2026-01-01T00:00:00Z"
+
+barry $COMMON_ARGS --rsync-path rsync-old/ --rrdp-path rrdp-old/ old.repo
+barry $COMMON_ARGS --rsync-path rsync-new/ --rrdp-path rrdp-new/ new.repo
+```
+
+Take a look at Barry's RRDP output:
+
+```sh
+$ ls rrdp-old/
+notif.xml  snapshot.xml
+$ 
+$ ls rrdp-new/
+notif.xml  snapshot.xml
+```
+
+Based on that, you can produce a delta between them:
+
+```
+mkdir -p fusion/
+barry-delta -v \
+	--old.notification    rrdp-old/notif.xml \
+	--old.snapshot        rrdp-old/snapshot.xml \
+	--new.notification    rrdp-new/notif.xml \
+	--new.snapshot        rrdp-new/snapshot.xml \
+	--output.notification fusion/notif.xml \
+	--output.delta.path   fusion/delta.xml \
+	--output.delta.uri    https://your-server.net/rrdp/v2/delta.xml
+```
+
+You might want to review `barry`'s output matches your expectations:
+
+```
+[DBG compute_de:0424] rsync://localhost:8873/rpki/ca1/roa1B.roa disappeared; adding withdraw
+[DBG compute_de:0428] rsync://localhost:8873/rpki/ca1/ca1.mft has a different hash; adding publish
+[DBG compute_de:0437] rsync://localhost:8873/rpki/ca1/roa1C.roa spawned; adding publish
+```
+
+Find your new notification and delta in `fusion/`.
 
 ## TODO
 
@@ -624,7 +713,6 @@ Add Github issues:
 
 - Configuration file section: `[Alias]`
 - `include`s is configuration
-- RRDP deltas
 - May want to purge all the memory leaks
 - Still unimplemented fields
 	- Certificates

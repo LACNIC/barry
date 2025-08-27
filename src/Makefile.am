@@ -1,4 +1,11 @@
-bin_PROGRAMS = barry delta
+common_CFLAGS  = -Wall -Wpedantic
+common_CFLAGS += -std=gnu11
+common_CFLAGS += -O2 -g
+if BACKTRACE_ENABLED
+common_CFLAGS += -DBACKTRACE_ENABLED -rdynamic
+endif
+
+bin_PROGRAMS = barry barry-delta
 
 barry_SOURCES = main.c
 
@@ -10,8 +17,8 @@ barry_SOURCES += csv.c csv.h
 barry_SOURCES += ext.c ext.h
 barry_SOURCES += field.c field.h
 barry_SOURCES += file.c file.h
+barry_SOURCES += keys.c keys.h
 barry_SOURCES += keyval.c keyval.h
-barry_SOURCES += libcrypto.c libcrypto.h
 barry_SOURCES += mft.c mft.h
 barry_SOURCES += oid.c oid.h
 barry_SOURCES += print.c print.h
@@ -20,31 +27,21 @@ barry_SOURCES += rpki_object.c rpki_object.h
 barry_SOURCES += rpki_tree.c rpki_tree.h
 barry_SOURCES += rpp.c rpp.h
 barry_SOURCES += rrdp.c rrdp.h
+barry_SOURCES += sha.c sha.h
+barry_SOURCES += signature.c signature.h
 barry_SOURCES += so.c so.h
 barry_SOURCES += str.c str.h
 barry_SOURCES += tal.c tal.h
 barry_SOURCES += uthash.h
 
-barry_CFLAGS  = -Wall -Wpedantic
-barry_CFLAGS += -std=gnu11
-barry_CFLAGS += -O2 -g
-if BACKTRACE_ENABLED
-barry_CFLAGS += -DBACKTRACE_ENABLED -rdynamic
-endif
-barry_CFLAGS += ${XML2_CFLAGS}
-barry_LDADD = -lasn1fort ${XML2_LIBS}
+barry_CFLAGS = ${common_CFLAGS}
+barry_LDADD  = ${common_LDADD} -lasn1fort
 
-delta_SOURCES = delta.c delta.h
-delta_SOURCES += alloc.c alloc.h
-delta_SOURCES += asn1.c asn1.h
-delta_SOURCES += file.c file.h
-delta_SOURCES += libcrypto.c libcrypto.h
+barry_delta_SOURCES = delta.c delta.h
+barry_delta_SOURCES += alloc.c alloc.h
+barry_delta_SOURCES += file.c file.h
+barry_delta_SOURCES += sha.c sha.h
+barry_delta_SOURCES += print.c print.h
 
-delta_CFLAGS  = -Wall -Wpedantic
-delta_CFLAGS += -std=gnu11
-delta_CFLAGS += -O2 -g
-if BACKTRACE_ENABLED
-delta_CFLAGS += -DBACKTRACE_ENABLED -rdynamic
-endif
-delta_CFLAGS += ${XML2_CFLAGS}
-delta_LDADD = -lasn1fort ${XML2_LIBS}
+barry_delta_CFLAGS = ${common_CFLAGS} ${XML2_CFLAGS}
+barry_delta_LDADD  = ${XML2_LIBS}

@@ -1,12 +1,15 @@
 #include "rrdp.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <openssl/evp.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "file.h"
-#include "libcrypto.h"
+#include "print.h"
 
 struct rrdp_type {
 	char const *name;
@@ -38,6 +41,49 @@ rrdp_save_notification(char const *path, char const *ss_uri, char const *ss_hash
 	dprintf(fd, "</notification>\n");
 
 	close(fd);
+}
+
+/*
+ * Base64-encodes the content of file @path,
+ * writes result into file descriptor @fd.
+ */
+static void
+base64_into_fd(char const *path, int fdout)
+{
+	int fdin;
+	EVP_ENCODE_CTX *ctx;
+	unsigned char bufin[48];
+	unsigned char bufout[66];
+	ssize_t inl;
+	int outl;
+
+	fdin = open(path, O_RDONLY, 0);
+	if (fdin < 0)
+		panic("open(%s): %s", path, strerror(errno));
+
+	ctx = EVP_ENCODE_CTX_new();
+	if (!ctx)
+		enomem;
+
+	EVP_EncodeInit(ctx);
+
+	do {
+		inl = read(fdin, bufin, 48);
+		if (inl < 0)
+			panic("read()");
+		if (inl == 0)
+			break;
+		if (!EVP_EncodeUpdate(ctx, bufout, &outl, bufin, inl))
+			panic("EVP_EncodeUpdate()");
+		if (write(fdout, bufout, outl) < 0)
+			panic("write(1)");
+	} while (1);
+
+	EVP_EncodeFinal(ctx, bufout, &outl);
+	if (write(fdout, bufout, outl) < 0)
+		panic("write(2)");
+
+	close(fdin);
 }
 
 void

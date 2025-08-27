@@ -8,7 +8,8 @@
 #include <openssl/obj_mac.h>
 
 #include "asn1.h"
-#include "libcrypto.h"
+#include "sha.h"
+#include "signature.h"
 
 /* Requires the EE ready and eContentS */
 static void

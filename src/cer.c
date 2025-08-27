@@ -6,7 +6,8 @@
 
 #include "asn1.h"
 #include "file.h"
-#include "libcrypto.h"
+#include "keys.h"
+#include "signature.h"
 
 static void
 init_extensions_ta(struct rpki_certificate *ta, struct field *extf)
@@ -77,6 +78,16 @@ cer_new(struct rpki_tree_node *node, enum cer_type type)
 	cer_init(cer, &node->meta, type);
 
 	return cer;
+}
+
+static void
+pubkey2asn1(EVP_PKEY *pubkey, SubjectPublicKeyInfo_t *asn1)
+{
+	unsigned char *der;
+	size_t derlen;
+
+	pubkey2der(pubkey, &der, &derlen);
+	ber2asn1(der, derlen, &asn_DEF_SubjectPublicKeyInfo, asn1);
 }
 
 void
