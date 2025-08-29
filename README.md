@@ -575,7 +575,7 @@ barry
     ...
 ```
 
-By default, all the non-TA tree files `barry` produces are snapshot'd into `<RRDP-PATH>/snapshot.xml` (which is assumed to be served from URL `[RRDP-URI]/snapshot.xml`), which is then referenced by `<RRDP-PATH>/notification.xml` (`[RRDP-URI]/notification.xml`). <s>Simply because of inertia, the TA is copied to `<RRDP-PATH>/<Name of TA>` (`[RRDP-URI]/<Name of TA>`).</s> No deltas are produced.
+By default, all the non-TA tree files `barry` produces are snapshot'd into `<RRDP-PATH>/snapshot.xml` (which is assumed to be served from URL `[RRDP-URI]/snapshot.xml`), which is then referenced by `<RRDP-PATH>/notification.xml` (`[RRDP-URI]/notification.xml`). Simply because of inertia, the TA is copied to `<RRDP-PATH>/<Name of TA>` (`[RRDP-URI]/<Name of TA>`). No deltas are produced.
 
 > Note: If `--rrdp-uri` is an empty string, RRDP will be completely disabled. (SIAs will not contain `rpkiNotify`s and RRDP files will not be generated.) Otherwise, if `rrdp-path` is an empty string, the SIAs will contain the corresponding `rpkiNotify`s, but no RRDP XMLs will be generated.
 

@@ -408,6 +408,24 @@ write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	mft_write(node->obj);
 }
 
+static void
+write_ta(struct rpki_tree_node *ta)
+{
+	char *rsync;
+	char *rrdp;
+
+	rsync = join_paths(rsync_path, ta->meta.path);
+	rrdp = join_paths(rrdp_path, ta->meta.name);
+
+	exec_mkdir_p(rrdp_path, true);
+	pr_trace("link %s %s", rsync, rrdp);
+	if (link(rsync, rrdp) < 0)
+		panic("Can't create the HTTP TA: %s", strerror(errno));
+
+	free(rrdp);
+	free(rsync);
+}
+
 void
 build_notif_filelists(struct rpki_tree *tree, struct rpki_tree_node *node,
     void *arg)
@@ -442,6 +460,8 @@ write_rrdp(struct rpki_tree *tree)
 	struct rpki_tree_node *node;
 	char *notif_path;
 	char *snapshot_path;
+
+	write_ta(tree->root);
 
 	rpkitree_pre_order(tree, build_notif_filelists, NULL);
 
@@ -565,6 +585,8 @@ main(int argc, char **argv)
 
 	pr_debug("Figuring out object types...");
 	rpkitree_pre_order(&tree, init_type, NULL);
+	if (tree.root->type != FT_TA)
+		panic("The root of the tree is not a certificate.");
 	pr_debug("Done.\n");
 
 	pr_debug("Adding missing CRLs and Manifests...");
@@ -590,8 +612,6 @@ main(int argc, char **argv)
 
 	pr_debug("Writing files (except manifests)...");
 	rpkitree_pre_order(&tree, write_not_mfts, NULL);
-	// XXX assuming type cer
-	tal_write(tree.root->obj, tal_path);
 	pr_debug("Done.\n");
 
 	pr_debug("Post-processing (manifests)...");
@@ -607,6 +627,10 @@ main(int argc, char **argv)
 		write_rrdp(&tree);
 		pr_debug("Done.\n");
 	}
+
+	pr_debug("Writing the TAL...");
+	tal_write(tree.root->obj, tal_path);
+	pr_debug("Done.");
 
 	if (print_format) {
 		pr_debug("Printing objects...");

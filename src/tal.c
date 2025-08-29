@@ -59,7 +59,10 @@ base64_pubkey(unsigned char *in, int inl, int fd)
 void
 tal_write(struct rpki_certificate *ta, char const *path)
 {
+	extern char const *rrdp_uri;
+
 	int fd;
+	char *uri;
 	unsigned char *der;
 	size_t size;
 
@@ -67,10 +70,18 @@ tal_write(struct rpki_certificate *ta, char const *path)
 
 	fd = write_open(path);
 
+	if (rrdp_uri) {
+		uri = join_paths(rrdp_uri, ta->meta->name);
+		if (write(fd, uri, strlen(uri)) < 0)
+			panic("write(HTTP URI)");
+		free(uri);
+		if (write(fd, "\n", 1) < 0)
+			panic("write(nl)");
+	}
 	if (write(fd, ta->meta->uri, strlen(ta->meta->uri)) < 0)
-		panic("write(1)");
+		panic("write(rsync URI)");
 	if (write(fd, "\n\n", strlen("\n\n")) < 0)
-		panic("write(2)");
+		panic("write(nlnl)");
 
 	pubkey2der(ta->keys, &der, &size);
 	base64_pubkey(der, size, fd);

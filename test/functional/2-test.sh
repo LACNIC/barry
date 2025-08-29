@@ -29,18 +29,18 @@ rm -rf sandbox/tal/*
 
 # Prepare common barry arguments, needed by all tests
 BARRY="../../src/barry"
-RSYNC_PATH="--rsync-path sandbox/rsync"
-RRDP_PATH="--rrdp-path sandbox/rrdp"
 KEYS="--keys sandbox/keys"
 PRINTS="-vvp csv"
 TIMES="--now 2025-01-01T00:00:00Z --later 2026-01-01T00:00:00Z"
-BASIC_ARGS="$RSYNC_PATH $RRDP_PATH $KEYS $PRINTS $TIMES"
+BASIC_ARGS="$KEYS $PRINTS $TIMES"
 
 # Cache default outputs.
 # (Several tests want to compare their outputs to these.)
 DEFAULT_OUTPUT_FILE="sandbox/output/root-only.log"
 $BARRY $BASIC_ARGS						\
 	--tal-path "sandbox/tal/root-only.tal"			\
+	--rsync-path sandbox/rsync/root-only			\
+	--rrdp-path sandbox/rrdp/root-only			\
 	"rd/root-only.rd"					\
 	> "$DEFAULT_OUTPUT_FILE" 2>&1
 
@@ -60,6 +60,8 @@ check_output_contains() {
 	if [ ! -f "$OUTPUT_FILE" ]; then
 		$BARRY $BASIC_ARGS				\
 			--tal-path "sandbox/tal/$TEST_RD.tal"	\
+			--rsync-path sandbox/rsync/$TEST_RD	\
+			--rrdp-path sandbox/rrdp/$TEST_RD	\
 			"rd/$TEST_RD.rd"			\
 			> "$OUTPUT_FILE" 2>&1
 		RETVAL="$?"
@@ -96,22 +98,22 @@ check_tutorial_delta() {
 
 	$BARRY $KEYS $PRINTS $TIMES \
 		--tal-path "sandbox/tal/delta.old.tal" \
-		--rsync-path sandbox/rsync/old/ \
-		--rrdp-path sandbox/rrdp/old/ \
+		--rsync-path sandbox/rsync/delta/old/ \
+		--rrdp-path sandbox/rrdp/delta/old/ \
 		rd/tutorial-delta-old.rd \
 		> /dev/null 2> /dev/null
 	$BARRY $KEYS $PRINTS $TIMES \
 		--tal-path "sandbox/tal/delta.new.tal" \
-		--rsync-path sandbox/rsync/new/ \
-		--rrdp-path sandbox/rrdp/new/ \
+		--rsync-path sandbox/rsync/delta/new/ \
+		--rrdp-path sandbox/rrdp/delta/new/ \
 		rd/tutorial-delta-new.rd \
 		> /dev/null 2> /dev/null
 	mkdir -p sandbox/rrdp/fusion/
 	${BARRY}-delta -v \
-		--old.notification    sandbox/rrdp/old/notif.xml \
-		--old.snapshot        sandbox/rrdp/old/snapshot.xml \
-		--new.notification    sandbox/rrdp/new/notif.xml \
-		--new.snapshot        sandbox/rrdp/new/snapshot.xml \
+		--old.notification    sandbox/rrdp/delta/old/notif.xml \
+		--old.snapshot        sandbox/rrdp/delta/old/snapshot.xml \
+		--new.notification    sandbox/rrdp/delta/new/notif.xml \
+		--new.snapshot        sandbox/rrdp/delta/new/snapshot.xml \
 		--output.notification sandbox/rrdp/fusion/notif.xml \
 		--output.delta.path   sandbox/rrdp/fusion/delta.xml \
 		--output.delta.uri    https://your-server.net/rrdp/v2/delta.xml \
