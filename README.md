@@ -570,7 +570,7 @@ RRDP has two relevant program arguments:
 
 ```
 barry
-    --rrdp-uri=<RRDP-URI>    # default: https://localhost:8080/rpki
+    --rrdp-uri=<RRDP-URI>    # default: https://localhost:8443/rpki
     --rrdp-path=<RRDP-PATH>  # default: rrdp/
     ...
 ```

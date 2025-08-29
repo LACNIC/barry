@@ -9,7 +9,7 @@
 
 /* Mocks */
 
-char const *rrdp_uri = "https://localhost:8080/rpki";
+char const *rrdp_uri = "https://localhost:8443/rpki";
 char const *rrdp_path = "rrdp/";
 unsigned int verbosity = 2;
 
