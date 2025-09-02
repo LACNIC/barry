@@ -758,21 +758,12 @@ PidFile pid
 ErrorLog logs/main.log
 LogLevel info
 
-# Bunch of plugins.
-# I tried filtering them, but it seems too many are needed for basic usage
-# (or SSL), so it's not worth it.
+# Some plugins. Obviously, we need SSL. I'm not sure about the others,
+# but things tend to fail when they're delisted.
 # You might need to tweak the paths if you installed in a different distro.
-IncludeOptional /etc/apache2/mods-enabled/*.load
-IncludeOptional /etc/apache2/mods-enabled/*.conf
-
+LoadModule mpm_event_module /usr/lib/apache2/modules/mod_mpm_event.so
+LoadModule authz_core_module /usr/lib/apache2/modules/mod_authz_core.so
 LoadModule ssl_module /usr/lib/apache2/modules/mod_ssl.so
-
-# Configure "$SANDBOX/content" for serving.
-# (One of the plugins blocks everything by default, apparently.)
-<Directory content>
-	AllowOverride None
-	Require all granted
-</Directory>
 
 # Finally, configure the HTTPS service we'll hang to port 8443.
 Listen 8443
@@ -794,10 +785,7 @@ Create `$SANDBOX/start.sh`, a script to start the server:
 #!/bin/sh
 
 mkdir -p content logs
-
-# APACHE_RUN_DIR is needed by Ubuntu's apache ssl module.
-# Don't really know why.
-APACHE_RUN_DIR="${PWD}" /usr/sbin/apache2 -f "${PWD}/apache2.conf"
+/usr/sbin/apache2 -f "${PWD}/apache2.conf"
 ```
 
 And another one to `stop.sh` it:
@@ -805,7 +793,9 @@ And another one to `stop.sh` it:
 ```sh
 #!/bin/sh
 
-kill $(cat pid)
+if [ -f "pid" ]; then
+	kill $(cat pid)
+fi
 ```
 
 Start the server:
@@ -824,7 +814,7 @@ curl https://localhost:8443/test.txt
 Now, when running Barry, ask it to dump the RRDP files into the `DocumentRoot` (or `mv` them after they're generated):
 
 ```sh
-mkdir ~/tmp/barry
+mkdir -p ~/tmp/barry
 cd ~/tmp/barry
 echo "ta.cer" > some.repo
 echo "	A.roa" >> some.repo
