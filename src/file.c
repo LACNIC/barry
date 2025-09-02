@@ -55,7 +55,7 @@ write_open(char const *path)
 	exec_mkdir_p(path, false);
 
 	pr_trace("echo 'Beep boop' > %s", path);
-	fd = creat(path, S_IRUSR | S_IWUSR | S_IRGRP);
+	fd = creat(path, 0644);
 	if (fd < 0)
 		panic("creat(%s): %s", path, strerror(errno));
 
@@ -67,7 +67,7 @@ void
 exec_mkdir(char *path)
 {
 	pr_trace("mkdir '%s'", path);
-	if (mkdir(path, 0750) < 0 && errno != EEXIST)
+	if (mkdir(path, 0755) < 0 && errno != EEXIST)
 		panic("mkdir(%s): %s", path, strerror(errno));
 }
 

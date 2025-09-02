@@ -570,7 +570,7 @@ RRDP has two relevant program arguments:
 
 ```
 barry
-    --rrdp-uri=<RRDP-URI>    # default: https://localhost:8443/rpki
+    --rrdp-uri=<RRDP-URI>    # default: https://localhost:8443/rrdp
     --rrdp-path=<RRDP-PATH>  # default: rrdp/
     ...
 ```
@@ -706,6 +706,142 @@ You might want to review `barry`'s output matches your expectations:
 ```
 
 Find your new notification and delta in `fusion/`.
+
+## Tutorial: RRDP recipe for Apache2 on Ubuntu
+
+This section is a quick and dirty means to start a local SSL-enabled Apache so it can serve Barry's RRDP output to the RP. Nothing's stopping you from employing other HTTP server or OS.
+
+First, make a sandbox:
+
+```sh
+SANDBOX=~/tmp/apache-barry
+mkdir -p $SANDBOX
+cd $SANDBOX
+```
+
+Install Apache:
+
+```sh
+sudo apt update && sudo apt upgrade
+sudo apt install apache2
+```
+
+Create a self-signed certificate for your HTTPS RRDP server, and copy it to the trust store (so the RP will accept it):
+
+```sh
+# When you fire this up, openssl will give you a few prompts.
+# If you want to run with Barry's default `--rrdp-uri`,
+# enter "`localhost`" as the common name.
+# Otherwise adjust to your needs.
+# The other fields don't matter.
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+	-keyout apache-barry.key -out apache-barry.crt
+
+sudo cp apache-barry.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+```
+
+Create `$SANDBOX/apache2.conf`, containing
+
+```conf
+# Again, assuming --rrdp-uri's default.
+ServerName localhost
+
+# Forces Apache to work in the current directory.
+# (Cancels out some obnoxious chdir() it does during startup for some reason.)
+ServerRoot ${PWD}
+# Dumps the process ID to a file named "pid".
+# We can later terminate the server with this, by running "kill $(cat pid)".
+PidFile pid
+
+# Read this logfile if your server has trouble starting.
+ErrorLog logs/main.log
+LogLevel info
+
+# Bunch of plugins.
+# I tried filtering them, but it seems too many are needed for basic usage
+# (or SSL), so it's not worth it.
+# You might need to tweak the paths if you installed in a different distro.
+IncludeOptional /etc/apache2/mods-enabled/*.load
+IncludeOptional /etc/apache2/mods-enabled/*.conf
+
+LoadModule ssl_module /usr/lib/apache2/modules/mod_ssl.so
+
+# Configure "$SANDBOX/content" for serving.
+# (One of the plugins blocks everything by default, apparently.)
+<Directory content>
+	AllowOverride None
+	Require all granted
+</Directory>
+
+# Finally, configure the HTTPS service we'll hang to port 8443.
+Listen 8443
+<VirtualHost *:8443>
+	DocumentRoot content
+
+	# Read this logfile if your requests aren't working
+	ErrorLog logs/8443.log
+
+	SSLEngine on
+	SSLCertificateFile	apache-barry.crt
+	SSLCertificateKeyFile	apache-barry.key
+</VirtualHost>
+```
+
+Create `$SANDBOX/start.sh`, a script to start the server:
+
+```sh
+#!/bin/sh
+
+mkdir -p content logs
+
+# APACHE_RUN_DIR is needed by Ubuntu's apache ssl module.
+# Don't really know why.
+APACHE_RUN_DIR="${PWD}" /usr/sbin/apache2 -f "${PWD}/apache2.conf"
+```
+
+And another one to `stop.sh` it:
+
+```sh
+#!/bin/sh
+
+kill $(cat pid)
+```
+
+Start the server:
+
+```sh
+sh start.sh
+```
+
+Might want to test it:
+
+```sh
+echo "Test succeeded!" > $SANDBOX/content/test.txt
+curl https://localhost:8443/test.txt
+```
+
+Now, when running Barry, ask it to dump the RRDP files into the `DocumentRoot` (or `mv` them after they're generated):
+
+```sh
+mkdir ~/tmp/barry
+cd ~/tmp/barry
+echo "ta.cer" > some.repo
+echo "	A.roa" >> some.repo
+barry --rrdp-path $SANDBOX/content/rrdp some.repo
+ls $SANDBOX/content/rrdp
+```
+
+RRDP can now be served:
+
+```sh
+$ fort --mode standalone --log.level info --tal some.tal | tail -5
+Sep  2 16:47:19 INF: Validation finished:
+Sep  2 16:47:19 INF: - Valid ROAs: 1
+Sep  2 16:47:19 INF: - Valid Router Keys: 0
+Sep  2 16:47:19 INF: - Real execution time: 0s
+Sep  2 16:47:19 INF: Done.
+```
 
 ## TODO
 

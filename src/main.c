@@ -15,7 +15,7 @@
 char const *repo_descriptor;
 char const *rsync_uri = "rsync://localhost:8873/rpki";
 char const *rsync_path = "rsync/";
-char const *rrdp_uri = "https://localhost:8443/rpki";
+char const *rrdp_uri = "https://localhost:8443/rrdp";
 char const *rrdp_path = "rrdp/";
 char const *tal_path;
 Time_t default_now;

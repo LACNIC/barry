@@ -344,15 +344,15 @@ check_output_contains "obj2" -Fx \
 	"ta.cer,obj.tbsCertificate.signature.parameters,ANY,0x0607"
 
 check_output_contains "notification-1" -Fx \
-	"https://localhost:8443/rpki/notification-1.xml,path,C String,notification-1.xml" \
-	"https://localhost:8443/rpki/notification-1.xml,snapshot.uri,C String,https://localhost:8443/rpki/notification-1.xml.snapshot" \
-	"https://localhost:8443/rpki/notification-1.xml,snapshot.path,C String,notification-1.xml.snapshot" \
-	"https://localhost:8443/rpki/notification-1.xml,snapshot.files,Snapshot Files,\"[ ta.mft, ta.crl ]\""
+	"https://localhost:8443/rrdp/notification-1.xml,path,C String,notification-1.xml" \
+	"https://localhost:8443/rrdp/notification-1.xml,snapshot.uri,C String,https://localhost:8443/rrdp/notification-1.xml.snapshot" \
+	"https://localhost:8443/rrdp/notification-1.xml,snapshot.path,C String,notification-1.xml.snapshot" \
+	"https://localhost:8443/rrdp/notification-1.xml,snapshot.files,Snapshot Files,\"[ ta.mft, ta.crl ]\""
 check_output_contains "notification-2" -Fx \
-	"https://localhost:8443/rpki/notification-2.xml,path,C String,notification-2.xml" \
-	"https://localhost:8443/rpki/notification-2.xml,snapshot.uri,C String,https://localhost:8443/rpki/notification-2.xml.snapshot" \
-	"https://localhost:8443/rpki/notification-2.xml,snapshot.path,C String,notification-2.xml.snapshot" \
-	"https://localhost:8443/rpki/notification-2.xml,snapshot.files,Snapshot Files,\"[ A.cer, A.roa, A.mft, A.crl, B.cer, B.mft, B.crl, ta.mft, ta.crl ]\""
+	"https://localhost:8443/rrdp/notification-2.xml,path,C String,notification-2.xml" \
+	"https://localhost:8443/rrdp/notification-2.xml,snapshot.uri,C String,https://localhost:8443/rrdp/notification-2.xml.snapshot" \
+	"https://localhost:8443/rrdp/notification-2.xml,snapshot.path,C String,notification-2.xml.snapshot" \
+	"https://localhost:8443/rrdp/notification-2.xml,snapshot.files,Snapshot Files,\"[ A.cer, A.roa, A.mft, A.crl, B.cer, B.mft, B.crl, ta.mft, ta.crl ]\""
 
 check_output_contains "root-only" -Fx \
 	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
@@ -363,7 +363,7 @@ check_output_contains "root-only" -Fx \
 	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta/ta.mft" \
 	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
 	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8443/rpki/notification.xml"
+	"ta.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8443/rrdp/notification.xml"
 check_output_contains "gname" -Fx \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.10 (RPKI Manifest)" \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,rfc822Name" \
@@ -390,7 +390,7 @@ check_output_contains "sia1" -Fx \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/A/A.mft" \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8443/rpki/notification.xml" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8443/rrdp/notification.xml" \
 	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.11 (Signed Object)" \
 	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
 	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.sia.extnValue.0.accessLocation.value,IA5String,rsync://localhost:8873/rpki/ta/B.mft"
@@ -428,7 +428,7 @@ check_output_contains "sia3" -Fx \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.1.accessLocation.value,IA5String,rsync://localhost:8873/rpki/A/A.mft" \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.13 (RPKI Notify)" \
 	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.type,GeneralName type,uniformResourceIdentifier" \
-	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8443/rpki/notification.xml" \
+	"A.cer,obj.tbsCertificate.extensions.sia.extnValue.2.accessLocation.value,IA5String,https://localhost:8443/rrdp/notification.xml" \
 	"B.mft,obj.content.certificates.0.tbsCertificate.extensions,Extensions,\"{ aia=aia, sia=sia }\"" \
 	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)" \
 	"B.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessLocation.type,GeneralName type,uniformResourceIdentifier" \

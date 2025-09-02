@@ -4,4 +4,4 @@ ta.cer
 	B.cer
 
 [node: ta.cer]
-rpp.notification = https://localhost:8443/rpki/notification-2.xml
+rpp.notification = https://localhost:8443/rrdp/notification-2.xml
