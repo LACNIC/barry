@@ -413,11 +413,19 @@ write_ta(struct rpki_tree_node *ta)
 {
 	char *rsync;
 	char *rrdp;
+	int error;
 
 	rsync = join_paths(rsync_path, ta->meta.path);
 	rrdp = join_paths(rrdp_path, ta->meta.name);
 
 	exec_mkdir_p(rrdp_path, true);
+
+	if (unlink(rrdp)) {
+		error = errno;
+		if (error != ENOENT)
+			panic("Cannot replace HTTP TA: %s", strerror(error));
+	}
+
 	pr_trace("link %s %s", rsync, rrdp);
 	if (link(rsync, rrdp) < 0)
 		panic("Can't create the HTTP TA: %s", strerror(errno));
