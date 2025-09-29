@@ -28,11 +28,3 @@ csv_print(char const *value, char separator)
 
 	printf("%s\"%c", value, separator);
 }
-
-void
-csv_print3(struct rpki_object *cell1, char const *cell2, char const *cell3)
-{
-	csv_print(cell1->name, ',');
-	csv_print(cell2, ',');
-	csv_print(cell3, '\n');
-}

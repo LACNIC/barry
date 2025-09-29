@@ -81,7 +81,7 @@ Feed the RD to `barry`:
 $ barry good.repo
 ```
 
-It'll make a bunch of assumptions and output the following file hierarchy:
+It'll make a bunch of assumptions and output the following file hierarchy (aside from some RRDP stuff):
 
 ```bash
 ./good.tal		# Named based on the RD
@@ -113,9 +113,9 @@ Serve them via rsync, and you've built yourself a "validateable" Repository Inst
 
 ```bash
 $ cat > rsyncd.conf <<\EOF
-lock file = lock.lock
-log file = log.log
-pid file = pid.pid
+lock file = rsyncd.lock
+log file = rsyncd.log
+pid file = rsyncd.pid
 port = 8873
 
 [rpki]
@@ -714,9 +714,9 @@ This section is a quick and dirty means to start a local SSL-enabled Apache so i
 First, make a sandbox:
 
 ```sh
-SANDBOX=~/tmp/apache-barry
-mkdir -p $SANDBOX
-cd $SANDBOX
+SANDBOX=~/tmp/apache2-barry
+mkdir -p "$SANDBOX"
+cd "$SANDBOX"
 ```
 
 Install Apache:
@@ -735,9 +735,9 @@ Create a self-signed certificate for your HTTPS RRDP server, and copy it to the 
 # Otherwise adjust to your needs.
 # The other fields don't matter.
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-	-keyout apache-barry.key -out apache-barry.crt
+	-keyout "apache2-barry.key" -out "apache2-barry.crt"
 
-sudo cp apache-barry.crt /usr/local/share/ca-certificates/
+sudo cp "apache2-barry.crt" "/usr/local/share/ca-certificates/"
 sudo update-ca-certificates
 ```
 
@@ -750,9 +750,9 @@ ServerName localhost
 # Forces Apache to work in the current directory.
 # (Cancels out some obnoxious chdir() it does during startup for some reason.)
 ServerRoot ${PWD}
-# Dumps the process ID to a file named "pid".
-# We can later terminate the server with this, by running "kill $(cat pid)".
-PidFile pid
+# Dumps the process ID to a file named "apache2.pid".
+# We can later terminate the server with this, by running "kill $(cat apache2.pid)".
+PidFile apache2.pid
 
 # Read this logfile if your server has trouble starting.
 ErrorLog logs/main.log
@@ -774,8 +774,8 @@ Listen 8443
 	ErrorLog logs/8443.log
 
 	SSLEngine on
-	SSLCertificateFile	apache-barry.crt
-	SSLCertificateKeyFile	apache-barry.key
+	SSLCertificateFile	apache2-barry.crt
+	SSLCertificateKeyFile	apache2-barry.key
 </VirtualHost>
 ```
 
@@ -784,7 +784,7 @@ Create `$SANDBOX/start.sh`, a script to start the server:
 ```sh
 #!/bin/sh
 
-mkdir -p content logs
+mkdir -p "content" "logs"
 /usr/sbin/apache2 -f "${PWD}/apache2.conf"
 ```
 
@@ -793,8 +793,8 @@ And another one to `stop.sh` it:
 ```sh
 #!/bin/sh
 
-if [ -f "pid" ]; then
-	kill $(cat pid)
+if [ -f "apache2.pid" ]; then
+	kill $(cat "apache2.pid")
 fi
 ```
 
@@ -807,8 +807,8 @@ sh start.sh
 Might want to test it:
 
 ```sh
-echo "Test succeeded!" > $SANDBOX/content/test.txt
-curl https://localhost:8443/test.txt
+echo "Test succeeded!" > "$SANDBOX/content/test.txt"
+curl "https://localhost:8443/test.txt"
 ```
 
 Now, when running Barry, ask it to dump the RRDP files into the `DocumentRoot` (or `mv` them after they're generated):
@@ -818,14 +818,14 @@ mkdir -p ~/tmp/barry
 cd ~/tmp/barry
 echo "ta.cer" > some.repo
 echo "	A.roa" >> some.repo
-barry --rrdp-path $SANDBOX/content/rrdp some.repo
-ls $SANDBOX/content/rrdp
+barry --rrdp-path "$SANDBOX/content/rrdp" some.repo
+ls "$SANDBOX/content/rrdp"
 ```
 
 RRDP can now be served:
 
 ```sh
-$ fort --mode standalone --log.level info --tal some.tal | tail -5
+$ fort --mode standalone --log.level info --tal "some.tal" | tail -5
 Sep  2 16:47:19 INF: Validation finished:
 Sep  2 16:47:19 INF: - Valid ROAs: 1
 Sep  2 16:47:19 INF: - Valid Router Keys: 0
