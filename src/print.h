@@ -1,6 +1,7 @@
 #ifndef SRC_PRINT_H_
 #define SRC_PRINT_H_
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,48 +15,58 @@
 #define C_RST		"\x1B[0m"
 
 extern unsigned int verbosity;
+extern bool print_colors;
+
+void pr_start(FILE *, char const *);
+void pr_end(FILE *);
 
 #define pr_debug(fmt, ...) do {						\
 		if (verbosity >= 1) {					\
-			printf(C_GRN "[DBG %10.10s:%4.4d] " fmt C_RST "\n",\
+			pr_start(stdout, C_GRN);			\
+			printf("[DBG %10.10s:%4.4d] " fmt,		\
 			    __func__, __LINE__, ##__VA_ARGS__);		\
-			fflush(stdout);					\
+			pr_end(stdout);					\
 		}							\
 	} while (0)
 
 #define pr_trace(fmt, ...) do {						\
 		if (verbosity >= 2) {					\
-			printf(C_CYAN "[TRC %10.10s:%4.4d] " fmt C_RST "\n",\
+			pr_start(stdout, C_CYAN);			\
+			printf("[TRC %10.10s:%4.4d] " fmt,		\
 			    __func__, __LINE__, ##__VA_ARGS__);		\
-			fflush(stdout);					\
+			pr_end(stdout);					\
 		}							\
 	} while (0)
 #define PR_TRACE pr_trace
 
 #define pr_warn(fmt, ...) do {						\
-		fprintf(stderr, C_YLLW "[WRN %10.10s:%4.4d] " fmt C_RST "\n",\
+		pr_start(stderr, C_YLLW);				\
+		fprintf(stderr, "[WRN %10.10s:%4.4d] " fmt,		\
 		    __func__, __LINE__, ##__VA_ARGS__);			\
-		fflush(stderr);						\
+		pr_end(stderr);						\
 	} while (0)
 
 #define pr_err(fmt, ...) do {						\
-		fprintf(stderr, C_RED "[ERR %10.10s:%4.4d] " fmt C_RST "\n",\
+		pr_start(stderr, C_RED);				\
+		fprintf(stderr, "[ERR %10.10s:%4.4d] " fmt,		\
 		    __func__, __LINE__, ##__VA_ARGS__);			\
-		fflush(stderr);						\
+		pr_end(stderr);						\
 	} while (0)
 
 #define panic(fmt, ...) do {						\
-		fprintf(stderr, C_RED "[ERR %s:%d] " fmt C_RST "\n",	\
+		pr_start(stderr, C_RED);				\
+		fprintf(stderr, "[ERR %s:%d] " fmt,			\
 		    __func__, __LINE__, ##__VA_ARGS__);			\
-		fflush(stderr);						\
+		pr_end(stderr);						\
 		exit(1);						\
 	} while (0)
 
 #define enomem panic("Out of memory")
 
 #define PR_DEBUG do {							\
-		printf(C_GRN "[DBG %s:%d]" C_RST "\n", __func__, __LINE__); \
-		fflush(stdout);						\
+		pr_start(stdout, C_GRN);				\
+		printf("[DBG %s:%d]", __func__, __LINE__);		\
+		pr_end(stdout);						\
 	} while (0)
 
 void register_signal_handlers(void);

@@ -97,6 +97,7 @@ static char const *delta_uri;
 static char const *delta_path;
 
 unsigned int verbosity;
+bool print_colors;
 
 static void
 print_help(void)

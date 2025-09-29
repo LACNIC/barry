@@ -67,3 +67,19 @@ register_signal_handlers(void)
 	}
 #endif
 }
+
+void
+pr_start(FILE *stream, char const *color)
+{
+	if (print_colors)
+		fprintf(stream, "%s", color);
+}
+
+void
+pr_end(FILE *stream)
+{
+	if (print_colors)
+		fprintf(stream, "%s", C_RST);
+	fprintf(stream, "\n");
+	fflush(stream);
+}

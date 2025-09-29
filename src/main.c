@@ -25,6 +25,7 @@ GeneralizedTime_t default_glater;
 char const *keys_path;
 char const *print_format;
 unsigned int verbosity;
+bool print_colors;
 
 #define OPTLONG_RSYNC_URI	"rsync-uri"
 #define OPTLONG_RSYNC_PATH	"rsync-path"
@@ -36,6 +37,7 @@ unsigned int verbosity;
 #define OPTLONG_KEYS		"keys"
 #define OPTLONG_PR_OBJS		"print-objects"
 #define OPTLONG_VERBOSE		"verbose"
+#define OPTLONG_COLOR		"color"
 #define OPTLONG_HELP		"help"
 
 static void
@@ -51,6 +53,7 @@ print_help(void)
 	printf("		[--" OPTLONG_KEYS "=<Path>]\n");
 	printf("		[--" OPTLONG_PR_OBJS "]\n");
 	printf("		[--" OPTLONG_VERBOSE " [--" OPTLONG_VERBOSE "]]\n");
+	printf("		[--" OPTLONG_COLOR "]\n");
 	printf("		[--" OPTLONG_HELP "]\n");
 	printf("		<Path>    # Repository Descriptor\n");
 }
@@ -99,6 +102,7 @@ parse_options(int argc, char **argv)
 		{ OPTLONG_KEYS,       required_argument, 0, 'k' },
 		{ OPTLONG_PR_OBJS,    required_argument, 0, 'p' },
 		{ OPTLONG_VERBOSE,    no_argument,       0, 'v' },
+		{ OPTLONG_COLOR,      no_argument,       0, 'c' },
 		{ OPTLONG_HELP,       no_argument,       0, 'h' },
 		{ 0 }
 	};
@@ -106,7 +110,7 @@ parse_options(int argc, char **argv)
 	char *optnow = NULL;
 	char *optlater = NULL;
 
-	while ((opt = getopt_long(argc, argv, "t:P:k:p:vh", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:P:k:p:vch", opts, NULL)) != -1) {
 		switch (opt) {
 		case 1024:
 			rsync_uri = optarg;
@@ -137,6 +141,9 @@ parse_options(int argc, char **argv)
 			break;
 		case 'v':
 			verbosity++;
+			break;
+		case 'c':
+			print_colors = true;
 			break;
 		case 'h':
 			print_help();
@@ -169,6 +176,7 @@ parse_options(int argc, char **argv)
 	pr_debug("   --" OPTLONG_KEYS "               : %s", keys_path);
 	pr_debug("   --" OPTLONG_PR_OBJS       "  (-p): %s", print_format);
 	pr_debug("   --" OPTLONG_VERBOSE "        (-v): %u", verbosity);
+	pr_debug("   --" OPTLONG_COLOR "          (-c): %u", print_colors);
 	pr_debug("");
 }
 
