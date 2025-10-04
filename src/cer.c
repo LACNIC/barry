@@ -59,7 +59,14 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 	exts_add_sia(&ee->exts, "sia", extf, sia_ee_defaults);
 	exts_add_cp(&ee->exts, "cp", extf);
 	exts_add_ip(&ee->exts, "ip", extf);
-	exts_add_asn(&ee->exts, "asn", extf);
+	/*
+	 * This `if` is an rpki-client quirk.
+	 * They ban ASN extensions in ROAs. AFAIK, this is not RFC'd, but makes
+	 * sense... although it doesn't seem consistent with their treatment of
+	 * other SOs.
+	 */
+	if (ee->meta->node->type != FT_ROA)
+		exts_add_asn(&ee->exts, "asn", extf);
 }
 
 struct rpki_certificate *
@@ -182,7 +189,7 @@ finish_aia(AuthorityInfoAccessSyntax_t *aia, struct field *extnValuef,
 
 static void
 finish_extensions(struct rpki_certificate *cer, enum cer_type type,
-    char const *so_uri)
+    struct rpki_object *so)
 {
 	struct ext_list_node *ext;
 	struct field *extsf;
@@ -227,7 +234,8 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 			break;
 
 		case EXT_SIA:
-			ext_finish_sia(&ext->v.sia, extnValuef, cer, so_uri);
+			ext_finish_sia(&ext->v.sia, extnValuef, cer,
+			    so ? so->uri : NULL);
 			break;
 
 		case EXT_CP:
@@ -237,12 +245,12 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 
 		case EXT_IP:
 			if (!fields_overridden(extnValuef, NULL))
-				ext_finish_ip(&ext->v.ip);
+				ext_finish_ip(&ext->v.ip, so);
 			break;
 
 		case EXT_ASN:
 			if (!fields_overridden(extnValuef, "asnum"))
-				ext_finish_asn(&ext->v.asn);
+				ext_finish_asn(&ext->v.asn, so);
 			break;
 		}
 	}
@@ -340,7 +348,7 @@ cer_finish_ee(struct rpki_certificate *ee, struct rpki_object *so)
 		pr_debug("- Autofilling Issuer");
 		init_name(&ee->obj.tbsCertificate.issuer, parent->meta->name);
 	}
-	finish_extensions(ee, CT_EE, so->uri);
+	finish_extensions(ee, CT_EE, so);
 	update_signature(ee, parent->keys);
 }
 

@@ -280,7 +280,7 @@ exts_add_ip(struct extensions *exts, char const *name, struct field *extsf)
 	struct ext_list_node *ext;
 
 	ext = add_extension(exts, EXT_IP, &asn_DEF_IPAddrBlocks, name,
-	    NID_sbgp_ipAddrBlockv2, true);
+	    NID_sbgp_ipAddrBlock, true);
 
 	add_ip_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
@@ -306,7 +306,7 @@ exts_add_asn(struct extensions *exts, char const *name, struct field *extsf)
 	struct ext_list_node *ext;
 
 	ext = add_extension(exts, EXT_ASN, &asn_DEF_ASIdentifiers, name,
-	    NID_sbgp_autonomousSysNumv2, true);
+	    NID_sbgp_autonomousSysNum, true);
 
 	add_asn_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
@@ -474,39 +474,81 @@ ext_finish_cp(CertificatePolicies_t *cp)
 {
 	pr_trace("Autocompleting CP");
 	INIT_ASN1_ARRAY(&cp->list, 1, PolicyInformation_t);
-	init_oid(&cp->list.array[0]->policyIdentifier, NID_ipAddr_asNumberv2);
+	init_oid(&cp->list.array[0]->policyIdentifier, NID_ipAddr_asNumber);
 }
 
 void
-ext_finish_ip(IPAddrBlocks_t *ip)
+ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_object *so)
 {
-	IPAddressFamily_t *iaf;
+	OCTET_STRING_t *iaf;
+	IPAddressChoice_t *iac;
 	IPAddressOrRange_t *iar;
+	IPAddress_t *ia;
 
 	pr_trace("Autocompleting IP");
 
-	INIT_ASN1_ARRAY(&ip->list, 1, IPAddressFamily_t);
+	INIT_ASN1_ARRAY(&ip->list, 2, IPAddressFamily_t);
 
-	iaf = ip->list.array[0];
-	iaf->addressFamily.size = 2;
-	iaf->addressFamily.buf = pmalloc(iaf->addressFamily.size);
-	iaf->addressFamily.buf[0] = 0;
-	iaf->addressFamily.buf[1] = 1;
+	/* IPv4 */
+	iaf = &ip->list.array[0]->addressFamily;
+	iaf->size = 2;
+	iaf->buf = pmalloc(iaf->size);
+	iaf->buf[0] = 0;
+	iaf->buf[1] = 1;
 
-	iaf->ipAddressChoice.present = IPAddressChoice_PR_addressesOrRanges;
-	INIT_ASN1_ARRAY(&iaf->ipAddressChoice.choice.addressesOrRanges.list, 1, IPAddressOrRange_t);
+	/* IPv6 */
+	iaf = &ip->list.array[1]->addressFamily;
+	iaf->size = 2;
+	iaf->buf = pmalloc(iaf->size);
+	iaf->buf[0] = 0;
+	iaf->buf[1] = 2;
 
-	iar = iaf->ipAddressChoice.choice.addressesOrRanges.list.array[0];
-	iar->present = IPAddressOrRange_PR_addressPrefix;
-	iar->choice.addressPrefix.size = 3;
-	iar->choice.addressPrefix.buf = pmalloc(iar->choice.addressPrefix.size);
-	iar->choice.addressPrefix.buf[0] = 192;
-	iar->choice.addressPrefix.buf[1] = 0;
-	iar->choice.addressPrefix.buf[2] = 2;
+	if (so ? (so->node->type == FT_ROA) : true) {
+		/* IPv4 */
+		iac = &ip->list.array[0]->ipAddressChoice;
+		iac->present = IPAddressChoice_PR_addressesOrRanges;
+		INIT_ASN1_ARRAY(&iac->choice.addressesOrRanges.list,
+		    1, IPAddressOrRange_t);
+		iar = iac->choice.addressesOrRanges.list.array[0];
+		iar->present = IPAddressOrRange_PR_addressPrefix;
+
+		ia = &iar->choice.addressPrefix;
+		ia->size = 3;
+		ia->buf = pmalloc(ia->size);
+		ia->buf[0] = 192;
+		ia->buf[1] = 0;
+		ia->buf[2] = 2;
+
+		/* IPv6 */
+		iac = &ip->list.array[1]->ipAddressChoice;
+		iac->present = IPAddressChoice_PR_addressesOrRanges;
+		INIT_ASN1_ARRAY(&iac->choice.addressesOrRanges.list,
+		    1, IPAddressOrRange_t);
+
+		iar = iac->choice.addressesOrRanges.list.array[0];
+		iar->present = IPAddressOrRange_PR_addressPrefix;
+
+		ia = &iar->choice.addressPrefix;
+		ia->size = 8;
+		ia->buf = pzalloc(ia->size);
+		ia->buf[0] = 0x20;
+		ia->buf[1] = 0x01;
+		ia->buf[2] = 0x0d;
+		ia->buf[3] = 0xb8;
+
+	} else {
+		/* IPv4 */
+		iac = &ip->list.array[0]->ipAddressChoice;
+		iac->present = IPAddressChoice_PR_inherit;
+
+		/* IPv6 */
+		iac = &ip->list.array[1]->ipAddressChoice;
+		iac->present = IPAddressChoice_PR_inherit;
+	}
 }
 
 void
-ext_finish_asn(ASIdentifiers_t *asn)
+ext_finish_asn(ASIdentifiers_t *asn, struct rpki_object *so)
 {
 	ASIdOrRange_t *air;
 
@@ -514,12 +556,17 @@ ext_finish_asn(ASIdentifiers_t *asn)
 
 	asn->asnum = pzalloc(sizeof(ASIdentifierChoice_t));
 
-	asn->asnum->present = ASIdentifierChoice_PR_asIdsOrRanges;
-	INIT_ASN1_ARRAY(&asn->asnum->choice.asIdsOrRanges.list, 1, ASIdOrRange_t);
+	if (!so || so->node->type == FT_ROA) {
+		asn->asnum->present = ASIdentifierChoice_PR_asIdsOrRanges;
+		INIT_ASN1_ARRAY(&asn->asnum->choice.asIdsOrRanges.list,
+		    1, ASIdOrRange_t);
 
-	air = asn->asnum->choice.asIdsOrRanges.list.array[0];
-	air->present = ASIdOrRange_PR_id;
-	init_INTEGER(&air->choice.id, 123);
+		air = asn->asnum->choice.asIdsOrRanges.list.array[0];
+		air->present = ASIdOrRange_PR_id;
+		init_INTEGER(&air->choice.id, 123);
+	} else {
+		asn->asnum->present = ASIdentifierChoice_PR_inherit;
+	}
 }
 
 void
