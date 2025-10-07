@@ -1,4 +1,4 @@
-# BARRY
+# BaRRy
 
 A program that can generate a BAd Rpki RepositorY.
 
@@ -276,6 +276,99 @@ obj.tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24-28, 2001:db8::/64 ]
 ```
 
 (See [Numerics](#numerics) below for an example of 6.)
+
+## Default Resource Distribution
+
+Please note the word "default." You can always override these.
+
+The TA contains `0.0.0.0/0`, and the default address assignment pattern for every other certificate is monotonic, wrapping and starts from 1:
+
+```
+TA              # Assigned 0.0.0.0/0
+    CA-1        # Assigned 1.0.0.0/8
+    CA-2        # Assigned 2.0.0.0/8
+    CA-3        # Assigned 3.0.0.0/8
+    CA-4        # Assigned 4.0.0.0/8
+    ...
+    CA-254      # Assigned 254.0.0.0/8
+    CA-255      # Assigned 255.0.0.0/8
+    CA-256      # Assigned 0.0.0.0/8
+    CA-257      # Also assigned 1.0.0.0/8
+```
+
+Each tree level below consumes 8 additional bits:
+
+```
+TA
+    CA-A                      # 1.0.0.0/8
+        CA-AA                 # 1.1.0.0/16
+            CA-AAA            # 1.1.1.0/24
+                CA-AAAA       # 1.1.1.1/32
+                CA-AAAB       # 1.1.1.2/32
+                CA-AAAC       # 1.1.1.3/32
+            CA-AAB            # 1.1.2.0/24
+                CA-AABA       # 1.1.2.1/32
+            CA-AAC            # 1.1.3.0/24
+        CA-AB                 # 1.2.0.0/16
+            CA-ABA            # 1.2.1.0/24
+        CA-AC                 # 1.3.0.0/16
+    CA-B                      # 2.0.0.0/8
+        CA-BA                 # 2.1.0.0/16
+        CA-BB                 # 2.2.0.0/16
+        CA-BC                 # 2.3.0.0/16
+            CA-BCA            # 2.3.1.0/24
+```
+
+The numbering starts from 1 so you can visualize the prefix length a little more intuitively.
+
+Tree nodes below level 4 will inherit their parents' addresses:
+
+```
+(Tree lvl 0) TA                              # 0/0
+(Tree lvl 1)     CA-A                        # 1/8
+(Tree lvl 2)         CA-B                    # 1.1/16
+(Tree lvl 3)             CA-C                # 1.1.1/24
+(Tree lvl 4)                 CA-D            # 1.1.1.1/32
+(Tree lvl 5)                    CA-E         # 1.1.1.1/32
+(Tree lvl 6)                        CA-F     # 1.1.1.1/32
+```
+
+ROA EE certificates follow the same patterns. ROAs themselves inherit (explicitely) their EE addresses.
+
+IPv6 and ASNs also follow the same patterns:
+
+```
+                        # IPv4        IPv6            AS
+TA                      # 0.0.0.0/0   ::/0            0-0xFFFFFFFF
+    CAA                 # 1.0.0.0/8   0100:0000::/8   0x01000000-0x01FFFFFF
+        CAB             # 1.1.0.0/16  0101:0000::/16  0x01010000-0x0101FFFF
+            CAC         # 1.1.1.0/24  0101:0100::/24  0x01010100-0x010101FF
+                CAD     # 1.1.1.1     0101:0101::/32  0x01010101
+                CAE     # 1.1.1.2     0101:0102::/32  0x01010102
+                CAF     # 1.1.1.3     0101:0103::/32  0x01010103
+            CAG         # 1.1.2.0/24  0101:0200::/24  0x01010200-0x010102FF
+                CAH     # 1.1.2.1     0101:0201::/32  0x01010201
+                CAI     # 1.1.2.2     0101:0202::/32  0x01010202
+        CAJ             # 1.2.0.0/16  0102:0000::/16  0x01020000-0x0102FFFF
+            CAK         # 1.2.1.0/24  0102:0100::/24  0x01020100-0x010201FF
+            CAL         # 1.2.2.0/24  0102:0200::/24  0x01020200-0x010202FF
+    CAM                 # 2.0.0.0/8   0200:0000::/8   0x02000000-0x02FFFFFF
+        CAN             # 2.1.0.0/16  0201:0000::/16  0x02010000-0x0201FFFF
+```
+
+Except IPv6 can dig deeper into the tree without running out of suballocations:
+
+```
+TA
+    CA1                             # 0100::/8
+        CA2                         # 0101::/16
+            CA3                     # 0101:0100::/24
+                CA4                 # 0101:0101::/32
+                    CA5             # 0101:0101:0100::/40
+                        CA6         # 0101:0101:0101::/48
+                            CA7     # 0101:0101:0101:0100::/56
+                                ... # etc
+```
 
 ## Attribute Data Types
 

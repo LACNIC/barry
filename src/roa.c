@@ -8,15 +8,9 @@
 struct signed_object *
 roa_new(struct rpki_tree_node *node)
 {
-	static const uint8_t IPV4[2] = { 0, 1 };
-	/* static const uint8_t IPV6[2] = { 0, 2 }; */
-	static const uint8_t ADDR[3] = { 192, 0, 2 };
-
 	struct signed_object *so;
 	RouteOriginAttestation_t *roa;
 	struct field *eContent;
-	struct ROAIPAddressFamily *riaf;
-	ROAIPAddress_t *ria;
 
 	so = signed_object_new(node, NID_id_ct_routeOriginAuthz, &eContent);
 	roa = &so->obj.roa;
@@ -30,22 +24,136 @@ roa_new(struct rpki_tree_node *node)
 	INIT_ASN1_ARRAY(&roa->ipAddrBlocks.list, 1, ROAIPAddressFamily_t);
 	field_add(eContent, "ipAddrBlocks", &ft_ip_roa, &roa->ipAddrBlocks, 0);
 
-	riaf = roa->ipAddrBlocks.list.array[0];
-	riaf->addressFamily.buf = (uint8_t *)IPV4;
-	riaf->addressFamily.size = sizeof(IPV4) / sizeof(IPV4[0]);
-	INIT_ASN1_ARRAY(&riaf->addresses.list, 1, ROAIPAddress_t);
-
-	ria = riaf->addresses.list.array[0];
-	ria->address.buf = (uint8_t *)ADDR;
-	ria->address.size = sizeof(ADDR) / sizeof(ADDR[0]);
-
 	return so;
+}
+
+static bool
+OCTET_STRING_cmp(OCTET_STRING_t *str1, OCTET_STRING_t *str2)
+{
+	return OCTET_STRING_compare(&asn_DEF_OCTET_STRING, str1, str2) == 0;
+}
+
+static IPAddressFamily_t *
+find_inheritor(struct rpki_certificate *cer, OCTET_STRING_t *af)
+{
+	struct rpki_tree_node *node;
+	struct ext_list_node *ext;
+	IPAddressFamily_t *iaf;
+	bool has_resources;
+	int i;
+
+	for (node = cer->meta->node->parent; node != NULL; node = node->parent) {
+		if (node->type != FT_TA && node->type != FT_CER)
+			return NULL;
+
+		ext = cer_ext(node->obj, EXT_IP);
+		if (!ext)
+			return NULL;
+
+		has_resources = false;
+		for (i = 0; i < ext->v.ip.list.count; i++) {
+			iaf = ext->v.ip.list.array[i];
+
+			if (OCTET_STRING_cmp(&iaf->addressFamily, af) == 0) {
+				switch (iaf->ipAddressChoice.present) {
+				case IPAddressChoice_PR_addressesOrRanges:
+					return iaf;
+				case IPAddressChoice_PR_inherit:
+					has_resources = true;
+					break;
+				case IPAddressChoice_PR_NOTHING:
+					break;
+				}
+			}
+		}
+		if (!has_resources)
+			return NULL;
+	}
+
+	return NULL;
+}
+
+static void
+ior2ria(IPAddressOrRange_t *ior, ROAIPAddress_t *ria)
+{
+	switch (ior->present) {
+	case IPAddressOrRange_PR_addressPrefix:
+		ria->address = ior->choice.addressPrefix;
+		break;
+	case IPAddressOrRange_PR_addressRange:
+		ria->address = ior->choice.addressRange.min;
+		break;
+	case IPAddressOrRange_PR_NOTHING:
+		panic("Undefined IPAddressOrRange.");
+	}
+}
+
+static void
+finish_addrs(struct signed_object *so)
+{
+	struct field *rootf;
+	struct ext_list_node *ext;
+
+	IPAddressFamily_t *iaf; /* src */
+	ROAIPAddressFamily_t *riaf; /* dst */
+
+	struct IPAddressChoice__addressesOrRanges *aor;
+
+	IPAddressOrRange_t *ior; /* src */
+	ROAIPAddress_t *ria; /* dst */
+
+	int i, j;
+
+	rootf = fields_find(so->objf,
+	    "content.encapContentInfo.eContent.ipAddrBlocks");
+	if (rootf && rootf->overridden)
+		return;
+
+	ext = cer_ext(&so->ee, EXT_IP);
+	if (!ext)
+		return;
+
+	INIT_ASN1_ARRAY(&so->obj.roa.ipAddrBlocks.list, ext->v.ip.list.count,
+	    ROAIPAddressFamily_t);
+
+	for (i = 0; i < ext->v.ip.list.count; i++) {
+		iaf = ext->v.ip.list.array[i];
+		riaf = so->obj.roa.ipAddrBlocks.list.array[i];
+
+		riaf->addressFamily = iaf->addressFamily;
+
+		switch (iaf->ipAddressChoice.present) {
+		case IPAddressChoice_PR_inherit:
+			iaf = find_inheritor(&so->ee, &iaf->addressFamily);
+			if (!iaf)
+				break;
+			/* No break */
+
+		case IPAddressChoice_PR_addressesOrRanges:
+			aor = &iaf->ipAddressChoice.choice.addressesOrRanges;
+			INIT_ASN1_ARRAY(&riaf->addresses.list, aor->list.count,
+			    ROAIPAddress_t);
+
+			for (j = 0; j < aor->list.count; j++) {
+				ior = aor->list.array[j];
+				ria = riaf->addresses.list.array[j];
+				ior2ria(ior, ria);
+			}
+
+			break;
+
+		case IPAddressChoice_PR_NOTHING:
+			break;
+		}
+	}
 }
 
 void
 roa_finish(struct signed_object *so)
 {
-	signed_object_finish(so, &asn_DEF_RouteOriginAttestation);
+	cer_finish_ee(&so->ee, so->meta);
+	finish_addrs(so);
+	content_info_finish(so, &asn_DEF_RouteOriginAttestation);
 }
 
 void

@@ -154,8 +154,9 @@ finish_fileList(struct signed_object *so, struct rpki_tree_node *siblings)
 void
 mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
 {
+	cer_finish_ee(&so->ee, so->meta);
 	finish_fileList(so, siblings);
-	signed_object_finish(so, &asn_DEF_Manifest);
+	content_info_finish(so, &asn_DEF_Manifest);
 }
 
 void

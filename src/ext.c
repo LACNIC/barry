@@ -1,5 +1,6 @@
 #include "ext.h"
 
+#include <errno.h>
 #include <libasn1fort/ASIdOrRange.h>
 #include <libasn1fort/ASIdentifierChoice.h>
 #include <libasn1fort/CertificateSerialNumber.h>
@@ -477,13 +478,49 @@ ext_finish_cp(CertificatePolicies_t *cp)
 	init_oid(&cp->list.array[0]->policyIdentifier, NID_ipAddr_asNumber);
 }
 
+static uint8_t *
+get_serials(struct rpki_tree_node *node)
+{
+	uint8_t *buf;
+	struct rpki_tree_node *cursor;
+	unsigned int n;
+
+	if (node->depth == 0)
+		return NULL;
+
+	buf = pcalloc(node->depth, sizeof(uint8_t));
+
+	cursor = node;
+	for (n = 0; n < node->depth; n++) {
+		buf[n] = cursor->serial & 0xFFu;
+		cursor = cursor->parent;
+	}
+
+	return buf;
+}
+
+static void
+serials2bitstr(uint8_t *serials, size_t addrn,
+    BIT_STRING_t *bs, unsigned int max)
+{
+	size_t i;
+
+	if (addrn == 0)
+		return;
+
+	bs->size = (addrn < max) ? addrn : max;
+	bs->buf = pmalloc(bs->size);
+	for (i = 0; i < bs->size; i++)
+		bs->buf[i] = serials[addrn - i - 1];
+}
+
 void
-ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_object *so)
+ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_tree_node *node)
 {
 	OCTET_STRING_t *iaf;
 	IPAddressChoice_t *iac;
 	IPAddressOrRange_t *iar;
-	IPAddress_t *ia;
+	uint8_t *serials;
 
 	pr_trace("Autocompleting IP");
 
@@ -503,7 +540,9 @@ ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_object *so)
 	iaf->buf[0] = 0;
 	iaf->buf[1] = 2;
 
-	if (so ? (so->node->type == FT_ROA) : true) {
+	if (node->type == FT_TA || node->type == FT_CER || node->type == FT_ROA) {
+		serials = get_serials(node);
+
 		/* IPv4 */
 		iac = &ip->list.array[0]->ipAddressChoice;
 		iac->present = IPAddressChoice_PR_addressesOrRanges;
@@ -511,30 +550,20 @@ ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_object *so)
 		    1, IPAddressOrRange_t);
 		iar = iac->choice.addressesOrRanges.list.array[0];
 		iar->present = IPAddressOrRange_PR_addressPrefix;
-
-		ia = &iar->choice.addressPrefix;
-		ia->size = 3;
-		ia->buf = pmalloc(ia->size);
-		ia->buf[0] = 192;
-		ia->buf[1] = 0;
-		ia->buf[2] = 2;
+		serials2bitstr(serials, node->depth,
+		    &iar->choice.addressPrefix, 4);
 
 		/* IPv6 */
 		iac = &ip->list.array[1]->ipAddressChoice;
 		iac->present = IPAddressChoice_PR_addressesOrRanges;
 		INIT_ASN1_ARRAY(&iac->choice.addressesOrRanges.list,
 		    1, IPAddressOrRange_t);
-
 		iar = iac->choice.addressesOrRanges.list.array[0];
 		iar->present = IPAddressOrRange_PR_addressPrefix;
+		serials2bitstr(serials, node->depth,
+		    &iar->choice.addressPrefix, 16);
 
-		ia = &iar->choice.addressPrefix;
-		ia->size = 8;
-		ia->buf = pzalloc(ia->size);
-		ia->buf[0] = 0x20;
-		ia->buf[1] = 0x01;
-		ia->buf[2] = 0x0d;
-		ia->buf[3] = 0xb8;
+		free(serials);
 
 	} else {
 		/* IPv4 */
@@ -547,23 +576,48 @@ ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_object *so)
 	}
 }
 
-void
-ext_finish_asn(ASIdentifiers_t *asn, struct rpki_object *so)
+static void
+serials2asn(uint8_t *serials, size_t addrn, INTEGER_t *asn, uint8_t empty)
 {
+	unsigned long val;
+
+	val = (((addrn > 0) ? (serials[addrn - 1] & 0xFFu) : empty) << 24u)
+	    | (((addrn > 1) ? (serials[addrn - 2] & 0xFFu) : empty) << 16u)
+	    | (((addrn > 2) ? (serials[addrn - 3] & 0xFFu) : empty) <<  8u)
+	    | (((addrn > 3) ? (serials[addrn - 4] & 0xFFu) : empty) <<  0u);
+
+	if (asn_ulong2INTEGER(asn, val) < 0)
+		panic("Cannot convert %lu to INTEGER: %s", val, strerror(errno));
+}
+
+void
+ext_finish_asn(ASIdentifiers_t *asn, struct rpki_tree_node *node)
+{
+	uint8_t *serials;
 	ASIdOrRange_t *air;
 
 	pr_trace("Autocompleting ASN");
 
 	asn->asnum = pzalloc(sizeof(ASIdentifierChoice_t));
 
-	if (!so || so->node->type == FT_ROA) {
+	if (node->type == FT_TA || node->type == FT_CER) {
 		asn->asnum->present = ASIdentifierChoice_PR_asIdsOrRanges;
 		INIT_ASN1_ARRAY(&asn->asnum->choice.asIdsOrRanges.list,
 		    1, ASIdOrRange_t);
 
 		air = asn->asnum->choice.asIdsOrRanges.list.array[0];
-		air->present = ASIdOrRange_PR_id;
-		init_INTEGER(&air->choice.id, 123);
+
+		serials = get_serials(node);
+		if (node->depth <= 4) {
+			air->present = ASIdOrRange_PR_range;
+			serials2asn(serials, node->depth, &air->choice.range.min, 0);
+			serials2asn(serials, node->depth, &air->choice.range.max, 0xFFu);
+		} else {
+			air->present = ASIdOrRange_PR_id;
+			serials2asn(serials, node->depth, &air->choice.id, 0);
+		}
+		free(serials);
+
 	} else {
 		asn->asnum->present = ASIdentifierChoice_PR_inherit;
 	}

@@ -63,7 +63,7 @@ void pr_end(FILE *);
 
 #define enomem panic("Out of memory")
 
-#define PR_DEBUG do {							\
+#define PR_HELLO do {							\
 		pr_start(stdout, C_GRN);				\
 		printf("[DBG %s:%d]", __func__, __LINE__);		\
 		pr_end(stdout);						\

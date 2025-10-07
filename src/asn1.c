@@ -13,7 +13,7 @@
 #include "field.h"
 #include "file.h"
 
-#define BUFSIZE 4096
+#define BUFSIZE (64 * 1024)
 
 void
 init_8str(OCTET_STRING_t *ostr, char const *value)

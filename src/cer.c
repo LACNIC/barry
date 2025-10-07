@@ -59,12 +59,6 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 	exts_add_sia(&ee->exts, "sia", extf, sia_ee_defaults);
 	exts_add_cp(&ee->exts, "cp", extf);
 	exts_add_ip(&ee->exts, "ip", extf);
-	/*
-	 * This `if` is an rpki-client quirk.
-	 * They ban ASN extensions in ROAs. AFAIK, this is not RFC'd, but makes
-	 * sense... although it doesn't seem consistent with their treatment of
-	 * other SOs.
-	 */
 	if (ee->meta->node->type != FT_ROA)
 		exts_add_asn(&ee->exts, "asn", extf);
 }
@@ -245,12 +239,12 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 
 		case EXT_IP:
 			if (!fields_overridden(extnValuef, NULL))
-				ext_finish_ip(&ext->v.ip, so);
+				ext_finish_ip(&ext->v.ip, cer->meta->node);
 			break;
 
 		case EXT_ASN:
 			if (!fields_overridden(extnValuef, "asnum"))
-				ext_finish_asn(&ext->v.asn, so);
+				ext_finish_asn(&ext->v.asn, cer->meta->node);
 			break;
 		}
 	}
@@ -388,6 +382,18 @@ cer_crldp(struct rpki_certificate *cer)
 	HASH_ITER(phook, parent->children, child, tmp)
 		if (child->type == FT_CRL)
 			return child->meta.uri;
+
+	return NULL;
+}
+
+struct ext_list_node *
+cer_ext(struct rpki_certificate *cer, enum ext_type type)
+{
+	struct ext_list_node *ext;
+
+	STAILQ_FOREACH(ext, &cer->exts, hook)
+		if (ext->type == type)
+			return ext;
 
 	return NULL;
 }

@@ -70,8 +70,12 @@ static void
 add_child(struct rpki_tree_node *parent, struct rpki_tree_node *child)
 {
 	size_t keylen = strlen(child->meta.name);
+
 	HASH_ADD_KEYPTR(phook, parent->children, child->meta.name, keylen, child);
+
 	child->parent = parent;
+	child->depth = parent->depth + 1;
+	child->serial = HASH_CNT(phook, parent->children);
 }
 
 static bool

@@ -307,7 +307,6 @@ create_missing_node(struct rpki_tree *tree, struct rpki_tree_node *parent,
 	child->meta.node = child;
 	child->type = type;
 	child->fields = pzalloc(sizeof(struct field));
-	child->parent = parent;
 
 	rpkitree_add(tree, parent, child);
 }

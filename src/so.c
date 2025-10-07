@@ -67,8 +67,8 @@ finish_signed_data(struct signed_object *so, asn_TYPE_descriptor_t *td)
 	finish_signer_info(&so->si, &so->ee, so->sd.encapContentInfo.eContent);
 }
 
-static void
-finish_content_info(struct signed_object *so, asn_TYPE_descriptor_t *td)
+void
+content_info_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 {
 	finish_signed_data(so, td);
 	pr_debug("- Encoding the SignedData into the ContentInfo");
@@ -179,11 +179,4 @@ signed_object_new(struct rpki_tree_node *node, int nid, struct field **eContent)
 	init_signer_info(&so->si, nid, sif);
 
 	return so;
-}
-
-void
-signed_object_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
-{
-	cer_finish_ee(&so->ee, so->meta);
-	finish_content_info(so, td);
 }

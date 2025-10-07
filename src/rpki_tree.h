@@ -25,11 +25,12 @@ struct rpki_tree_node {
 	/* Overrides by the user */
 	struct keyvals props;
 
-	/* For tree building */
-	unsigned int indent;
+	unsigned int indent;	/* Only for tree building */
 	struct rpki_tree_node *parent;
 	/* Hash table */
 	struct rpki_tree_node *children;
+	unsigned int depth;	/* aka. ancestor count */
+	unsigned int serial;	/* This node is parent's `serial`th child */
 
 	/* Parent hash table hook */
 	UT_hash_handle phook;
