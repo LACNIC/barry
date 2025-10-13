@@ -184,7 +184,7 @@ Jul 14 13:26:41 INF: - Valid ROAs: 0
 ...
 ```
 
-With this, you can create some manner of testing mechanism by checking the presence of outputted ROAs, stat querying and/or maybe log grepping.
+With this, you can create some manner of [testing mechanism by checking the presence of outputted ROAs, stat querying and/or maybe log grepping](https://github.com/LACNIC/rapport).
 
 ## Tutorial: Verbose output
 
@@ -528,7 +528,12 @@ obj.tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, asn ]
 # Regular CAs
 obj.tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
 
-# End-Entities
+# ROAs
+obj.content.certificates.0.tbsCertificate.extensions = [
+	ski, aki, ku, crldp, aia, sia, cp, ip
+]
+
+# Manifests
 obj.content.certificates.0.tbsCertificate.extensions = [
 	ski, aki, ku, crldp, aia, sia, cp, ip, asn
 ]
@@ -607,8 +612,6 @@ obj.content.encapContentInfo.eContent.ipAddrBlocks = [
 ```
 
 List as many as you need. `barry` will automatically detect IP version and drop each entry to the corresponding `ROAIPAddressFamily`.
-
-> At present, all certificates and ROAs contain `192.0.2.0/24` as their only default IP resource. **This is going to change in the future**.
 
 ### fileList
 
@@ -822,12 +825,10 @@ sudo apt install apache2
 Create a self-signed certificate for your HTTPS RRDP server, and copy it to the trust store (so the RP will accept it):
 
 ```sh
-# When you fire this up, openssl will give you a few prompts.
-# If you want to run with Barry's default `--rrdp-uri`,
-# enter "`localhost`" as the common name.
-# Otherwise adjust to your needs.
-# The other fields don't matter.
+# "CN=localhost" is meant to match Barry's default `--rrdp-uri`.
+# The other -subj fields don't need specific values.
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+	-subj "/C=AU/ST=Some-State/O=IWPL/CN=localhost" \
 	-keyout "apache2-barry.key" -out "apache2-barry.crt"
 
 sudo cp "apache2-barry.crt" "/usr/local/share/ca-certificates/"
@@ -918,7 +919,8 @@ ls "$SANDBOX/content/rrdp"
 RRDP can now be served:
 
 ```sh
-$ fort --mode standalone --log.level info --tal "some.tal" | tail -5
+$ mkdir -p cache/
+$ fort --tal "some.tal" --mode standalone --local-repository cache/ --log.level info | tail -5
 Sep  2 16:47:19 INF: Validation finished:
 Sep  2 16:47:19 INF: - Valid ROAs: 1
 Sep  2 16:47:19 INF: - Valid Router Keys: 0

@@ -51,7 +51,7 @@ print_help(void)
 	printf("		[--" OPTLONG_NOW "=<Datetime>]\n");
 	printf("		[--" OPTLONG_LATER "=<Datetime>]\n");
 	printf("		[--" OPTLONG_KEYS "=<Path>]\n");
-	printf("		[--" OPTLONG_PR_OBJS "]\n");
+	printf("		[--" OPTLONG_PR_OBJS "=(csv|markdown)]\n");
 	printf("		[--" OPTLONG_VERBOSE " [--" OPTLONG_VERBOSE "]]\n");
 	printf("		[--" OPTLONG_COLOR "]\n");
 	printf("		[--" OPTLONG_HELP "]\n");
