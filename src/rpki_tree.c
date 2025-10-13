@@ -6,6 +6,7 @@
 #include <sys/types.h>
 
 #include "alloc.h"
+#include "asn1.h"
 #include "print.h"
 
 #define BADCFG(rdr, fmt, ...) panic("Line %u: " fmt, rdr->line, ##__VA_ARGS__)
@@ -624,6 +625,8 @@ default_paths(struct rrdp_notification *notif, char *notif_uri)
 
 	notif->uri = pstrdup(notif_uri);
 	notif->snapshot.uri = concat(notif_uri, ".snapshot");
+	notif->session = "9df4b597-af9e-4dca-bdda-719cce2c4e28";
+	init_INTEGER(&notif->serial, 1);
 
 	rrdp_uri_len = strlen(rrdp_uri);
 	if (strncmp(notif_uri, rrdp_uri, rrdp_uri_len) != 0)
@@ -643,10 +646,14 @@ init_notif_fields(struct rrdp_notification *notif)
 	notif->fields = pzalloc(sizeof(struct field));
 
 	field_add(notif->fields, "path", &ft_cstr, &notif->path, 0);
+	field_add(notif->fields, "session", &ft_cstr, &notif->session, 0);
+	field_add(notif->fields, "serial", &ft_int, &notif->serial, 0);
 
 	ssf = field_add(notif->fields, "snapshot", &ft_obj, &notif->snapshot, 0);
 	field_add(ssf, "uri", &ft_cstr, &notif->snapshot.uri, 0);
 	field_add(ssf, "path", &ft_cstr, &notif->snapshot.path, 0);
+	field_add(ssf, "session", &ft_cstr, &notif->snapshot.session, 0);
+	field_add(ssf, "serial", &ft_int, &notif->snapshot.serial, sizeof(INTEGER_t));
 	field_add(ssf, "files", &ft_files, &notif->snapshot.files, 0);
 }
 

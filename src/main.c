@@ -531,9 +531,13 @@ write_rrdp(struct rpki_tree *tree)
 		notif_path = join_paths(rrdp_path, notif->path);
 		snapshot_path = join_paths(rrdp_path, notif->snapshot.path);
 
-		rrdp_save_snapshot(snapshot_path, &SNAPSHOT, req, f);
-		rrdp_save_notification(notif_path, notif->snapshot.uri,
-		    sha256_file_str(snapshot_path));
+		rrdp_save_snapshot(snapshot_path, &SNAPSHOT,
+		    notif->snapshot.session ? notif->snapshot.session : notif->session,
+		    notif->snapshot.serial ? notif->snapshot.serial : &notif->serial,
+		    req, f);
+		rrdp_save_notification(notif_path,
+		    notif->session, &notif->serial,
+		    notif->snapshot.uri, sha256_file_str(snapshot_path));
 
 		free(snapshot_path);
 		free(notif_path);

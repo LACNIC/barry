@@ -46,10 +46,14 @@ struct rrdp_file {
 struct rrdp_notification {
 	char *uri;
 	char *path;
+	char *session;
+	INTEGER_t serial;
 
 	struct {
 		char *uri;
 		char *path;
+		char *session;
+		INTEGER_t *serial;
 		STAILQ_HEAD(rrdp_files, rrdp_file) files;
 	} snapshot;
 

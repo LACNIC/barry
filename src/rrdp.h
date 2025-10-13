@@ -1,6 +1,8 @@
 #ifndef SRC_OBJ_RRDP_H_
 #define SRC_OBJ_RRDP_H_
 
+#include <libasn1fort/INTEGER.h>
+
 struct rrdp_type;
 extern const struct rrdp_type SNAPSHOT;
 extern const struct rrdp_type DELTA;
@@ -16,8 +18,10 @@ struct rrdp_entry_file {
 	char *hash;
 };
 
-void rrdp_save_notification(char const *, char const *, char const *);
+void rrdp_save_notification(char const *, char const *, INTEGER_t *,
+    char const *, char const *);
 void rrdp_save_snapshot(char const *, struct rrdp_type const *,
+    char const *, INTEGER_t *,
     struct rrdp_entry_file *, unsigned int);
 
 #endif /* SRC_OBJ_RRDP_H_ */

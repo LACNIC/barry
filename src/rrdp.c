@@ -25,18 +25,29 @@ struct rrdp_entry_type {
 const struct rrdp_entry_type PUBLISH = { "publish" };
 const struct rrdp_entry_type WITHDRAW = { "withdraw" };
 
+static int
+just_write(const void *buffer, size_t size, void *arg)
+{
+	int *fd = arg;
+	dprintf(*fd, "%.*s", (int)size, (char *)buffer);
+	return 0;
+}
+
 void
-rrdp_save_notification(char const *path, char const *ss_uri, char const *ss_hash)
+rrdp_save_notification(char const *path,
+    char const *session, INTEGER_t *serial,
+    char const *ss_uri, char const *ss_hash)
 {
 	int fd;
 
 	fd = write_open(path);
 
-	// TODO the attributes need to be args
 	dprintf(fd, "<notification xmlns=\"%s\"\n", "http://www.ripe.net/rpki/rrdp");
 	dprintf(fd, "              version=\"%u\"\n", 1);
-	dprintf(fd, "              session_id=\"%s\"\n", "9df4b597-af9e-4dca-bdda-719cce2c4e28");
-	dprintf(fd, "              serial=\"%u\">\n", 3);
+	dprintf(fd, "              session_id=\"%s\"\n", session);
+	dprintf(fd, "              serial=\"");
+	INTEGER_print(&asn_DEF_INTEGER, serial, 0, just_write, &fd);
+	dprintf(fd, "\">\n");
 	dprintf(fd, "  <snapshot uri=\"%s\" hash=\"%s\"/>\n", ss_uri, ss_hash);
 	dprintf(fd, "</notification>\n");
 
@@ -88,6 +99,7 @@ base64_into_fd(char const *path, int fdout)
 
 void
 rrdp_save_snapshot(char const *path, struct rrdp_type const *type,
+    char const *session, INTEGER_t *serial,
     struct rrdp_entry_file *files, unsigned int count)
 {
 	extern char const *rsync_path;
@@ -103,8 +115,10 @@ rrdp_save_snapshot(char const *path, struct rrdp_type const *type,
 	tabbing = strlen(type->name) + 2;
 	dprintf(fd, "<%s xmlns=\"%s\"\n", type->name, "http://www.ripe.net/rpki/rrdp");
 	dprintf(fd, "%*cversion=\"%u\"\n", tabbing, ' ', 1);
-	dprintf(fd, "%*csession_id=\"%s\"\n", tabbing, ' ', "9df4b597-af9e-4dca-bdda-719cce2c4e28");
-	dprintf(fd, "%*cserial=\"%u\">\n", tabbing, ' ', 3);
+	dprintf(fd, "%*csession_id=\"%s\"\n", tabbing, ' ', session);
+	dprintf(fd, "%*cserial=\"", tabbing, ' ');
+	INTEGER_print(&asn_DEF_INTEGER, serial, 0, just_write, &fd);
+	dprintf(fd, "\">\n");
 
 	for (f = 0; f < count; f++) {
 		file = &files[f];
