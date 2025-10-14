@@ -170,7 +170,7 @@ print_sha256(int fd, unsigned char *sha)
 {
 	size_t i;
 	for (i = 0; i < HASHSIZE; i++)
-		dprintf(fd, "%x", sha[i]);
+		dprintf(fd, "%02x", sha[i]);
 }
 
 static char *
@@ -460,9 +460,13 @@ write_delta(xmlChar *uri, xmlChar *content, void *_args)
 		print_sha256(args->fd, delta->hash);
 		dprintf(args->fd, "\"");
 	}
-	dprintf(args->fd, ">");
-	dprintf(args->fd, "%s", content);
-	dprintf(args->fd, "</%s>\n", tagname);
+	if (delta->type != DT_WITHDRAW) {
+		dprintf(args->fd, ">");
+		dprintf(args->fd, "%s", content);
+		dprintf(args->fd, "</%s>\n", tagname);
+	} else {
+		dprintf(args->fd, " />\n");
+	}
 }
 
 static void
@@ -508,7 +512,7 @@ write_notification(char const *path, struct notification *new,
 	dprintf(fd, "              session_id=\"%s\"\n", new->meta.session_id);
 	dprintf(fd, "              serial=\"%s\">\n", new->meta.serial);
 
-	dprintf(fd, "  <snapshot uri=\"%s\" hash=\"%s\"/>\n",
+	dprintf(fd, "  <snapshot uri=\"%s\" hash=\"%s\" />\n",
 	    new->snapshot.uri, new->snapshot.hash);
 
 	sha256_file(delta_path, hash, &hlen);
@@ -521,7 +525,7 @@ write_notification(char const *path, struct notification *new,
 		dprintf(fd, "  <delta serial=\"%s\" uri=\"%s\" hash=\"%s\" />\n",
 		    delta->serial, delta->uri, delta->hash);
 
-	dprintf(fd, "</notification>\"\n");
+	dprintf(fd, "</notification>\n");
 
 	close(fd);
 }
