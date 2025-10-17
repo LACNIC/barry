@@ -608,7 +608,7 @@ ext_finish_asn(ASIdentifiers_t *asn, struct rpki_tree_node *node)
 		air = asn->asnum->choice.asIdsOrRanges.list.array[0];
 
 		serials = get_serials(node);
-		if (node->depth <= 4) {
+		if (node->depth < 4) {
 			air->present = ASIdOrRange_PR_range;
 			serials2asn(serials, node->depth, &air->choice.range.min, 0);
 			serials2asn(serials, node->depth, &air->choice.range.max, 0xFFu);
