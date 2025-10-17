@@ -109,7 +109,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	tbs->version = intmax2INTEGER(2);
 	field_add(tbsf, "version", &ft_int, &tbs->version, sizeof(Version_t));
 
-	init_INTEGER(&tbs->serialNumber, 0);
+	init_INTEGER(&tbs->serialNumber, meta->node->serial);
 	field_add(tbsf, "serialNumber", &ft_int, &tbs->serialNumber, 0);
 
 	init_oid(&tbs->signature.algorithm, NID_sha256WithRSAEncryption);
