@@ -539,6 +539,9 @@ main(int argc, char **argv)
 	struct snapshot ss2 = { 0 };
 	struct deltas deltas = { 0 };
 
+	STAILQ_INIT(&notif1.deltas);
+	STAILQ_INIT(&notif2.deltas);
+
 	register_signal_handlers();
 
 	parse_options(argc, argv);
