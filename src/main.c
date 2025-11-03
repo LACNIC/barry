@@ -641,7 +641,7 @@ main(int argc, char **argv)
 	rpkitree_pre_order(&tree, write_mfts, NULL);
 	pr_debug("Done.\n");
 
-	if (rrdp_uri && rrdp_path) {
+	if (rrdp_uri[0] && rrdp_path[0]) {
 		pr_debug("Writing RRDP XMLs...");
 		write_rrdp(&tree);
 		pr_debug("Done.\n");

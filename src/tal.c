@@ -70,7 +70,7 @@ tal_write(struct rpki_certificate *ta, char const *path)
 
 	fd = write_open(path);
 
-	if (rrdp_uri) {
+	if (rrdp_uri[0]) {
 		uri = join_paths(rrdp_uri, ta->meta->name);
 		if (write(fd, uri, strlen(uri)) < 0)
 			panic("write(HTTP URI)");

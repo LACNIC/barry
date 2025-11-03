@@ -205,9 +205,9 @@ sia_ca_defaults(SubjectInfoAccessSyntax_t *sia, struct field *evf)
 	init_ad(sia->list.array[0], evf, NID_caRepository, "0");
 	init_ad(sia->list.array[1], evf, NID_rpkiManifest, "1");
 	// TODO (test) check no default rpkiNotify is created if --rrdp-uri is missing
-	if (rrdp_uri)
+	if (rrdp_uri[0])
 		init_ad(sia->list.array[2], evf, NID_rpkiNotify, "2");
-end:	return rrdp_uri ? 3 : 2;
+end:	return rrdp_uri[0] ? 3 : 2;
 }
 
 int
