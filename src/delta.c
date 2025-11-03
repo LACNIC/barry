@@ -497,13 +497,23 @@ write_deltas(char const *path, char const *ss1, char const *ss2,
 }
 
 static void
-write_notification(char const *path, struct notification *new,
+print_notification_deltas(int fd, struct notification *notif)
+{
+	struct notification_delta *delta;
+
+	STAILQ_FOREACH(delta, &notif->deltas, hook)
+		dprintf(fd, "  <delta serial=\"%s\" uri=\"%s\" hash=\"%s\" />\n",
+		    delta->serial, delta->uri, delta->hash);
+}
+
+static void
+write_notification(char const *path,
+    struct notification *old, struct notification *new,
     char const *delta_uri, char const *delta_path)
 {
 	int fd;
 	unsigned char hash[EVP_MAX_MD_SIZE];
 	unsigned int hlen;
-	struct notification_delta *delta;
 
 	fd = write_open(path);
 
@@ -521,9 +531,8 @@ write_notification(char const *path, struct notification *new,
 	print_sha256(fd, hash); // TODO (fine) send hlen
 	dprintf(fd, "\" />\n");
 
-	STAILQ_FOREACH(delta, &new->deltas, hook)
-		dprintf(fd, "  <delta serial=\"%s\" uri=\"%s\" hash=\"%s\" />\n",
-		    delta->serial, delta->uri, delta->hash);
+	print_notification_deltas(fd, old);
+	print_notification_deltas(fd, new);
 
 	dprintf(fd, "</notification>\n");
 
@@ -554,5 +563,5 @@ main(int argc, char **argv)
 	deltas.meta = &notif2.meta;
 	compute_deltas(&ss1, &ss2, &deltas);
 	write_deltas(delta_path, ss1_path, ss2_path, &deltas);
-	write_notification(notif3_path, &notif2, delta_uri, delta_path);
+	write_notification(notif3_path, &notif1, &notif2, delta_uri, delta_path);
 }
