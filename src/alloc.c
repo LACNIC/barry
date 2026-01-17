@@ -22,8 +22,9 @@ pzalloc(size_t size)
 {
 	void *result;
 
-	result = pmalloc(size);
-	memset(result, 0, size);
+	result = calloc(1, size);
+	if (!result)
+		enomem;
 
 	return result;
 }

@@ -385,8 +385,8 @@ read_keyvals(struct rd_parse_context *ctx)
 {
 	struct token tkn;
 	char *type, *id;
-	struct rpki_tree_node *node;
-	struct rrdp_notification *notif;
+	struct rpki_tree_node *node = NULL;
+	struct rrdp_notification *notif = NULL;
 	struct keyval *kv;
 
 again:
@@ -625,7 +625,7 @@ default_paths(struct rrdp_notification *notif, char *notif_uri)
 
 	notif->uri = pstrdup(notif_uri);
 	notif->snapshot.uri = concat(notif_uri, ".snapshot");
-	notif->session = "9df4b597-af9e-4dca-bdda-719cce2c4e28";
+	notif->session = "1";
 	init_INTEGER(&notif->serial, 1);
 
 	rrdp_uri_len = strlen(rrdp_uri);
