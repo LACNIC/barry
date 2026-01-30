@@ -14,6 +14,7 @@ struct rpki_object {
 	struct rpki_tree_node *node;
 };
 
+struct rpki_certificate *meta_certificate(struct rpki_object *);
 struct rpki_certificate *meta_parent(struct rpki_object *);
 
 #endif /* SRC_RPKI_OBJECT_H_ */

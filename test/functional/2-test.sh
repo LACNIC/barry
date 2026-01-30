@@ -30,7 +30,7 @@ rm -rf sandbox/tal/*
 # Prepare common barry arguments, needed by all tests
 BARRY="../../src/barry"
 KEYS="--keys sandbox/keys"
-PRINTS="-vvp csv"
+PRINTS="-cvvp csv"
 TIMES="--now 2025-01-01T00:00:00Z --later 2026-01-01T00:00:00Z"
 BASIC_ARGS="$KEYS $PRINTS $TIMES"
 
@@ -177,7 +177,7 @@ check_output_contains "tutorial-name" -Fx \
 check_output_contains "tutorial-ext" -Fx \
 	"ta.cer,obj.tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, ku=ku, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
 	"ca1.cer,obj.tbsCertificate.extensions,Extensions,\"{ bc=bc, ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
-	"roa1.roa,obj.content.certificates.0.tbsCertificate.extensions,Extensions,\"{ ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }\"" \
+	"roa1.roa,obj.content.certificates.0.tbsCertificate.extensions,Extensions,\"{ ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip }\"" \
 	"ta.crl,obj.tbsCertList.crlExtensions,Extensions,\"{ aki=aki, crln=crln }\"" \
 	"ca1.cer,obj.tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.28 (sbgp-ipAddrBlockv2)" \
 	"ca1.cer,obj.tbsCertificate.extensions.ip.critical,BOOLEAN,true" \
@@ -500,6 +500,15 @@ check_output_contains "sia4" -Fx \
 	"C.crl,obj.tbsCertList.crlExtensions.3.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.5 (CA Repository)" \
 	"C.crl,obj.tbsCertList.crlExtensions.3.extnValue.0.accessLocation.type,GeneralName type,registeredID" \
 	"C.crl,obj.tbsCertList.crlExtensions.3.extnValue.0.accessLocation.value,OBJECT IDENTIFIER,1.4.8.16"
+
+check_output_contains "aspa-min" -Fx \
+	"aspa.asa,obj.content.encapContentInfo.eContent.version,INTEGER,0x01" \
+	"aspa.asa,obj.content.encapContentInfo.eContent.customerASID,INTEGER,0x01000000" \
+	"aspa.asa,obj.content.encapContentInfo.eContent.providers,ASPA Providers,[ 0 ]"
+check_output_contains "aspa-max" -Fx \
+	"aspa.asa,obj.content.encapContentInfo.eContent.version,INTEGER,0x04" \
+	"aspa.asa,obj.content.encapContentInfo.eContent.customerASID,INTEGER,0x0200" \
+	"aspa.asa,obj.content.encapContentInfo.eContent.providers,ASPA Providers,\"[ 0x0100, 0x0300, 0x0400, 0x0555 ]\""
 
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

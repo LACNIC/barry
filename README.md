@@ -538,6 +538,11 @@ obj.content.certificates.0.tbsCertificate.extensions = [
 	ski, aki, ku, crldp, aia, sia, cp, ip, asn
 ]
 
+# ASPAs
+obj.content.certificates.0.tbsCertificate.extensions = [ 
+	ski, aki, ku, crldp, aia, sia, cp, asn
+]
+
 # CRLs
 obj.tbsCertList.crlExtensions = [ aki, crln ]
 ```

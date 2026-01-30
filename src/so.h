@@ -1,6 +1,7 @@
 #ifndef SRC_SO_H_
 #define SRC_SO_H_
 
+#include <libasn1fort/ASProviderAttestation.h>
 #include <libasn1fort/ContentInfo.h>
 #include <libasn1fort/Manifest.h>
 #include <libasn1fort/RouteOriginAttestation.h>
@@ -24,6 +25,7 @@ struct signed_object {
 	union {
 		Manifest_t mft;
 		RouteOriginAttestation_t roa;
+		ASProviderAttestation_t aspa;
 	} obj;
 	struct rpki_certificate ee;
 	struct rpki_object ee_meta;

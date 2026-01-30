@@ -10,6 +10,7 @@ bin_PROGRAMS = barry barry-delta
 barry_SOURCES = main.c
 
 barry_SOURCES += alloc.c alloc.h
+barry_SOURCES += asa.c asa.h
 barry_SOURCES += asn1.c asn1.h
 barry_SOURCES += cer.c cer.h
 barry_SOURCES += crl.c crl.h

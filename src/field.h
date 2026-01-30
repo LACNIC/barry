@@ -60,6 +60,7 @@ extern const struct field_type ft_ia5str;
 extern const struct field_type ft_anystr;
 extern const struct field_type ft_cstr;		/* char * */
 extern const struct field_type ft_any;
+extern const struct field_type ft_any_oid;
 extern const struct field_type ft_bitstr;
 extern const struct field_type ft_rdnseq;
 extern const struct field_type ft_gname_type;	/* GeneralName type */
@@ -73,6 +74,7 @@ extern const struct field_type ft_ip_cer;
 extern const struct field_type ft_asn_cer;
 extern const struct field_type ft_revoked;
 extern const struct field_type ft_filelist;
+extern const struct field_type ft_providers;
 extern const struct field_type ft_files;
 
 struct field *field_add(struct field *, char const *, struct field_type const *,

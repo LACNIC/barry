@@ -12,6 +12,10 @@ enum file_type {
 	FT_CRL,
 	FT_MFT,
 	FT_ROA,
+	FT_ASA,
+
+#define IS_CER(t) ((t) == FT_CER || (t) == FT_TA)
+#define IS_SO(t) ((t) == FT_ROA || (t) == FT_ASA || (t) == FT_MFT)
 };
 
 struct rpki_tree_node {

@@ -540,7 +540,7 @@ ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_tree_node *node)
 	iaf->buf[0] = 0;
 	iaf->buf[1] = 2;
 
-	if (node->type == FT_TA || node->type == FT_CER || node->type == FT_ROA) {
+	if (IS_CER(node->type) || node->type == FT_ROA) {
 		serials = get_serials(node);
 
 		/* IPv4 */
@@ -599,28 +599,22 @@ ext_finish_asn(ASIdentifiers_t *asn, struct rpki_tree_node *node)
 	pr_trace("Autocompleting ASN");
 
 	asn->asnum = pzalloc(sizeof(ASIdentifierChoice_t));
+	asn->asnum->present = ASIdentifierChoice_PR_asIdsOrRanges;
+	INIT_ASN1_ARRAY(&asn->asnum->choice.asIdsOrRanges.list,
+	    1, ASIdOrRange_t);
 
-	if (node->type == FT_TA || node->type == FT_CER) {
-		asn->asnum->present = ASIdentifierChoice_PR_asIdsOrRanges;
-		INIT_ASN1_ARRAY(&asn->asnum->choice.asIdsOrRanges.list,
-		    1, ASIdOrRange_t);
+	air = asn->asnum->choice.asIdsOrRanges.list.array[0];
 
-		air = asn->asnum->choice.asIdsOrRanges.list.array[0];
-
-		serials = get_serials(node);
-		if (node->depth < 4) {
-			air->present = ASIdOrRange_PR_range;
-			serials2asn(serials, node->depth, &air->choice.range.min, 0);
-			serials2asn(serials, node->depth, &air->choice.range.max, 0xFFu);
-		} else {
-			air->present = ASIdOrRange_PR_id;
-			serials2asn(serials, node->depth, &air->choice.id, 0);
-		}
-		free(serials);
-
+	serials = get_serials(node);
+	if (node->depth < 4) {
+		air->present = ASIdOrRange_PR_range;
+		serials2asn(serials, node->depth, &air->choice.range.min, 0);
+		serials2asn(serials, node->depth, &air->choice.range.max, 0xFFu);
 	} else {
-		asn->asnum->present = ASIdentifierChoice_PR_inherit;
+		air->present = ASIdOrRange_PR_id;
+		serials2asn(serials, node->depth, &air->choice.id, 0);
 	}
+	free(serials);
 }
 
 void

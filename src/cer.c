@@ -58,9 +58,20 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 	exts_add_aia(&ee->exts, "aia", extf);
 	exts_add_sia(&ee->exts, "sia", extf, sia_ee_defaults);
 	exts_add_cp(&ee->exts, "cp", extf);
-	exts_add_ip(&ee->exts, "ip", extf);
-	if (ee->meta->node->type != FT_ROA)
+	switch (ee->meta->node->type) {
+	case FT_MFT: /* TODO ??? */
+		exts_add_ip(&ee->exts, "ip", extf);
 		exts_add_asn(&ee->exts, "asn", extf);
+		break;
+	case FT_ROA:
+		exts_add_ip(&ee->exts, "ip", extf);
+		break;
+	case FT_ASA:
+		exts_add_asn(&ee->exts, "asn", extf);
+		break;
+	default:
+		break;
+	}
 }
 
 struct rpki_certificate *

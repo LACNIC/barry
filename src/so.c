@@ -81,6 +81,7 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 {
 	CMSAttribute_t *attr;
 	OBJECT_IDENTIFIER_t ct;
+	struct field *saf;
 	Time_t st = { 0 };
 
 	init_INTEGER(&si->version, 3);
@@ -99,12 +100,15 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 
 	si->signedAttrs = pzalloc(sizeof(SignedAttributes_t));
 	INIT_ASN1_ARRAY(&si->signedAttrs->list, 3, CMSAttribute_t);
+	saf = field_add(sif, "signedAttrs", NULL, NULL, 0);
 
+	/* signedAttrs[0] */
 	attr = si->signedAttrs->list.array[0];
 	init_oid(&attr->attrType, NID_pkcs9_contentType);
 	INIT_ASN1_ARRAY(&attr->attrValues.list, 1, CMSAttributeValue_t);
 	init_oid(&ct, nid);
 	der_encode_any(&asn_DEF_OBJECT_IDENTIFIER, &ct, attr->attrValues.list.array[0]);
+	field_add(saf, "content-type", &ft_any_oid, attr->attrValues.list.array[0], 0);
 
 	/* signedAttrs[1] postponed */
 
@@ -113,6 +117,7 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 	INIT_ASN1_ARRAY(&attr->attrValues.list, 1, CMSAttributeValue_t);
 	init_time_now(&st);
 	der_encode_any(&asn_DEF_Time, &st, attr->attrValues.list.array[0]);
+//	field_add(saf, "signing-time", ct_any_time, &attr->attrValues, 0);
 
 	/* TODO signedAttrs field not implemented yet */
 

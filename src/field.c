@@ -10,6 +10,7 @@
 #include <libasn1fort/IPAddressOrRange.h>
 #include <libasn1fort/Manifest.h>
 #include <libasn1fort/PrintableString.h>
+#include <libasn1fort/ProviderASSet.h>
 #include <libasn1fort/ROAIPAddress.h>
 #include <libasn1fort/ROAIPAddressFamily.h>
 #include <libasn1fort/RelativeDistinguishedName.h>
@@ -637,6 +638,43 @@ print_any(struct dynamic_string *dstr, void *val)
 {
 	ANY_t *any = val;
 	print_maybe_string(dstr, any->buf, any->size);
+}
+
+static error_msg
+parse_any_oid(struct field *fields, struct kv_value *src, void *dst)
+{
+	OBJECT_IDENTIFIER_t oid = { 0 };
+	ANY_t *any = dst;
+	error_msg error;
+
+	error = parse_oid(fields, src, &oid);
+	if (error)
+		return error;
+
+	der_encode_any(&asn_DEF_OBJECT_IDENTIFIER, &oid, any);
+	return NULL;
+}
+
+static void
+print_any_oid(struct dynamic_string *dstr, void *val)
+{
+	ANY_t *any = val;
+	OBJECT_IDENTIFIER_t *oid = NULL;
+	asn_dec_rval_t rval;
+
+	rval = ber_decode_primitive(NULL, &asn_DEF_OBJECT_IDENTIFIER,
+	    (void **)&oid, any->buf, any->size, 0);
+	switch (rval.code) {
+	case RC_OK:
+		print_oid(dstr, oid);
+		break;
+	case RC_WMORE:
+		pr_err("Error: Incomplete value");
+		break;
+	case RC_FAIL:
+		pr_err("Error: Unparseable");
+		break;
+	}
 }
 
 static error_msg
@@ -1687,6 +1725,52 @@ print_filelist(struct dynamic_string *dstr, void *arg)
 }
 
 static error_msg
+parse_providers(struct field *rootf, struct kv_value *src, void *arg)
+{
+	ProviderASSet_t *providers = arg;
+	struct kv_node *kv;
+	error_msg error;
+	int p;
+
+	if (src->type != VALT_SET)
+		return "Providers list is not an array";
+
+	p = 0;
+	STAILQ_FOREACH(kv, &src->v.set, hook)
+		p++;
+
+	INIT_ASN1_ARRAY(&providers->list, p, ASId_t);
+	p = 0;
+	STAILQ_FOREACH(kv, &src->v.set, hook) {
+		error = __parse_int(&kv->value, providers->list.array[p]);
+		if (error)
+			return error;
+
+//		field_addn(rootf, p, &ft_int, providers->list.array[p],
+//		    sizeof(ASId_t));
+
+		p++;
+	}
+
+	return NULL;
+}
+
+static void
+print_providers(struct dynamic_string *dstr, void *arg)
+{
+	ProviderASSet_t *providers = arg;
+	int a;
+
+	dstr_append(dstr, "[ ");
+	for (a = 0; a < providers->list.count; a++) {
+		print_int(dstr, providers->list.array[a]);
+		if (a != providers->list.count - 1)
+			dstr_append(dstr, ", ");
+	}
+	dstr_append(dstr, " ]");
+}
+
+static error_msg
 parse_files(struct field *rootf, struct kv_value *src, void *dst)
 {
 	struct kv_node *node;
@@ -1734,6 +1818,7 @@ const struct field_type ft_ia5str = { "IA5String", parse_ia5str, print_ia5str };
 const struct field_type ft_anystr = { "PrintableString in ANY", parse_anystr, print_anystr };
 const struct field_type ft_cstr = { "C String", parse_cstr, print_cstr };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
+const struct field_type ft_any_oid = { "ANY-OID", parse_any_oid, print_any_oid };
 const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr };
 const struct field_type ft_rdnseq = { "RDN Sequence", parse_rdnseq, NULL };
 const struct field_type ft_gname_type = { "GeneralName type", parse_gname_type, print_gname_type };
@@ -1747,6 +1832,7 @@ const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_ce
 const struct field_type ft_asn_cer = { "AS Resources", parse_asns, print_asns };
 const struct field_type ft_revoked = { "Revoked Certificates", parse_revoked_list, print_revokeds };
 const struct field_type ft_filelist = { "File List", parse_filelist, print_filelist };
+const struct field_type ft_providers = { "ASPA Providers", parse_providers, print_providers };
 const struct field_type ft_files = { "Snapshot Files", parse_files, print_files };
 
 struct field *

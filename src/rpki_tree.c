@@ -599,12 +599,18 @@ rpkitree_add(struct rpki_tree *tree, struct rpki_tree_node *parent,
 static void
 print_node(struct rpki_tree_node *node, unsigned int indent)
 {
+	struct keyval *kv;
 	struct rpki_tree_node *child, *tmp;
 	size_t i;
 
 	for (i = 0; i < indent; i++)
 		printf("\t");
-	printf("%s\n", node->meta.name);
+
+	i = 0;
+	STAILQ_FOREACH(kv, &node->props, hook)
+		i++;
+
+	printf("%s (%zu props)\n", node->meta.name, i);
 
 	indent++;
 	HASH_ITER(phook, node->children, child, tmp)

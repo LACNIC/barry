@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "asa.h"
 #include "asn1.h"
 #include "crl.h"
 #include "file.h"
@@ -191,6 +192,8 @@ str2ft(struct rpki_tree_node *node, char const *str)
 		return FT_MFT;
 	if (strcmp(str, "roa") == 0)
 		return FT_ROA;
+	if (strcmp(str, "asa") == 0 || strcmp(str, "aspa") == 0)
+		return FT_ASA;
 	return FT_UNKNOWN;
 }
 
@@ -264,6 +267,9 @@ init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	case FT_ROA:
 		node->obj = roa_new(node);
 		break;
+	case FT_ASA:
+		node->obj = asa_new(node);
+		break;
 	default:
 		panic("Unknown file type: %s", node->meta.name);
 	}
@@ -286,7 +292,7 @@ generate_paths(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 		pr_debug("- path: %s", meta->path);
 	}
 
-	if (node->type == FT_TA || node->type == FT_CER)
+	if (IS_CER(node->type))
 		cer_finish_rpp(node->obj);
 }
 
@@ -315,7 +321,7 @@ static void
 add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
     void *arg)
 {
-	if (parent->type != FT_CER && parent->type != FT_TA)
+	if (!IS_CER(parent->type))
 		return;
 
 	if (find_child(parent, FT_MFT) == NULL) {
@@ -367,6 +373,9 @@ finish_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	case FT_ROA:
 		roa_finish(node->obj);
 		break;
+	case FT_ASA:
+		asa_finish(node->obj);
+		break;
 	default:
 		panic("Unknown file type: %s", node->meta.name);
 	}
@@ -399,6 +408,9 @@ write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 		break;
 	case FT_ROA:
 		roa_write(node->obj);
+		break;
+	case FT_ASA:
+		asa_write(node->obj);
 		break;
 	default:
 		panic("Unknown file type: %s", node->meta.name);
@@ -451,7 +463,7 @@ build_notif_filelists(struct rpki_tree *tree, struct rpki_tree_node *node,
 
 	ancestor = node;
 	while ((ancestor = ancestor->parent) != NULL) {
-		if (ancestor->type != FT_TA && ancestor->type != FT_CER)
+		if (!IS_CER(ancestor->type))
 			continue;
 
 		cer = ancestor->obj;

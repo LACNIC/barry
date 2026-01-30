@@ -43,7 +43,7 @@ find_inheritor(struct rpki_certificate *cer, OCTET_STRING_t *af)
 	int i;
 
 	for (node = cer->meta->node->parent; node != NULL; node = node->parent) {
-		if (node->type != FT_TA && node->type != FT_CER)
+		if (!IS_CER(node->type))
 			return NULL;
 
 		ext = cer_ext(node->obj, EXT_IP);
