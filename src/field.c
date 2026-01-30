@@ -49,9 +49,11 @@ static error_msg const BAD_ASN = "Expected an array of AS identifiers or 'inheri
 static error_msg
 parse_obj(struct field *fields, struct kv_value *src, void *dst)
 {
-	return (src->type == VALT_MAP)
-		? fields_apply_keyvals(fields, &src->v.map)
-		: NEED_MAP;
+	if (src->type != VALT_MAP)
+		return NEED_MAP;
+
+	fields_apply_keyvals(fields, &src->v.map);
+	return NULL;
 }
 
 static int
@@ -2053,7 +2055,7 @@ is_pointer(struct field const *field)
 	return field->size != 0;
 }
 
-error_msg
+void
 fields_apply_keyvals(struct field *ht, struct keyvals *kvs)
 {
 	struct keyval *kv;
@@ -2079,12 +2081,10 @@ fields_apply_keyvals(struct field *ht, struct keyvals *kvs)
 			error = field->type->parser(field, &kv->value, value);
 		}
 		if (error)
-			return error;
+			panic("%s", error);
 
 		field->overridden = true;
 	}
-
-	return NULL;
 }
 
 static void

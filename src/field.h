@@ -94,7 +94,7 @@ struct field *fields_find(struct field *, char const *);
 struct field *fields_find_n(struct field *, size_t);
 bool fields_overridden(struct field *, char const *);
 
-error_msg fields_apply_keyvals(struct field *, struct keyvals *);
+void fields_apply_keyvals(struct field *, struct keyvals *);
 void fields_print_md(struct field const *);
 void fields_print_csv(struct field const *, char const *);
 
