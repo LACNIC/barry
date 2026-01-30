@@ -21,14 +21,19 @@ field_test_SOURCES += ../../src/asn1.c ../../src/asn1.h
 field_test_SOURCES += ../../src/csv.c ../../src/csv.h
 field_test_SOURCES += ../../src/ext.c ../../src/ext.h
 field_test_SOURCES += ../../src/file.c ../../src/file.h
+field_test_SOURCES += ../../src/global.h
 field_test_SOURCES += ../../src/oid.c ../../src/oid.h
+field_test_SOURCES += ../../src/print.c ../../src/print.h
 field_test_SOURCES += ../../src/sha.c ../../src/sha.h
 field_test_SOURCES += ../../src/str.c ../../src/str.h
 field_test_LDADD = ${MY_LDADD}
 
 tree_test_SOURCES  = tree_test.c
 tree_test_SOURCES += ../../src/alloc.c ../../src/alloc.h
+tree_test_SOURCES += ../../src/asn1.c ../../src/asn1.h
 tree_test_SOURCES += ../../src/file.c ../../src/file.h
+tree_test_SOURCES += ../../src/global.h
+tree_test_SOURCES += ../../src/print.c ../../src/print.h
 tree_test_SOURCES += ../../src/str.c ../../src/str.h
 tree_test_LDADD = ${MY_LDADD}
 

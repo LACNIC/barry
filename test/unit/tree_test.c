@@ -4,14 +4,12 @@
 #include <stdarg.h>
 #include <unistd.h>
 
+#include "../src/global.h"
+
 #define RDFD 0
 #define WRFD 1
 
 /* Mocks */
-
-char const *rrdp_uri = "https://localhost:8443/rrdp";
-char const *rrdp_path = "rrdp/";
-unsigned int verbosity = 2;
 
 struct field *
 field_add(struct field *parent, char const *name,

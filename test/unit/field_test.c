@@ -2,17 +2,9 @@
 
 #include <check.h>
 
+#include "../src/global.h"
+
 /* Mocks */
-
-char const *rsync_path;
-char const *rrdp_uri;
-Time_t default_now;
-Time_t default_later;
-GeneralizedTime_t default_gnow;
-GeneralizedTime_t default_glater;
-
-char const *keys_path = NULL;
-unsigned int verbosity = 0;
 
 char const *
 cer_rpkiManifest(struct rpki_certificate *cer)
