@@ -223,8 +223,13 @@ der_encode_8str(const asn_TYPE_descriptor_t *td, void *obj, OCTET_STRING_t *os)
 	os->buf = pmalloc(BUFSIZE);
 
 	rval = der_encode_to_buffer(td, obj, os->buf, BUFSIZE);
-	if (rval.encoded < 0)
-		panic("Cannot encode %s: %zd", td->name, rval.encoded);
+	if (rval.encoded < 0) {
+		if (rval.failed_type)
+			panic("Cannot encode %s's %s: %zd", td->name,
+			    rval.failed_type->name, rval.encoded);
+		else
+			panic("Cannot encode %s: %zd", td->name, rval.encoded);
+	}
 
 	os->size = rval.encoded;
 }

@@ -3,6 +3,13 @@
 
 #include <sys/queue.h>
 
+/*
+ * Somewhat annoying naming:
+ *
+ * - "keyval"s are the user's overrides.
+ * - "field"s (field.h) are ASN1 object metadata.
+ */
+
 enum kv_type {
 	VALT_STR,
 	VALT_SET,

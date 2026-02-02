@@ -27,10 +27,17 @@ struct field_type {
 	print_field print;
 };
 
+/*
+ * Somewhat annoying naming:
+ *
+ * - "field"s are ASN1 object metadata.
+ * - "keyval"s (keyval.h) are the user's overrides.
+ */
 struct field {
 	/* AKA. "name" */
 	char const *key;
 	struct field_type const *type;
+
 	/* Memory location of the field's value */
 	void *address;
 	/*
@@ -40,7 +47,22 @@ struct field {
 	 *    if the field needs to exist.
 	 */
 	size_t size;
-	/* Value already applied to @address? */
+
+	/*
+	 * Memory location of the field's alternate value.
+	 * (It never needs to be reallocated by definition.)
+	 *
+	 * This is only used in ANYs or OCTET STRINGS that are supposed to be
+	 * DER-encoded object hacks.
+	 * "address" points to the ANY or 8STR, while "address2" points to the
+	 * object that's supposed to be encoded into the ANY or 8STR.
+	 * The user is allowed to define either.
+	 * They can also sometimes override both, though the precedence is
+	 * rather undefined right now.
+	 */
+	void *address2;
+
+	/* Did the user tweak this value? ("address" only) */
 	bool overridden;
 
 	struct field *parent;

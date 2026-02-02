@@ -72,7 +72,6 @@ content_info_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 {
 	finish_signed_data(so, td);
 	pr_debug("- Encoding the SignedData into the ContentInfo");
-	// TODO autocomputed even if overridden
 	der_encode_any(&asn_DEF_SignedData, &so->sd, &so->ci.content);
 }
 
@@ -149,7 +148,8 @@ signed_object_new(struct rpki_tree_node *node, int nid, struct field **eContent)
 
 	init_oid(&so->ci.contentType, NID_pkcs7_signed);
 	field_add(so->objf, "contentType", &ft_oid, &so->ci.contentType, 0);
-	sdf = field_add(so->objf, "content", &ft_obj, &so->ci.content, 0);
+	sdf = field_add(so->objf, "content", &ft_any, &so->ci.content, 0);
+	sdf->address2 = sd;
 
 	init_INTEGER(&sd->version, 3);
 	field_add(sdf, "version", &ft_int, &sd->version, 0);
@@ -163,7 +163,7 @@ signed_object_new(struct rpki_tree_node *node, int nid, struct field **eContent)
 	/* eContent postponed */
 	ecif = field_add(sdf, "encapContentInfo", &ft_obj, &sd->encapContentInfo, 0);
 	field_add(ecif, "eContentType", &ft_oid, &sd->encapContentInfo.eContentType, 0);
-	*eContent = field_add(ecif, "eContent", &ft_any,
+	*eContent = field_add(ecif, "eContent", &ft_8str,
 	    &sd->encapContentInfo.eContent, sizeof(OCTET_STRING_t));
 
 	sd->certificates = pzalloc(sizeof(struct CertificateSet));

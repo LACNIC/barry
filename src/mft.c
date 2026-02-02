@@ -56,7 +56,7 @@ mft_new(struct rpki_tree_node *node)
 	struct field *eContent, *fileList;
 
 	so = signed_object_new(node, NID_id_ct_rpkiManifest, &eContent);
-	mft = &so->obj.mft;
+	mft = eContent->address2 = &so->obj.mft;
 
 	mft->version = intmax2INTEGER(0);
 	field_add(eContent, "version", &ft_int, &mft->version, sizeof(INTEGER_t));
@@ -154,6 +154,9 @@ finish_fileList(struct signed_object *so, struct rpki_tree_node *siblings)
 void
 mft_finish(struct signed_object *so, struct rpki_tree_node *siblings)
 {
+	if (fields_overridden(so->objf, "content"))
+		return;
+
 	cer_finish_ee(&so->ee, so->meta);
 	finish_fileList(so, siblings);
 	content_info_finish(so, &asn_DEF_Manifest);

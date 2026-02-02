@@ -621,6 +621,7 @@ void
 rpkitree_print(struct rpki_tree *tree)
 {
 	print_node(tree->root, 0);
+	printf("\n");
 }
 
 static void

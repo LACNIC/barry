@@ -43,6 +43,7 @@ static error_msg const BAD_IP = "Unparseable IP address";
 static error_msg const NEED_STRING = "Expected a string value";
 static error_msg const NEED_SET = "Expected a set/array value ([brackets])";
 static error_msg const NEED_MAP = "Expected a map value ({braces})";
+static error_msg const NEED_STR_OR_MAP = "Expected a string or map ({braces})";
 static error_msg const NEED_SET_OR_MAP = "Expected a set/array ([brackets]) or map ({braces})";
 static error_msg const BAD_ASN = "Expected an array of AS identifiers or 'inherit'";
 
@@ -486,17 +487,31 @@ print_oid(struct dynamic_string *dstr, void *val)
 }
 
 static error_msg
-parse_8str(struct field *fields, struct kv_value *src, void *dst)
+parse_8str(struct field *field, struct kv_value *src, void *dst)
 {
 	OCTET_STRING_t *result = dst;
 	size_t size;
 	error_msg error;
 
-	if ((error = parse_numeric_primitive(src, &result->buf, &size)) != NULL)
-		return error;
+	switch (src->type) {
+	case VALT_STR:
+		result = dst;
+		error = parse_numeric_primitive(src, &result->buf, &size);
+		if (error)
+			return error;
 
-	result->size = size;
-	return NULL;
+		result->size = size;
+		field->children = NULL;
+		return NULL;
+
+	case VALT_MAP:
+		if (!field->address2)
+			return NEED_STRING;
+		return parse_obj(field, src, field->address2);
+
+	default:
+		return NEED_STR_OR_MAP;
+	}
 }
 
 static error_msg
@@ -621,18 +636,31 @@ print_8str(struct dynamic_string *dstr, void *val)
 }
 
 static error_msg
-parse_any(struct field *fields, struct kv_value *src, void *dst)
+parse_any(struct field *field, struct kv_value *src, void *dst)
 {
-	ANY_t *any = dst;
+	ANY_t *any;
 	size_t size;
 	error_msg error;
 
-	if ((error = parse_numeric_primitive(src, &any->buf, &size)) != NULL)
-		return error;
+	switch (src->type) {
+	case VALT_STR:
+		any = dst;
+		error = parse_numeric_primitive(src, &any->buf, &size);
+		if (error)
+			return error;
 
-	any->size = size;
-	fields->children = NULL;
-	return NULL;
+		any->size = size;
+		field->children = NULL;
+		return NULL;
+
+	case VALT_MAP:
+		if (!field->address2)
+			return NEED_STRING;
+		return parse_obj(field, src, field->address2);
+
+	default:
+		return NEED_STR_OR_MAP;
+	}
 }
 
 static void
@@ -2056,7 +2084,7 @@ is_pointer(struct field const *field)
 }
 
 void
-fields_apply_keyvals(struct field *ht, struct keyvals *kvs)
+fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 {
 	struct keyval *kv;
 	struct field *field;
@@ -2066,7 +2094,7 @@ fields_apply_keyvals(struct field *ht, struct keyvals *kvs)
 	STAILQ_FOREACH(kv, kvs, hook) {
 		pr_trace("keyval: %s", kv->key);
 
-		field = fields_find(ht, kv->key);
+		field = fields_find(root, kv->key);
 		if (!field)
 			panic("Key '%s' is unknown.", kv->key);
 		if (!field->type || !field->type->parser)

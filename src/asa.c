@@ -35,7 +35,7 @@ asa_new(struct rpki_tree_node *node)
 	struct field *eContent;
 
 	so = signed_object_new(node, aspa_nid(), &eContent);
-	aspa = &so->obj.aspa;
+	aspa = eContent->address2 = &so->obj.aspa;
 
 	aspa->version = intmax2INTEGER(1);
 	field_add(eContent, "version", &ft_int, &aspa->version, sizeof(INTEGER_t));
@@ -102,13 +102,11 @@ find_resources(struct rpki_tree_node *node)
 static void
 finish_customerASID(struct signed_object *so)
 {
-	struct field *rootf;
 	struct ext_list_node *ext;
 	struct ASIdentifierChoice__asIdsOrRanges *aiors;
 
-	rootf = fields_find(so->objf,
-	    "content.encapContentInfo.eContent.customerASID");
-	if (rootf && rootf->overridden)
+	if (fields_overridden(so->objf,
+	    "content.encapContentInfo.eContent.customerASID"))
 		return;
 
 	ext = cer_ext(&so->ee, EXT_ASN);
@@ -125,6 +123,9 @@ finish_customerASID(struct signed_object *so)
 void
 asa_finish(struct signed_object *so)
 {
+	if (fields_overridden(so->objf, "content"))
+		return;
+
 	cer_finish_ee(&so->ee, so->meta);
 	finish_customerASID(so);
 	content_info_finish(so, &asn_DEF_ASProviderAttestation);

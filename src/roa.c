@@ -13,7 +13,7 @@ roa_new(struct rpki_tree_node *node)
 	struct field *eContent;
 
 	so = signed_object_new(node, NID_id_ct_routeOriginAuthz, &eContent);
-	roa = &so->obj.roa;
+	roa = eContent->address2 = &so->obj.roa;
 
 	roa->version = intmax2INTEGER(0);
 	field_add(eContent, "version", &ft_int, &roa->version, sizeof(INTEGER_t));
@@ -91,7 +91,6 @@ ior2ria(IPAddressOrRange_t *ior, ROAIPAddress_t *ria)
 static void
 finish_addrs(struct signed_object *so)
 {
-	struct field *rootf;
 	struct ext_list_node *ext;
 
 	IPAddressFamily_t *iaf; /* src */
@@ -104,9 +103,8 @@ finish_addrs(struct signed_object *so)
 
 	int i, j;
 
-	rootf = fields_find(so->objf,
-	    "content.encapContentInfo.eContent.ipAddrBlocks");
-	if (rootf && rootf->overridden)
+	if (fields_overridden(so->objf,
+	    "content.encapContentInfo.eContent.ipAddrBlocks"))
 		return;
 
 	ext = cer_ext(&so->ee, EXT_IP);
@@ -151,6 +149,9 @@ finish_addrs(struct signed_object *so)
 void
 roa_finish(struct signed_object *so)
 {
+	if (fields_overridden(so->objf, "content"))
+		return;
+
 	cer_finish_ee(&so->ee, so->meta);
 	finish_addrs(so);
 	content_info_finish(so, &asn_DEF_RouteOriginAttestation);
