@@ -507,6 +507,7 @@ parse_8str(struct field *field, struct kv_value *src, void *dst)
 	case VALT_MAP:
 		if (!field->address2)
 			return NEED_STRING;
+		field->overridden = false;
 		return parse_obj(field, src, field->address2);
 
 	default:
@@ -656,6 +657,7 @@ parse_any(struct field *field, struct kv_value *src, void *dst)
 	case VALT_MAP:
 		if (!field->address2)
 			return NEED_STRING;
+		field->overridden = false;
 		return parse_obj(field, src, field->address2);
 
 	default:
@@ -2100,6 +2102,8 @@ fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 		if (!field->type || !field->type->parser)
 			panic("I don't have a parser for '%s'", kv->key);
 
+		field->overridden = true;
+
 		value = field->address;
 		if (is_pointer(field)) {
 			if (*value == NULL)
@@ -2110,8 +2114,6 @@ fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 		}
 		if (error)
 			panic("%s", error);
-
-		field->overridden = true;
 	}
 }
 
