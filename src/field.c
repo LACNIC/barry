@@ -2085,6 +2085,14 @@ is_pointer(struct field const *field)
 	return field->size != 0;
 }
 
+static bool
+is_null(struct kv_value *value)
+{
+	return (value->type == VALT_STR)
+	    ? (strcmp(value->v.str, "NULL") == 0)
+	    : false;
+}
+
 void
 fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 {
@@ -2106,6 +2114,10 @@ fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 
 		value = field->address;
 		if (is_pointer(field)) {
+			if (is_null(&kv->value)) {
+				*value = NULL;
+				continue;
+			}
 			if (*value == NULL)
 				*value = pzalloc(field->size);
 			error = field->type->parser(field, &kv->value, *value);
