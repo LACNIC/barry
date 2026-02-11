@@ -20,6 +20,35 @@ field_add(struct field *parent, char const *name,
 
 /* Tests */
 
+START_TEST(check_clean_token)
+{
+	struct rd_parse_context ctx = { 0 };
+	struct dynamic_string src;
+	char *dst;
+
+	ck_assert_int_eq(0, setenv("VEGETABLE", "potato", 1));
+	ck_assert_int_eq(0, setenv("FRUIT", "orange", 1));
+
+#define CK_CLEAN(test, expected)					\
+		src.buf = pstrdup(test);				\
+		src.len = src.size = strlen(src.buf);			\
+		dst = clean_token(&ctx, &src);				\
+		ck_assert_str_eq(expected, dst);			\
+		free(src.buf);						\
+		free(dst);
+
+	CK_CLEAN("veg.tomato.color", "veg.tomato.color");
+	CK_CLEAN("$FRUIT", "orange");
+	CK_CLEAN("veg.$VEGETABLE.color", "veg.potato.color");
+	CK_CLEAN("veg.${VEGETABLE}.color", "veg.potato.color");
+	CK_CLEAN("veg.$VEGETABLE-fries.color", "veg.potato-fries.color");
+	CK_CLEAN("veg.${VEGETABLE}fries.color", "veg.potatofries.color");
+	CK_CLEAN("$FRUIT-${VEGETABLE}A${FRUIT}b$VEGETABLE", "orange-potatoAorangebpotato");
+
+#undef CK_CLEAN
+}
+END_TEST
+
 static void
 send_input(int fd, char *input)
 {
@@ -632,6 +661,7 @@ address_load_suite(void)
 	TCase *parser;
 
 	parser = tcase_create("Parser");
+	tcase_add_test(parser, check_clean_token);
 	tcase_add_test(parser, check_accept_value);
 	tcase_add_test(parser, check_read_tree);
 	tcase_add_test(parser, check_read_keyvals);

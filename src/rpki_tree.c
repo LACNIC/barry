@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -120,6 +121,108 @@ next_char(struct rd_parse_context *ctx)
 	return ctx->buf + ctx->offset++;
 }
 
+static bool
+is_envar_start_chr(char chr)
+{
+	return ('a' <= chr && chr <= 'z')
+	    || ('A' <= chr && chr <= 'Z')
+	    || chr == '_';
+}
+
+static bool
+is_envar_chr(char chr)
+{
+	return is_envar_start_chr(chr) || ('0' <= chr && chr <= '9');
+}
+
+char *
+find_not_envar_chr(char *str)
+{
+	while (is_envar_chr(*str))
+		str++;
+	return str;
+}
+
+/*
+ * src.buf needs to be modifiable.
+ *
+ * Applies environment variable names:
+ *
+ * 	veg.tomato.color -> veg.tomato.color
+ * 	veg.$SHELL.color -> veg./bin/bash.color
+ * 	veg.${SHELL}.color -> veg./bin/bash.color
+ */
+static char *
+clean_token(struct rd_parse_context *ctx, struct dynamic_string *src)
+{
+	struct dynamic_string dst;
+	size_t i;
+
+	size_t s;
+	char chr;
+
+	char *endbrc;
+	char bkp;
+	char const *envar;
+
+	dst.buf = pmalloc(src->size);
+	dst.len = 0;
+	dst.size = src->size;
+
+	s = 0;
+
+	for (i = 0; i < src->len; i++) {
+		if (src->buf[i] != '$')
+			continue;
+
+		chr = src->buf[i + 1];
+		if (chr == '$') {
+			i++;
+			dstr_append(&dst, "%.*s", (int)(i - s), src->buf + s);
+
+		} else if (chr == '{') {
+			dstr_append(&dst, "%.*s", (int)(i - s) , src->buf + s);
+
+			endbrc = strchr(src->buf + i + 2, '}');
+			if (!endbrc)
+				BADCFG(ctx, "Unterminated variable brace");
+			*endbrc = '\0';
+			envar = getenv(src->buf + i + 2);
+			if (!envar)
+				BADCFG(ctx, "Environment variable not found: %s",
+				    src->buf + i + 2);
+			dstr_append(&dst, "%s", envar);
+			*endbrc = '}';
+
+			i = endbrc - src->buf;
+
+		} else if (is_envar_start_chr(chr)) {
+			dstr_append(&dst, "%.*s", (int)(i - s) , src->buf + s);
+
+			endbrc = find_not_envar_chr(src->buf + i + 2);
+			bkp = *endbrc;
+			*endbrc = '\0';
+			envar = getenv(src->buf + i + 1);
+			if (!envar)
+				BADCFG(ctx, "Environment variable not found: %s",
+				    src->buf + i + 1);
+			dstr_append(&dst, "%s", envar);
+			*endbrc = bkp;
+
+			i = endbrc - src->buf - 1;
+
+		} else {
+			BADCFG(ctx, "Invalid character after '$'. "
+			    "(If you want to escape $, write '$$'.)");
+		}
+
+		s = i + 1;
+	}
+
+	dstr_append(&dst, "%s", src->buf + s);
+	return dstr_finish(&dst);
+}
+
 static char *
 tokenize(struct rd_parse_context *ctx, bool (*chr_matches)(char))
 {
@@ -148,9 +251,8 @@ tokenize(struct rd_parse_context *ctx, bool (*chr_matches)(char))
 	} while (true);
 
 commit:
-	dstr_finish(&result);
 	ctx->offset = i;
-	return result.buf;
+	return clean_token(ctx, &result);
 }
 
 static unsigned char *
@@ -230,7 +332,7 @@ next_token(struct rd_parse_context *ctx, struct token *tkn)
 			return init_token(tkn, TKNT_EOF, "EOF");
 		chr = *_chr;
 
-		if (is_alphanumeric(chr)) {
+		if (is_alphanumeric(chr) || chr == '$') {
 			ctx->offset--;
 
 			token = tokenize(ctx, is_unquoted_string_chr);

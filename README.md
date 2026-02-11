@@ -205,7 +205,7 @@ Reminder: This is a WIP. It's liable to change backwards-incompatibly until `bar
 
 The confirmed reserved characters are `=` (assignment), `,` (separator), `{` and `}` (map delimiters), `[` and `]` (array/set delimiters) and `#` (comment).
 
-The only other token type is String, which is either
+The only other token type is `String`, which is either
 
 1. A continuous sequence of unreserved and non-whitespace characters (eg. `10`, `0x0100`, `potatoes`, `192.0.2.0/24-28`),
 2. or a quoted sequence of any character except `"` (eg. `"also a string"`, `"!#$%^&*()[]{}"`). (There is no way to escape `"` at the moment.)
@@ -242,12 +242,12 @@ The key-value section is a JSON-adjacent hierarchy. Here is an example in which 
 
 The format differs from JSON in several ways:
 
-1. You can comment out the remainder of a line by issuing the `#` character outside of a string,
+1. You can comment out the remainder of a line by issuing the `#` character outside of a `String`,
 2. as you can see above, the assignment reserved character is `=` (not `:`),
 3. the last element of any set or map is allowed to be suffixed by a redundant comma (for reduced diff noise),
-4. if a string (whether key or value) does not contain reserved characters or whitespace, then you can omit the quotes,
+4. if a `String` (whether key or value) does not contain reserved characters or whitespace, then you can omit the quotes,
 5. you can reduce stacking by dot-chaining field names as you see fit,
-6. and quoted strings can contain newlines.
+6. and quoted `String`s can contain newlines.
 
 Hence, the example above is equivalent to
 
@@ -369,6 +369,55 @@ TA
                             CA7     # 0101:0101:0101:0100::/56
                                 ... # etc
 ```
+
+## Shell variable expansion
+
+`$` is not technically reserved, but emulates simple environment variable shell expansion inside of `String`s.
+
+For example, assume the environment has
+
+```bash
+SUBJECT="LACNIC"
+ISSUANCE_DATE="$(date +%Y-%m-%dT%H:%M:%SZ)"
+TBSCER="tbsCertificate"
+```
+
+Then
+
+```
+obj.tbsCertificate.subject.rdnSequence.0.0.value = $SUBJECT
+obj.$TBSCER.validity.notBefore = $ISSUANCE_DATE
+```
+
+Is parsed as
+
+```
+obj.tbsCertificate.subject.rdnSequence.0.0.value = LACNIC
+# This would be the variable definition date, not the RD parsing date.
+obj.tbsCertificate.validity.notBefore = 2026-02-11T11:25:15Z
+```
+
+The `${}` format is also available, particularly so you can sandwitch the environment variable between environment variable name characters. Notice that this forces you to quote the string, because `{` and `}` are reserved.
+
+Suppose the environment has
+
+```bash
+TBS="tbs"
+```
+
+Then
+
+```
+"obj.${TBS}Certificate.subject.rdnSequence.0.0.value" = Te$$t
+```
+
+Becomes
+
+```
+"obj.tbsCertificate.subject.rdnSequence.0.0.value" = Te$t
+```
+
+As seen above, if you do not want to reference an environment variable, escape `$` as `$$`.
 
 ## Attribute Data Types
 
