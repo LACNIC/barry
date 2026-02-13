@@ -332,7 +332,7 @@ next_token(struct rd_parse_context *ctx, struct token *tkn)
 			return init_token(tkn, TKNT_EOF, "EOF");
 		chr = *_chr;
 
-		if (is_alphanumeric(chr) || chr == '$') {
+		if (is_alphanumeric(chr) || chr == '$' || chr == '-') {
 			ctx->offset--;
 
 			token = tokenize(ctx, is_unquoted_string_chr);

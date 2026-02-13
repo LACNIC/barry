@@ -74,3 +74,8 @@ obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x1000000000000000000
 obj.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey = 0x10/136
 [node: 5.cer]
 obj.tbsCertificate.version = 0x01/1000
+
+# Negative
+
+[node: 6.cer]
+obj.tbsCertificate.version = -1

@@ -497,7 +497,11 @@ Prefixing is actually also compatible with the other "numeric" data types, but t
 obj.tbsCertificate.version = 0x01/1000
 ```
 
-I haven't implemented negative `INTEGER`s yet.
+Decimal numbers are allowed to be negative:
+
+```
+obj.tbsCertificate.version = -1    # DER-encodes as "02 01 FF" (INTEGER, Length=1, Value=-1)
+```
 
 ### Booleans
 

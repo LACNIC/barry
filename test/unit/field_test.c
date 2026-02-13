@@ -273,29 +273,63 @@ START_TEST(check_parse_bitstr_bin)
 }
 END_TEST
 
+static void
+ck_encoding(INTEGER_t *num, ...)
+{
+	va_list ap;
+	size_t i, n = 0;
+
+	va_start(ap, num);
+	while (va_arg(ap, int) != -1)
+		n++;
+	va_end(ap);
+
+	ck_assert_uint_eq(n, num->size);
+
+	va_start(ap, num);
+	for (i = 0; i < n; i++)
+		ck_assert_int_eq(va_arg(ap, int), num->buf[i]);
+	va_end(ap);
+}
+
 START_TEST(check_parse_int_dec)
 {
-	struct kv_value kv;
-	INTEGER_t num;
+	struct kv_value src = { .type = VALT_STR };
+	INTEGER_t dst;
+	intmax_t res;
 
-	kv.type = VALT_STR;
+#define ck_small_int(test, expected)					\
+		src.v.str = test;					\
+		ck_assert_ptr_eq(NULL, __parse_int(&src, &dst));	\
+		ck_assert_int_eq(0, asn_INTEGER2imax(&dst, &res));	\
+		ck_assert_int_eq(expected, res);
 
-	memset(&num, 0, sizeof(num));
-	kv.v.str = "123";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
-	ck_assert_int_eq(num.size, 1);
-	ck_assert_int_eq(num.buf[0], 0x7B);
+	ck_small_int("123", 123);
+	ck_encoding(&dst, 0x7b, -1);
 
-	memset(&num, 0, sizeof(num));
-	kv.v.str = "1234567890";
-	ck_assert_pstr_eq(NULL, parse_int(NULL, &kv, &num));
-	ck_assert_int_eq(num.size, 4);
-	ck_assert_int_eq(num.buf[0], 0x49);
-	ck_assert_int_eq(num.buf[1], 0x96);
-	ck_assert_int_eq(num.buf[2], 0x02);
-	ck_assert_int_eq(num.buf[3], 0xD2);
+	ck_small_int("1234567890", 1234567890);
+	ck_encoding(&dst, 0x49, 0x96, 0x02, 0xd2, -1);
 
-	/* Meh */
+	ck_small_int("50", 50);
+	ck_encoding(&dst, 0x32, -1);
+	ck_small_int("-100", -100);
+	ck_encoding(&dst, 0x9c, -1);
+	ck_small_int("-549755813887", -549755813887);
+	ck_encoding(&dst, 0x80, 0, 0, 0, 1, -1);
+
+	ck_small_int("255", 255);
+	ck_encoding(&dst, 0, 0xFF, -1);
+	ck_small_int("-1", -1);
+	ck_encoding(&dst, 0xFF, -1);
+	ck_small_int("-128", -128);
+	ck_encoding(&dst, 0x80, -1);
+
+	/* 2^63 + 1 (not small int) */
+	src.v.str = "9223372036854775809";
+	ck_assert_ptr_eq(NULL, __parse_int(&src, &dst));
+	ck_encoding(&dst, 0, 0x80, 0, 0, 0, 0, 0, 0, 1, -1);
+
+#undef ck_small_int
 }
 END_TEST
 

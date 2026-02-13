@@ -18,6 +18,9 @@
 #include <libasn1fort/TBSCertList.h>
 #include <libasn1fort/UTCTime.h>
 #include <limits.h>
+#include <openssl/asn1.h>
+#include <openssl/bn.h>
+#include <openssl/crypto.h>
 #include <strings.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -32,7 +35,6 @@
 static error_msg const HEX_EMPTY = "Hexadecimal string is empty";
 static error_msg const HEX_ODD_DIGITS = "Hexadecimal numbers need an even number of digits";
 static error_msg const BIN_EMPTY = "Binary string is empty";
-static error_msg const DEC_ERANGE = "Decimal number too large";
 static error_msg const DEC_EINVAL = "Not a number";
 static error_msg const PREF_TRUNC = "There are enabled bits after the prefix length";
 static error_msg const PREF_LEN_2BIG = "Prefix length too long";
@@ -258,27 +260,47 @@ print_bitstr(struct dynamic_string *dstr, void *val)
 static error_msg
 parse_dec(char const *src, INTEGER_t *dst)
 {
-	unsigned long primitive;
-	size_t srclen;
+	BIGNUM *bn;
+	ASN1_INTEGER *asn1;
+	unsigned char *der = NULL;
+	int derlen;
+	size_t i;
 
-	srclen = strlen(src);
-
-	dst->size = (srclen + 7) / 8;
-	dst->buf = pmalloc(dst->size);
-
-	errno = 0;
-	primitive = strtoul(src, NULL, 10);
-	if (primitive == ULONG_MAX && errno == ERANGE)
-		return DEC_ERANGE;
-
-	if (asn_ulong2INTEGER(dst, primitive) < 0)
+	bn = BN_new();
+	if (!bn)
+		enomem;
+	if (BN_dec2bn(&bn, src) < 0) {
+		BN_free(bn);
 		return DEC_EINVAL;
+	}
+	asn1 = BN_to_ASN1_INTEGER(bn, NULL);
+	if (!asn1)
+		enomem;
+	derlen = i2d_ASN1_INTEGER(asn1, &der);
+	if (derlen < 0)
+		panic("i2d_ASN1_INTEGER(): %d", derlen);
+	if (derlen > 127)
+		/* Multi-byte length. Legal, but not considered below */
+		panic("Number too big!");
+	if (derlen < 2)
+		panic("Bad DER header length: %d", derlen);
+	if (der[0] != 2 || der[1] != (derlen - 2))
+		panic("Bad DER header: %u %u", der[0], der[1]);
+
+	dst->size = derlen - 2;
+	dst->buf = pcalloc(dst->size, sizeof(uint8_t));
+	for (i = 0; i < dst->size; i++)
+		dst->buf[i] = der[i + 2];
+
+	OPENSSL_free(der);
+	ASN1_INTEGER_free(asn1);
+	BN_free(bn);
 
 	return NULL;
 }
 
 static error_msg
-parse_numeric_primitive(struct kv_value *src, uint8_t **buf, size_t *size)
+parse_byte_array(struct kv_value *src, uint8_t **buf, size_t *size)
 {
 	BIT_STRING_t bs;
 	INTEGER_t num;
@@ -321,7 +343,7 @@ parse_long_int(struct kv_value *src, long int *result)
 	long int longint;
 	error_msg error;
 
-	error = parse_numeric_primitive(src, &integer.buf, &integer.size);
+	error = parse_byte_array(src, &integer.buf, &integer.size);
 	if (error)
 		return error;
 	if (asn_INTEGER2long(&integer, &longint) < 0)
@@ -370,7 +392,7 @@ print_bool(struct dynamic_string *dstr, void *val)
 static error_msg
 __parse_int(struct kv_value *src, INTEGER_t *dst)
 {
-	return parse_numeric_primitive(src, &dst->buf, &dst->size);
+	return parse_byte_array(src, &dst->buf, &dst->size);
 }
 
 static error_msg
@@ -496,7 +518,7 @@ parse_8str(struct field *field, struct kv_value *src, void *dst)
 	switch (src->type) {
 	case VALT_STR:
 		result = dst;
-		error = parse_numeric_primitive(src, &result->buf, &size);
+		error = parse_byte_array(src, &result->buf, &size);
 		if (error)
 			return error;
 
@@ -646,7 +668,7 @@ parse_any(struct field *field, struct kv_value *src, void *dst)
 	switch (src->type) {
 	case VALT_STR:
 		any = dst;
-		error = parse_numeric_primitive(src, &any->buf, &size);
+		error = parse_byte_array(src, &any->buf, &size);
 		if (error)
 			return error;
 
