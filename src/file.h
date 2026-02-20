@@ -11,4 +11,6 @@ int write_open(char const *);
 void exec_mkdir(char *);
 void exec_mkdir_p(char const *, bool);
 
+void exec_rm_rf_content(char const *);
+
 #endif /* SRC_FILE_H_ */

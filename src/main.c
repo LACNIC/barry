@@ -627,6 +627,11 @@ main(int argc, char **argv)
 	rpkitree_pre_order(&tree, finish_not_mfts, NULL);
 	pr_debug("Done.\n");
 
+	pr_debug("Clearing existing output directories...");
+	exec_rm_rf_content(rsync_path);
+	exec_rm_rf_content(rrdp_path);
+	pr_debug("Done.\n");
+
 	pr_debug("Writing files (except manifests)...");
 	rpkitree_pre_order(&tree, write_not_mfts, NULL);
 	pr_debug("Done.\n");
