@@ -53,13 +53,13 @@ struct ext_list_node {
 		SubjectKeyIdentifier_t ski;
 		AuthorityKeyIdentifier_t aki;
 		KeyUsage_t ku;
-		CRLDistributionPoints_t crldp;
+		CRLDistributionPoints_t cdp;
 		AuthorityInfoAccessSyntax_t aia;
 		SubjectInfoAccessSyntax_t sia;
 		CertificatePolicies_t cp;
 		IPAddrBlocks_t ip;
-		ASIdentifiers_t asn;
-		CRLNumber_t crln;
+		ASIdentifiers_t as;
+		CRLNumber_t cn;
 	} v;
 
 	STAILQ_ENTRY(ext_list_node) hook;
@@ -76,12 +76,12 @@ void exts_add_bc(struct extensions *, char const *, struct field *);
 void exts_add_ski(struct extensions *, char const *, struct field *);
 void exts_add_aki(struct extensions *, char const *, struct field *);
 void exts_add_ku(struct extensions *, char const *, struct field *);
-void exts_add_crldp(struct extensions *, char const *, struct field *);
+void exts_add_cdp(struct extensions *, char const *, struct field *);
 void exts_add_aia(struct extensions *, char const *, struct field *);
 void exts_add_sia(struct extensions *, char const *, struct field *, sia_defaults);
 void exts_add_cp(struct extensions *, char const *, struct field *);
 void exts_add_ip(struct extensions *, char const *, struct field *);
-void exts_add_asn(struct extensions *, char const *, struct field *);
+void exts_add_as(struct extensions *, char const *, struct field *);
 void exts_add_crln(struct extensions *, char const *, struct field *);
 
 struct rpki_certificate;
@@ -89,14 +89,14 @@ struct rpki_certificate;
 void ext_finish_ski(SubjectKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
 void ext_finish_aki(AuthorityKeyIdentifier_t *, SubjectPublicKeyInfo_t *);
 void ext_finish_ku(KeyUsage_t *, enum cer_type);
-void ext_finish_crldp(CRLDistributionPoints_t *, char const *);
+void ext_finish_cdp(CRLDistributionPoints_t *, char const *);
 void ext_finish_aia(AuthorityInfoAccessSyntax_t *, struct field *,
     char const *);
 void ext_finish_sia(SubjectInfoAccessSyntax_t *, struct field *,
     struct rpki_certificate *, char const *);
 void ext_finish_cp(CertificatePolicies_t *);
 void ext_finish_ip(IPAddrBlocks_t *, struct rpki_tree_node *);
-void ext_finish_asn(ASIdentifiers_t *, struct rpki_tree_node *);
+void ext_finish_as(ASIdentifiers_t *, struct rpki_tree_node *);
 
 void ext_compile(struct extensions *, Extensions_t **);
 

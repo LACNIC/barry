@@ -42,10 +42,10 @@ ta.cer,obj.tbsCertificate.extensions.cp.critical,BOOLEAN,true
 ta.cer,obj.tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.28 (sbgp-ipAddrBlockv2)
 ta.cer,obj.tbsCertificate.extensions.ip.critical,BOOLEAN,true
 ta.cer,obj.tbsCertificate.extensions.ip.extnValue,IP Resources (Certificate),[ [ 192.0.2.0/24 ] ]
-ta.cer,obj.tbsCertificate.extensions.asn.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.29 (sbgp-autonomousSysNumv2)
-ta.cer,obj.tbsCertificate.extensions.asn.critical,BOOLEAN,true
-ta.cer,obj.tbsCertificate.extensions.asn.extnValue.asnum,AS Resources,[ 0x7B ]
-ta.cer,obj.tbsCertificate.extensions.asn.extnValue.rdi,AS Resources,
+ta.cer,obj.tbsCertificate.extensions.as.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.29 (sbgp-autonomousSysNumv2)
+ta.cer,obj.tbsCertificate.extensions.as.critical,BOOLEAN,true
+ta.cer,obj.tbsCertificate.extensions.as.extnValue.asnum,AS Resources,[ 0x7B ]
+ta.cer,obj.tbsCertificate.extensions.as.extnValue.rdi,AS Resources,
 ta.cer,obj.signatureAlgorithm.algorithm,OBJECT IDENTIFIER,1.2.840.113549.1.1.11 (sha256WithRSAEncryption)
 ta.cer,obj.signatureAlgorithm.parameters,ANY,0x0500
 ta.cer,obj.signature,BIT STRING,0xCDEF4BDB2BE29D785B89E4C6E0FC1A0EE92ADBA6F41B86475292DBC92CD9AA0D3DD5580942284521D47FCF18B95188413BB2491ED990F7AA7BEB7D0B832E3D190BFE4D0FC2284C2F66294B27A74A63B66908F1131238D2A6AD191733968D4825043EE7335077E64A048C1C000B0FB48984F8A6931C79FB1EDB8E682FF08B64F6BDD62EED8015DC4A9E9F90E08EEDF74716B290F6F689D5425A440ECC7B9BB4EDE8213014C814C90545DA086A63CEBA3B065EE892548F0A2B8742F9101E55A9C9BBFEAB07939A8DF647E259913C7CBF430967030726D68E290DFC9201B018ACAF9595BDCA2912B2842AE26A58FDC82D48F0EC47879E21764CD8E80A71228119C9
@@ -75,7 +75,7 @@ ta.mft,obj.content.certificates.0.tbsCertificate.subject.rdnSequence.0.0.value,P
 ta.mft,obj.content.certificates.0.tbsCertificate.subjectPublicKeyInfo.algorithm.algorithm,OBJECT IDENTIFIER,1.2.840.113549.1.1.1 (rsaEncryption)
 ta.mft,obj.content.certificates.0.tbsCertificate.subjectPublicKeyInfo.algorithm.parameters,ANY,0x0500
 ta.mft,obj.content.certificates.0.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey,BIT STRING,0x3082010A0282010100BD30944E70B0D56EFCE8ED337049D448F4C1645ABCD912E038333CE05F84DDC950763E07358A207464DE26E380BC054239BEADBDE6795412EC4DE808E50CD61CCF67D05F48E9763897C5481637118CCD623715621C8B9C9EB99F45E4096EE49B16618767DC872F4B7623932B703F0EC308034DB422CEE98925E2903972ECAA3E42E951847AE2154D50D807844A477E3D392EE24D57F414765A507E826A8EABC6C4FEA8FF988FEABE09F6280DF796084CEFB08ACC28D9A5F7085A8BDF710F5DFC5E85FAA2EFD21956B337A8C1F485BFA77026FD84598181D841B8F8C60401F4302A6CE73F32B5E4E6DE250CCC1992C2603735AEF4E5AF8F5E74801181E2C285C10203010001
-ta.mft,obj.content.certificates.0.tbsCertificate.extensions,Extensions,"{ ski=ski, aki=aki, ku=ku, crldp=crldp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }"
+ta.mft,obj.content.certificates.0.tbsCertificate.extensions,Extensions,"{ ski=ski, aki=aki, ku=ku, cdp=cdp, aia=aia, sia=sia, cp=cp, ip=ip, asn=asn }"
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ski.extnID,OBJECT IDENTIFIER,2.5.29.14 (X509v3 Subject Key Identifier)
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ski.critical,BOOLEAN,false
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ski.extnValue,OCTET STRING,0x082DFCD14E0E5AD0A8538AB2DF862976B74CC69F
@@ -86,8 +86,8 @@ ta.mft,obj.content.certificates.0.tbsCertificate.extensions.aki.extnValue.author
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ku.extnID,OBJECT IDENTIFIER,2.5.29.15 (X509v3 Key Usage)
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ku.critical,BOOLEAN,true
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ku.extnValue,BIT STRING,0x80/1
-ta.mft,obj.content.certificates.0.tbsCertificate.extensions.crldp.extnID,OBJECT IDENTIFIER,2.5.29.31 (X509v3 CRL Distribution Points)
-ta.mft,obj.content.certificates.0.tbsCertificate.extensions.crldp.critical,BOOLEAN,false
+ta.mft,obj.content.certificates.0.tbsCertificate.extensions.cdp.extnID,OBJECT IDENTIFIER,2.5.29.31 (X509v3 CRL Distribution Points)
+ta.mft,obj.content.certificates.0.tbsCertificate.extensions.cdp.critical,BOOLEAN,false
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.1 (Authority Information Access)
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.critical,BOOLEAN,false
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.aia.extnValue.0.accessMethod,OBJECT IDENTIFIER,1.3.6.1.5.5.7.48.2 (CA Issuers)
@@ -103,10 +103,10 @@ ta.mft,obj.content.certificates.0.tbsCertificate.extensions.cp.critical,BOOLEAN,
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ip.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.28 (sbgp-ipAddrBlockv2)
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ip.critical,BOOLEAN,true
 ta.mft,obj.content.certificates.0.tbsCertificate.extensions.ip.extnValue,IP Resources (Certificate),[ [ 192.0.2.0/24 ] ]
-ta.mft,obj.content.certificates.0.tbsCertificate.extensions.asn.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.29 (sbgp-autonomousSysNumv2)
-ta.mft,obj.content.certificates.0.tbsCertificate.extensions.asn.critical,BOOLEAN,true
-ta.mft,obj.content.certificates.0.tbsCertificate.extensions.asn.extnValue.asnum,AS Resources,[ 0x7B ]
-ta.mft,obj.content.certificates.0.tbsCertificate.extensions.asn.extnValue.rdi,AS Resources,
+ta.mft,obj.content.certificates.0.tbsCertificate.extensions.as.extnID,OBJECT IDENTIFIER,1.3.6.1.5.5.7.1.29 (sbgp-autonomousSysNumv2)
+ta.mft,obj.content.certificates.0.tbsCertificate.extensions.as.critical,BOOLEAN,true
+ta.mft,obj.content.certificates.0.tbsCertificate.extensions.as.extnValue.asnum,AS Resources,[ 0x7B ]
+ta.mft,obj.content.certificates.0.tbsCertificate.extensions.as.extnValue.rdi,AS Resources,
 ta.mft,obj.content.certificates.0.signatureAlgorithm.algorithm,OBJECT IDENTIFIER,1.2.840.113549.1.1.11 (sha256WithRSAEncryption)
 ta.mft,obj.content.certificates.0.signatureAlgorithm.parameters,ANY,0x0500
 ta.mft,obj.content.certificates.0.signature,BIT STRING,0x945DAEA2EE78A7DF8882857FA736DF497810722280B4A4DC26F3B57C00DB2E73A32BD9A8805919B2BC36B3CA0AA6836266400D44D52740C9C624A328AFD656E4CCAE6361F35F4270D8573ACE6D7883B59644C006FCCA12C9DB0FDBC87AE3BDF9F4D03DEF938E569C1475F777DE9E80736002C22A6DE8DB5C3A556A68F9DE0F278616DBF80ADA9C80A0DCBF65A27314CBF133224114A6500476FD125C61365204285D05000FE304806ACD8FAA5DDCC951D204ECFDB66CD891C1C02E6555F06E3742A98388EBAEAD1779DCC573B30C565A0BB90A80A936133E5858E4605163D40C03ADD60751704A29595BDE74F1CD039ABA408327E0467A3CBE3DFC739D2B0045
@@ -125,14 +125,14 @@ ta.crl,obj.tbsCertList.signature.parameters,ANY,0x0500
 ta.crl,obj.tbsCertList.thisUpdate,Time,2025-08-26T02:51:52Z
 ta.crl,obj.tbsCertList.nextUpdate,Time,2026-08-26T02:51:52Z
 ta.crl,obj.tbsCertList.revokedCertificates,Revoked Certificates,
-ta.crl,obj.tbsCertList.crlExtensions,Extensions,"{ aki=aki, crln=crln }"
+ta.crl,obj.tbsCertList.crlExtensions,Extensions,"{ aki=aki, cn=cn }"
 ta.crl,obj.tbsCertList.crlExtensions.aki.extnID,OBJECT IDENTIFIER,2.5.29.35 (X509v3 Authority Key Identifier)
 ta.crl,obj.tbsCertList.crlExtensions.aki.critical,BOOLEAN,false
 ta.crl,obj.tbsCertList.crlExtensions.aki.extnValue.keyIdentifier,OCTET STRING,0x452177031CB485B01C4E514B1E3F2C05EE381E17
 ta.crl,obj.tbsCertList.crlExtensions.aki.extnValue.authorityCertSerialNumber,INTEGER,
-ta.crl,obj.tbsCertList.crlExtensions.crln.extnID,OBJECT IDENTIFIER,2.5.29.20 (X509v3 CRL Number)
-ta.crl,obj.tbsCertList.crlExtensions.crln.critical,BOOLEAN,false
-ta.crl,obj.tbsCertList.crlExtensions.crln.extnValue,INTEGER,0x01
+ta.crl,obj.tbsCertList.crlExtensions.cn.extnID,OBJECT IDENTIFIER,2.5.29.20 (X509v3 CRL Number)
+ta.crl,obj.tbsCertList.crlExtensions.cn.critical,BOOLEAN,false
+ta.crl,obj.tbsCertList.crlExtensions.cn.extnValue,INTEGER,0x01
 ta.crl,obj.signatureAlgorithm.algorithm,OBJECT IDENTIFIER,1.2.840.113549.1.1.11 (sha256WithRSAEncryption)
 ta.crl,obj.signatureAlgorithm.parameters,ANY,0x0500
 ta.crl,obj.signature,BIT STRING,0x96578335EDD094C3B5331E689F2AD5624ECE636ACAB2C21E2BC01761A54D389645383DF4AE81A7DB2BD701FF972E1F77CA1895441872A380A3C4B74D5A8DD29EF04802E5C4D931C1F0FB407C4D2EC7A64D83B92F136F795937B328DF82F6AE94E7A887617529AD8AA0D61D7A02378C6DD5AA32093D1521E9B57AAE9458D46356F52CB319B4D848CD47D48B472A9AED2EA7FD9867E0F0BE2BF213E1371471021069DF9EFE2D713D3AC7DE60801E245BEBCB670383A02AA4A7CFF4FCBD1D00B9DF9D863482FB76814CE2E3D2246E594A846184C0FAEBAB44624D0E699546541CAF42C175C546A5DDA1A2045E4F7FBD0D9D2A5722D1A1FB02A35268374793CC1CF6

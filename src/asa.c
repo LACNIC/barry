@@ -86,9 +86,9 @@ find_resources(struct rpki_tree_node *node)
 		if (!ext)
 			return NULL;
 
-		switch (ext->v.asn.asnum->present) {
+		switch (ext->v.as.asnum->present) {
 		case ASIdentifierChoice_PR_asIdsOrRanges:
-			return &ext->v.asn.asnum->choice.asIdsOrRanges;
+			return &ext->v.as.asnum->choice.asIdsOrRanges;
 		case ASIdentifierChoice_PR_inherit:
 			break;
 		case ASIdentifierChoice_PR_NOTHING:

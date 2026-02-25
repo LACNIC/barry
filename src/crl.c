@@ -15,7 +15,7 @@ init_extensions_crl(struct rpki_crl *crl, struct field *extf)
 	STAILQ_INIT(&crl->exts);
 
 	exts_add_aki(&crl->exts, "aki", extf);
-	exts_add_crln(&crl->exts, "crln", extf);
+	exts_add_crln(&crl->exts, "cn", extf);
 }
 
 struct rpki_crl *

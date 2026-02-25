@@ -22,7 +22,7 @@ init_extensions_ta(struct rpki_certificate *ta, struct field *extf)
 	exts_add_sia(&ta->exts, "sia", extf, sia_ca_defaults);
 	exts_add_cp(&ta->exts, "cp", extf);
 	exts_add_ip(&ta->exts, "ip", extf);
-	exts_add_asn(&ta->exts, "asn", extf);
+	exts_add_as(&ta->exts, "as", extf);
 }
 
 static void
@@ -36,12 +36,12 @@ init_extensions_ca(struct rpki_certificate *ca, struct field *extsf)
 	exts_add_ski(&ca->exts, "ski", extsf);
 	exts_add_aki(&ca->exts, "aki", extsf);
 	exts_add_ku(&ca->exts, "ku", extsf);
-	exts_add_crldp(&ca->exts, "crldp", extsf);
+	exts_add_cdp(&ca->exts, "cdp", extsf);
 	exts_add_aia(&ca->exts, "aia", extsf);
 	exts_add_sia(&ca->exts, "sia", extsf, sia_ca_defaults);
 	exts_add_cp(&ca->exts, "cp", extsf);
 	exts_add_ip(&ca->exts, "ip", extsf);
-	exts_add_asn(&ca->exts, "asn", extsf);
+	exts_add_as(&ca->exts, "as", extsf);
 }
 
 static void
@@ -54,20 +54,20 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 	exts_add_ski(&ee->exts, "ski", extf);
 	exts_add_aki(&ee->exts, "aki", extf);
 	exts_add_ku(&ee->exts, "ku", extf);
-	exts_add_crldp(&ee->exts, "crldp", extf);
+	exts_add_cdp(&ee->exts, "cdp", extf);
 	exts_add_aia(&ee->exts, "aia", extf);
 	exts_add_sia(&ee->exts, "sia", extf, sia_ee_defaults);
 	exts_add_cp(&ee->exts, "cp", extf);
 	switch (ee->meta->node->type) {
 	case FT_MFT: /* TODO ??? */
 		exts_add_ip(&ee->exts, "ip", extf);
-		exts_add_asn(&ee->exts, "asn", extf);
+		exts_add_as(&ee->exts, "as", extf);
 		break;
 	case FT_ROA:
 		exts_add_ip(&ee->exts, "ip", extf);
 		break;
 	case FT_ASA:
-		exts_add_asn(&ee->exts, "asn", extf);
+		exts_add_as(&ee->exts, "as", extf);
 		break;
 	default:
 		break;
@@ -172,11 +172,11 @@ finish_aki(AuthorityKeyIdentifier_t *aki, struct rpki_certificate *cer)
 }
 
 static void
-finish_crldp(CRLDistributionPoints_t *crldp, struct rpki_certificate *cer)
+finish_cdp(CRLDistributionPoints_t *cdp, struct rpki_certificate *cer)
 {
 	if (!cer_parent(cer))
 		panic("Certificate needs a default CRLDP, but lacks a parent");
-	ext_finish_crldp(crldp, cer_crldp(cer));
+	ext_finish_cdp(cdp, cer_cdp(cer));
 }
 
 static void
@@ -230,7 +230,7 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 
 		case EXT_CRLDP:
 			if (!fields_overridden(extnValuef, NULL))
-				finish_crldp(&ext->v.crldp, cer);
+				finish_cdp(&ext->v.cdp, cer);
 			break;
 
 		case EXT_AIA:
@@ -254,7 +254,7 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 
 		case EXT_ASN:
 			if (!fields_overridden(extnValuef, "asnum"))
-				ext_finish_asn(&ext->v.asn, cer->meta->node);
+				ext_finish_as(&ext->v.as, cer->meta->node);
 			break;
 		}
 	}
@@ -381,7 +381,7 @@ cer_rpkiManifest(struct rpki_certificate *cer)
 }
 
 char const *
-cer_crldp(struct rpki_certificate *cer)
+cer_cdp(struct rpki_certificate *cer)
 {
 	struct rpki_tree_node *parent, *child, *tmp;
 

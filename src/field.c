@@ -1002,8 +1002,8 @@ add_ext(char const *type, char const *name,
 		exts_add_aki(exts, name, fields);
 	else if (strcmp(type, "ku") == 0)
 		exts_add_ku(exts, name, fields);
-	else if (strcmp(type, "crldp") == 0)
-		exts_add_crldp(exts, name, fields);
+	else if (strcmp(type, "cdp") == 0)
+		exts_add_cdp(exts, name, fields);
 	else if (strcmp(type, "aia") == 0)
 		exts_add_aia(exts, name, fields);
 	else if (strcmp(type, "sia") == 0)
@@ -1012,9 +1012,9 @@ add_ext(char const *type, char const *name,
 		exts_add_cp(exts, name, fields);
 	else if (strcmp(type, "ip") == 0)
 		exts_add_ip(exts, name, fields);
-	else if (strcmp(type, "asn") == 0)
-		exts_add_asn(exts, name, fields);
-	else if (strcmp(type, "crln") == 0)
+	else if (strcmp(type, "as") == 0)
+		exts_add_as(exts, name, fields);
+	else if (strcmp(type, "cn") == 0)
 		exts_add_crln(exts, name, fields);
 	else
 		return "Unknown extension type";
@@ -1082,13 +1082,13 @@ print_exts(struct dynamic_string *dstr, void *_exts)
 		case EXT_AKI:	type = "aki";		break;
 		case EXT_KU:	type = "ku";		break;
 //		case EXT_EKU:	type = "eku";		break;
-		case EXT_CRLDP:	type = "crldp";		break;
+		case EXT_CRLDP:	type = "cdp";		break;
 		case EXT_AIA:	type = "aia";		break;
 		case EXT_SIA:	type = "sia";		break;
 		case EXT_CP:	type = "cp";		break;
 		case EXT_IP:	type = "ip";		break;
-		case EXT_ASN:	type = "asn";		break;
-		case EXT_CRLN:	type = "crln";		break;
+		case EXT_ASN:	type = "as";		break;
+		case EXT_CRLN:	type = "cn";		break;
 		}
 
 		dstr_append(dstr, "%s=%s", ext->name, type);
@@ -1883,7 +1883,7 @@ const struct field_type ft_exts = { "Extensions", parse_exts, print_exts };
 const struct field_type ft_ads = { "Access Descriptions", parse_ads, NULL };
 const struct field_type ft_ip_roa = { "IP Resources (ROA)", parse_ips_roa, print_roa_ips };
 const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_cer, print_cer_ips };
-const struct field_type ft_asn_cer = { "AS Resources", parse_asns, print_asns };
+const struct field_type ft_as_cer = { "AS Resources", parse_asns, print_asns };
 const struct field_type ft_revoked = { "Revoked Certificates", parse_revoked_list, print_revokeds };
 const struct field_type ft_filelist = { "File List", parse_filelist, print_filelist };
 const struct field_type ft_providers = { "ASPA Providers", parse_providers, print_providers };

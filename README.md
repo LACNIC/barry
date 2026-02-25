@@ -335,7 +335,7 @@ Tree nodes below level 4 will inherit their parents' addresses:
 
 ROA EE certificates follow the same patterns. ROAs themselves inherit (explicitely) their EE addresses.
 
-IPv6 and ASNs also follow the same patterns:
+IPv6 and AS numbers also follow the same patterns:
 
 ```
                         # IPv4        IPv6            AS
@@ -509,7 +509,7 @@ obj.tbsCertificate.version = -1    # DER-encodes as "02 01 FF" (INTEGER, Length=
 
 ```
 obj.tbsCertificate.extensions.ip.critical = 0xFF
-obj.tbsCertificate.extensions.asn.critical = true
+obj.tbsCertificate.extensions.as.critical = true
 obj.tbsCertificate.extensions.ski.critical = false
 ```
 
@@ -576,45 +576,45 @@ By default, your certificates get the following extension lists:
 
 ```
 # TAs
-obj.tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, asn ]
+obj.tbsCertificate.extensions = [ bc, ski, ku, sia, cp, ip, as ]
 
 # Regular CAs
-obj.tbsCertificate.extensions = [ bc, ski, aki, ku, crldp, aia, sia, cp, ip, asn ]
+obj.tbsCertificate.extensions = [ bc, ski, aki, ku, cdp, aia, sia, cp, ip, as ]
 
 # ROAs
 obj.content.certificates.0.tbsCertificate.extensions = [
-	ski, aki, ku, crldp, aia, sia, cp, ip
+	ski, aki, ku, cdp, aia, sia, cp, ip
 ]
 
 # Manifests
 obj.content.certificates.0.tbsCertificate.extensions = [
-	ski, aki, ku, crldp, aia, sia, cp, ip, asn
+	ski, aki, ku, cdp, aia, sia, cp, ip, as
 ]
 
 # ASPAs
 obj.content.certificates.0.tbsCertificate.extensions = [ 
-	ski, aki, ku, crldp, aia, sia, cp, asn
+	ski, aki, ku, cdp, aia, sia, cp, as
 ]
 
 # CRLs
-obj.tbsCertList.crlExtensions = [ aki, crln ]
+obj.tbsCertList.crlExtensions = [ aki, crn ]
 ```
 
 The presently implemented extensions are
 
 | Initials | Extension                    | Reference |
 |----------|------------------------------|-----------|
-| bc       | Basic Constraints            | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.9), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.1) |
-| ski      | Subject Key Identifier       | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.2) |
-| aki      | Authority Key Identifier     | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.1), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.3) |
-| ku       | Key Usage                    | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.3), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.4) |
-| crldp    | CRL Distribution Points      | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.6) |
-| aia      | Authority Information Access | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.7) |
-| sia      | Subject Information Access   | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.8) |
-| cp       | Certificate Policies         | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.4), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.9) |
-| ip       | IP Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.10) |
-| asn      | AS Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-3), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.11) |
-| crln     | CRL Number                   | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-5.2.3) |
+| bc       | Basic Constraints            | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.9), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.1)  |
+| ski      | Subject Key Identifier       | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.2)  |
+| aki      | Authority Key Identifier     | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.1), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.3)  |
+| ku       | Key Usage                    | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.3), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.4)  |
+| cdp      | CRL Distribution Points      | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.6) |
+| aia      | Authority Information Access | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.7)  |
+| sia      | Subject Information Access   | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.8)  |
+| cp       | Certificate Policies         | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.4), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.9)  |
+| ip       | IP Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-2), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.10)       |
+| as       | AS Resources                 | [Generic](https://datatracker.ietf.org/doc/html/rfc3779#section-3), [RPKI](https://datatracker.ietf.org/doc/html/rfc6487#section-4.8.11)       |
+| cn       | CRL Number                   | [Generic](https://datatracker.ietf.org/doc/html/rfc5280#section-5.2.3)                                                                         |
 
 Every extension gets an `extnID` OID, a `critical` boolean and a type-dependent `extnValue`, all editable through subfields:
 
@@ -622,18 +622,18 @@ Every extension gets an `extnID` OID, a `critical` boolean and a type-dependent 
 obj.tbsCertificate.extensions.ip.extnID = 1.3.6.1.5.5.7.1.28
 obj.tbsCertificate.extensions.ip.critical = true
 obj.tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24, 2001:db8::/96 ]
-obj.tbsCertificate.extensions.asn.extnID = 1.3.6.1.5.5.7.1.29
-obj.tbsCertificate.extensions.asn.critical = true
-obj.tbsCertificate.extensions.asn.extnValue.asnum = [ 0x1234, 0x5678 ]
-obj.tbsCertificate.extensions.asn.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
+obj.tbsCertificate.extensions.as.extnID = 1.3.6.1.5.5.7.1.29
+obj.tbsCertificate.extensions.as.critical = true
+obj.tbsCertificate.extensions.as.extnValue.asnum = [ 0x1234, 0x5678 ]
+obj.tbsCertificate.extensions.as.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
 ```
 
 If you want a different extension list, override it:
 
 ```
 # Replaces the extension list with an IP extension (type "ip", name "ip")
-# and an ASN extension (type "asn", name "asn").
-obj.tbsCertificate.extensions = [ ip, asn ]
+# and an AS extension (type "as", name "as").
+obj.tbsCertificate.extensions = [ ip, as ]
 
 # The "ip" label now refers to the first extension (because that's the one named "ip" now),
 # not the (now nonexistent) 6th or 9th.
@@ -646,11 +646,11 @@ You can customize the extension names by declaring the `extensions` object as a 
 obj.tbsCertificate.extensions = {
 	# <name> = <type>
 	red = ip,
-	blue = asn,
+	blue = as,
 	yellow = ip,
 	purple = bc,
 	orange = ip,
-	green = asn
+	green = as
 }
 
 # Overrides the OID of the third ip extension

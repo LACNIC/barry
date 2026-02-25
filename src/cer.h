@@ -31,7 +31,7 @@ void cer_write(struct rpki_certificate *);
 
 struct rpki_certificate *cer_parent(struct rpki_certificate *);
 char const *cer_rpkiManifest(struct rpki_certificate *);
-char const *cer_crldp(struct rpki_certificate *);
+char const *cer_cdp(struct rpki_certificate *);
 struct ext_list_node *cer_ext(struct rpki_certificate *, enum ext_type);
 
 #endif /* SRC_CER_H_ */

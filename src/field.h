@@ -93,7 +93,7 @@ extern const struct field_type ft_exts;
 extern const struct field_type ft_ads;		/* AccessDescriptions array */
 extern const struct field_type ft_ip_roa;
 extern const struct field_type ft_ip_cer;
-extern const struct field_type ft_asn_cer;
+extern const struct field_type ft_as_cer;
 extern const struct field_type ft_revoked;
 extern const struct field_type ft_filelist;
 extern const struct field_type ft_providers;

@@ -135,22 +135,22 @@ exts_add_ku(struct extensions *exts, char const *name, struct field *extsf)
 }
 
 static void
-add_crldp_fields(struct field *parent, struct ext_list_node *ext)
+add_cdp_fields(struct field *parent, struct ext_list_node *ext)
 {
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
-//	"extnValue", &ext->v.crldp, 0	TODO not implemented yet
+//	"extnValue", &ext->v.cdp, 0	TODO not implemented yet
 }
 
 void
-exts_add_crldp(struct extensions *exts, char const *name, struct field *extsf)
+exts_add_cdp(struct extensions *exts, char const *name, struct field *extsf)
 {
 	struct ext_list_node *ext;
 
 	ext = add_extension(exts, EXT_CRLDP, &asn_DEF_CRLDistributionPoints,
 	    name, NID_crl_distribution_points, false);
 
-	add_crldp_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
+	add_cdp_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
 static struct field *
@@ -287,7 +287,7 @@ exts_add_ip(struct extensions *exts, char const *name, struct field *extsf)
 }
 
 static void
-add_asn_fields(struct field *parent, struct ext_list_node *ext)
+add_as_fields(struct field *parent, struct ext_list_node *ext)
 {
 	struct field *value;
 
@@ -295,21 +295,21 @@ add_asn_fields(struct field *parent, struct ext_list_node *ext)
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
 
 	value = field_add(parent, "extnValue", &ft_obj, &ext->v, 0);
-	field_add(value, "asnum", &ft_asn_cer, &ext->v.asn.asnum,
+	field_add(value, "asnum", &ft_as_cer, &ext->v.as.asnum,
 	    sizeof(ASIdentifierChoice_t));
-	field_add(value, "rdi", &ft_asn_cer, &ext->v.asn.rdi,
+	field_add(value, "rdi", &ft_as_cer, &ext->v.as.rdi,
 	    sizeof(ASIdentifierChoice_t));
 }
 
 void
-exts_add_asn(struct extensions *exts, char const *name, struct field *extsf)
+exts_add_as(struct extensions *exts, char const *name, struct field *extsf)
 {
 	struct ext_list_node *ext;
 
 	ext = add_extension(exts, EXT_ASN, &asn_DEF_ASIdentifiers, name,
 	    NID_sbgp_autonomousSysNum, true);
 
-	add_asn_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
+	add_as_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -317,7 +317,7 @@ add_crln_fields(struct field *parent, struct ext_list_node *ext)
 {
 	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
 	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
-	field_add(parent, "extnValue", &ft_int, &ext->v.crln, 0);
+	field_add(parent, "extnValue", &ft_int, &ext->v.cn, 0);
 }
 
 void
@@ -327,7 +327,7 @@ exts_add_crln(struct extensions *exts, char const *name, struct field *extsf)
 
 	ext = add_extension(exts, EXT_CRLN, &asn_DEF_CRLNumber, name,
 	    NID_crl_number, false);
-	init_INTEGER(&ext->v.crln, 1);
+	init_INTEGER(&ext->v.cn, 1);
 
 	add_crln_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
@@ -377,15 +377,15 @@ finish_gn_uri(GeneralName_t *gn, char const *url)
 }
 
 void
-ext_finish_crldp(CRLDistributionPoints_t *crldp, char const *url)
+ext_finish_cdp(CRLDistributionPoints_t *cdp, char const *url)
 {
 	DistributionPointName_t *dpn;
 
 	pr_trace("Autocompleting CRLDP");
 
-	INIT_ASN1_ARRAY(&crldp->list, 1, DistributionPoint_t);
+	INIT_ASN1_ARRAY(&cdp->list, 1, DistributionPoint_t);
 	dpn = pzalloc(sizeof(DistributionPointName_t));
-	crldp->list.array[0]->distributionPoint = dpn;
+	cdp->list.array[0]->distributionPoint = dpn;
 	dpn->present = DistributionPointName_PR_fullName;
 	INIT_ASN1_ARRAY(&dpn->choice.fullName.list, 1, GeneralName_t);
 	finish_gn_uri(dpn->choice.fullName.list.array[0], url);
@@ -591,7 +591,7 @@ serials2asn(uint8_t *serials, size_t addrn, INTEGER_t *asn, uint8_t empty)
 }
 
 void
-ext_finish_asn(ASIdentifiers_t *asn, struct rpki_tree_node *node)
+ext_finish_as(ASIdentifiers_t *asn, struct rpki_tree_node *node)
 {
 	uint8_t *serials;
 	ASIdOrRange_t *air;
