@@ -540,5 +540,12 @@ check_output_contains "alt-content" -Fx \
 	"raw.asa,obj.content,ANY,0x050607" \
 	"encoded.asa,obj.content.encapContentInfo.eContent.customerASID,INTEGER,0x0100"
 
+check_output_contains "issuerUniqueID" -Fx \
+	"empty.cer,obj.tbsCertificate.issuerUniqueID,BIT STRING," \
+	"populated.cer,obj.tbsCertificate.issuerUniqueID,BIT STRING,0x112233"
+check_output_contains "subjectUniqueID" -Fx \
+	"empty.cer,obj.tbsCertificate.subjectUniqueID,BIT STRING," \
+	"populated.cer,obj.tbsCertificate.subjectUniqueID,BIT STRING,0x332211"
+
 echo "Successes: $SUCCESSES"
 echo "Failures : $FAILS"

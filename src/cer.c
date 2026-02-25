@@ -142,10 +142,9 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	pubkey2asn1(cer->keys, &tbs->subjectPublicKeyInfo);
 	field_add_spki(tbsf, "subjectPublicKeyInfo", &tbs->subjectPublicKeyInfo);
 
-	/* tbs->issuerUniqueID: TODO not implemented yet */
-	/* tbs->subjectUniqueID: TODO not implemented yet */
+	field_add(tbsf, "issuerUniqueID", &ft_bitstr, &tbs->issuerUniqueID, sizeof(BIT_STRING_t));
+	field_add(tbsf, "subjectUniqueID", &ft_bitstr, &tbs->subjectUniqueID, sizeof(BIT_STRING_t));
 
-	tbs->extensions = NULL;
 	extsf = field_add(tbsf, "extensions", &ft_exts, &cer->exts, 0);
 	switch (type) {
 	case CT_TA:	init_extensions_ta(cer, extsf);		break;
