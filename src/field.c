@@ -1032,27 +1032,27 @@ static error_msg
 add_ext(char const *type, char const *name,
     struct extensions *exts, struct field *fields)
 {
-	if (strcmp(type, "bc") == 0)
+	if (strncmp(type, "bc", 2) == 0)
 		exts_add_bc(exts, name, fields);
-	else if (strcmp(type, "ski") == 0)
+	else if (strncmp(type, "ski", 3) == 0)
 		exts_add_ski(exts, name, fields);
-	else if (strcmp(type, "aki") == 0)
+	else if (strncmp(type, "aki", 3) == 0)
 		exts_add_aki(exts, name, fields);
-	else if (strcmp(type, "ku") == 0)
+	else if (strncmp(type, "ku", 2) == 0)
 		exts_add_ku(exts, name, fields);
-	else if (strcmp(type, "cdp") == 0)
+	else if (strncmp(type, "cdp", 3) == 0)
 		exts_add_cdp(exts, name, fields);
-	else if (strcmp(type, "aia") == 0)
+	else if (strncmp(type, "aia", 3) == 0)
 		exts_add_aia(exts, name, fields);
-	else if (strcmp(type, "sia") == 0)
+	else if (strncmp(type, "sia", 3) == 0)
 		exts_add_sia(exts, name, fields, get_sia_defaults(fields));
-	else if (strcmp(type, "cp") == 0)
+	else if (strncmp(type, "cp", 2) == 0)
 		exts_add_cp(exts, name, fields);
-	else if (strcmp(type, "ip") == 0)
+	else if (strncmp(type, "ip", 2) == 0)
 		exts_add_ip(exts, name, fields);
-	else if (strcmp(type, "as") == 0)
+	else if (strncmp(type, "as", 2) == 0)
 		exts_add_as(exts, name, fields);
-	else if (strcmp(type, "cn") == 0)
+	else if (strncmp(type, "cn", 2) == 0)
 		exts_add_crln(exts, name, fields);
 	else
 		return "Unknown extension type";
@@ -1065,19 +1065,14 @@ parse_exts(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
 {
 	struct extensions *dst_exts;
 	struct kv_node *node;
-	struct keyval *kv;
 	error_msg error;
-
-	if (src_exts->type != VALT_SET && src_exts->type != VALT_MAP)
-		return NEED_SET;
-
-	fields->children = NULL;
-
-	dst_exts = _dst_exts;
-	STAILQ_INIT(dst_exts);
 
 	switch (src_exts->type) {
 	case VALT_SET:
+		fields->children = NULL;
+		dst_exts = _dst_exts;
+		STAILQ_INIT(dst_exts);
+
 		STAILQ_FOREACH(node, &src_exts->v.set, hook) {
 			if (node->value.type != VALT_STR)
 				return NEED_STRING;
@@ -1086,22 +1081,15 @@ parse_exts(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
 			if (error)
 				return error;
 		}
-		break;
+
+		return NULL;
+
 	case VALT_MAP:
-		STAILQ_FOREACH(kv, &src_exts->v.map, hook) {
-			if (kv->value.type != VALT_STR)
-				return NEED_STRING;
-			error = add_ext(kv->value.v.str, kv->key,
-			    dst_exts, fields);
-			if (error)
-				return error;
-		}
-		break;
+		return parse_obj(fields, src_exts, _dst_exts);
+
 	default:
 		return NEED_SET_OR_MAP;
 	}
-
-	return NULL;
 }
 
 static void
@@ -1109,31 +1097,14 @@ print_exts(struct dynamic_string *dstr, void *_exts)
 {
 	struct extensions *exts = _exts;
 	struct ext_list_node *ext;
-	char const *type;
 
-	dstr_append(dstr, "{ ");
+	dstr_append(dstr, "[ ");
 	STAILQ_FOREACH(ext, exts, hook) {
-		type = NULL;
-		switch (ext->type) {
-		case EXT_BC:	type = "bc";		break;
-		case EXT_SKI:	type = "ski";		break;
-		case EXT_AKI:	type = "aki";		break;
-		case EXT_KU:	type = "ku";		break;
-//		case EXT_EKU:	type = "eku";		break;
-		case EXT_CRLDP:	type = "cdp";		break;
-		case EXT_AIA:	type = "aia";		break;
-		case EXT_SIA:	type = "sia";		break;
-		case EXT_CP:	type = "cp";		break;
-		case EXT_IP:	type = "ip";		break;
-		case EXT_ASN:	type = "as";		break;
-		case EXT_CRLN:	type = "cn";		break;
-		}
-
-		dstr_append(dstr, "%s=%s", ext->name, type);
+		dstr_append(dstr, "%s", ext->name);
 		if (STAILQ_NEXT(ext, hook) != NULL)
 			dstr_append(dstr, ", ");
 	}
-	dstr_append(dstr, " }");
+	dstr_append(dstr, " ]");
 }
 
 struct ip_list_node {

@@ -19,12 +19,5 @@ obj.tbsCertificate.extensions = [ ip, as ]
 obj.tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 
 [node: ca3.cer]
-obj.tbsCertificate.extensions = {
-	red = ip,
-	blue = as,
-	yellow = ip,
-	purple = bc,
-	orange = ip,
-	green = as
-}
-obj.tbsCertificate.extensions.orange.extnID = 1.2.3.4.5
+obj.tbsCertificate.extensions = [ ip1, as1, ip2, bc, ip3, as2 ]
+obj.tbsCertificate.extensions.ip3.extnID = 1.2.3.4.5

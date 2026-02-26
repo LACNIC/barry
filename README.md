@@ -221,9 +221,9 @@ The key-value section is a JSON-adjacent hierarchy. Here is an example in which 
 			"notAfter" = "2026-06-01T00:00:00Z"
 		},
 		"extensions" = {
-			"ip" = { 
+			"ip" = {
 				"extnValue" = [
-					"192.0.2.0/24-28",
+					"192.0.2.0/24",
 					"2001:db8::/64"
 				]
 			}
@@ -260,7 +260,7 @@ obj.tbsCertificate = { # <-- 4, 5
 		notAfter = 2026-06-01T00:00:00Z
 	},
 	extensions.ip.extnValue = [ # <-- 5
-		192.0.2.0/24-28,
+		192.0.2.0/24,
 		2001:db8::/64, # <-- 3
 	], # <-- 3
 }
@@ -272,7 +272,7 @@ Which is also equivalent to
 [node: ta.cer]
 obj.tbsCertificate.validity.notBefore = 2025-06-01T00:00:00Z
 obj.tbsCertificate.validity.notAfter = 2026-06-01T00:00:00Z
-obj.tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24-28, 2001:db8::/64 ]
+obj.tbsCertificate.extensions.ip.extnValue = [ 192.0.2.0/24, 2001:db8::/64 ]
 ```
 
 (See [Numerics](#numerics) below for an example of 6.)
@@ -628,36 +628,26 @@ obj.tbsCertificate.extensions.as.extnValue.asnum = [ 0x1234, 0x5678 ]
 obj.tbsCertificate.extensions.as.extnValue.rdi = [ 0x9ABC, 0xDEF0 ]
 ```
 
-If you want a different extension list, override it:
+If you want a different extension list, the `extension` field has a custom parser that accepts an array of identifiers:
 
 ```
-# Replaces the extension list with an IP extension (type "ip", name "ip")
-# and an AS extension (type "as", name "as").
+# Replaces the extension list with an IP extension and an AS extension.
 obj.tbsCertificate.extensions = [ ip, as ]
 
-# The "ip" label now refers to the first extension (because that's the one named "ip" now),
+# The "ip" field now refers to the first extension (because that's the one named "ip" now),
 # not the (now nonexistent) 6th or 9th.
 obj.tbsCertificate.extensions.ip.extnID = 1.2.3.4.5
 ```
 
-You can customize the extension names by declaring the `extensions` object as a map. This is useful if you want to list multiple extensions of the same type:
+The new list will contain the extensions in the same order in which they were declared in the array.
+
+If you want to list multiple extensions of the same type, append a string to the type ID:
 
 ```
-obj.tbsCertificate.extensions = {
-	# <name> = <type>
-	red = ip,
-	blue = as,
-	yellow = ip,
-	purple = bc,
-	orange = ip,
-	green = as
-}
-
-# Overrides the OID of the third ip extension
-obj.tbsCertificate.extensions.orange.extnID = 1.2.3.4.5
+obj.tbsCertificate.extensions = [ ip1, as1, ip2, bc, ip3, as2 ]
+# Overrides the OID of the fifth extension
+obj.tbsCertificate.extensions.ip3.extnID = 1.2.3.4.5
 ```
-
-Whether declared as a set or map, the final list will contain the extensions in the same order in which they were declared.
 
 ### IP Resources
 

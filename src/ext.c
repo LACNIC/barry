@@ -26,6 +26,12 @@ add_extension(struct extensions *exts,
 {
 	struct ext_list_node *ext;
 
+	STAILQ_FOREACH(ext, exts, hook)
+		if (strcmp(name, ext->name) == 0)
+			panic("There is more than one extension named '%s'. "
+			    "(You can append a suffix to differentiate them.)",
+			    name);
+
 	pr_trace("Adding extension: %s", td->name);
 	ext = pzalloc(sizeof(struct ext_list_node));
 	ext->type = type;
