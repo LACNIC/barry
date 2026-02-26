@@ -793,6 +793,44 @@ parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
 	return NULL;
 }
 
+static void
+print_rdnseq(struct dynamic_string *dstr, void *arg)
+{
+	Name_t *name = arg;
+	RDNSequence_t *seq;
+	int s;
+	RelativeDistinguishedName_t *rdn;
+	int r;
+	AttributeTypeAndValue_t *tv;
+
+	seq = &name->choice.rdnSequence;
+	dstr_append(dstr, "[ ");
+
+	for (s = 0; s < seq->list.count; s++) {
+		dstr_append(dstr, "[ ");
+
+		rdn = seq->list.array[s];
+		for (r = 0; r < rdn->list.count; r++) {
+			tv = rdn->list.array[r];
+
+			dstr_append(dstr, "{ \"");
+			print_oid(dstr, &tv->type);
+			dstr_append(dstr, "\": \"");
+			print_anystr(dstr, &tv->value);
+			dstr_append(dstr, "\" }");
+
+			if (r != rdn->list.count - 1)
+				dstr_append(dstr, ", ");
+		}
+
+		dstr_append(dstr, " ]");
+		if (s != seq->list.count - 1)
+			dstr_append(dstr, ", ");
+	}
+
+	dstr_append(dstr, " ]");
+}
+
 static error_msg
 parse_gname_type(struct field *fields, struct kv_value *src, void *dst)
 {
@@ -1874,7 +1912,7 @@ const struct field_type ft_cstr = { "C String", parse_cstr, print_cstr };
 const struct field_type ft_any = { "ANY", parse_any, print_any };
 const struct field_type ft_any_oid = { "ANY-OID", parse_any_oid, print_any_oid };
 const struct field_type ft_bitstr = { "BIT STRING", parse_bitstr, print_bitstr };
-const struct field_type ft_rdnseq = { "RDN Sequence", parse_rdnseq, NULL };
+const struct field_type ft_rdnseq = { "RDN Sequence", parse_rdnseq, print_rdnseq };
 const struct field_type ft_gname_type = { "GeneralName type", parse_gname_type, print_gname_type };
 const struct field_type ft_time = { "Time", parse_time, print_time };
 const struct field_type ft_gtime = { "GeneralizedTime", parse_gtime, print_gtime };
