@@ -2051,7 +2051,7 @@ field_add_ad(struct field *parent, size_t adn, AccessDescription_t *ad)
 }
 
 struct field *
-fields_find(struct field *root, char const *key)
+__fields_find(struct field *root, char const *key, bool prepare)
 {
 	struct field *parent, *child;
 	char const *dot;
@@ -2064,10 +2064,15 @@ fields_find(struct field *root, char const *key)
 	parent = root;
 
 	do {
+		if (prepare && (parent->prepare != NULL))
+			parent->prepare(parent->prepare_arg);
+
 		dot = strchr(key, '.');
 		if (!dot) {
 			keylen = strlen(key);
 			HASH_FIND(hh, parent->children, key, keylen, child);
+			if (prepare && (child->prepare != NULL))
+				child->prepare(child->prepare_arg);
 			return child;
 		}
 
@@ -2126,7 +2131,7 @@ fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 	STAILQ_FOREACH(kv, kvs, hook) {
 		pr_trace("keyval: %s", kv->key);
 
-		field = fields_find(root, kv->key);
+		field = __fields_find(root, kv->key, true);
 		if (!field)
 			panic("Key '%s' is unknown.", kv->key);
 		if (!field->type || !field->type->parser)
@@ -2151,32 +2156,49 @@ fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 	}
 }
 
-static void
-__fields_print(struct field const *field, char *key, size_t key_offset)
+static char *
+field2str(struct field const *field)
 {
-	struct field *child, *tmp;
 	unsigned char **address;
 	struct dynamic_string dstr = { 0 };
 
+	address = field->address;
+	if (is_pointer(field)) {
+		if (*address != NULL)
+			field->type->print(&dstr, *address);
+	} else {
+		field->type->print(&dstr, address);
+	}
+
+	return dstr.buf;
+}
+
+static void
+__fields_print(struct field const *field, char *key, size_t key_offset,
+    bool is_null)
+{
+	char *printable;
+	struct field *child, *tmp;
+
 	strcpy(key + key_offset, field->key);
 
-	if (field->type && field->type->print) {
-		address = field->address;
-		if (is_pointer(field)) {
-			if (*address != NULL)
-				field->type->print(&dstr, *address);
-		} else {
-			field->type->print(&dstr, address);
-		}
+	if (field->cond && !field->cond(field->cond_arg))
+		is_null = true;
 
-		printf("%s = %s\n", key, dstr_finish(&dstr));
-		dstr_cleanup(&dstr);
+	if (field->type && field->type->print) {
+		if (is_null) {
+			printf("%s = NULL\n", key);
+		} else {
+			printable = field2str(field);
+			printf("%s = %s\n", key, printable);
+			free(printable);
+		}
 	}
 
 	key_offset += strlen(field->key);
 	key[key_offset] = '.';
 	HASH_ITER(hh, field->children, child, tmp)
-		__fields_print(child, key, key_offset + 1);
+		__fields_print(child, key, key_offset + 1, is_null);
 }
 
 void
@@ -2187,41 +2209,40 @@ fields_print_md(struct field const *root)
 
 	printf("```\n");
 	HASH_ITER(hh, root->children, child, tmp)
-		__fields_print(child, key, 0);
+		__fields_print(child, key, 0, false);
 	printf("```\n");
 }
 
 static void
 __fields_print_csv(char const *name, struct field const *field,
-    char *key, size_t key_offset)
+    char *key, size_t key_offset, bool is_null)
 {
+	char *printable;
 	struct field *child, *tmp;
-	unsigned char **address;
-	struct dynamic_string dstr = { 0 };
 
 	strcpy(key + key_offset, field->key);
 
-	if (field->type && field->type->print) {
-		address = field->address;
-		if (is_pointer(field)) {
-			if (*address != NULL)
-				field->type->print(&dstr, *address);
-		} else {
-			field->type->print(&dstr, address);
-		}
+	if (field->cond && !field->cond(field->cond_arg))
+		is_null = true;
 
+	if (field->type && field->type->print) {
 		csv_print(name, ',');
 		csv_print(key, ',');
 		csv_print(field->type->name, ',');
-		csv_print(dstr_finish(&dstr), '\n');
 
-		dstr_cleanup(&dstr);
+		if (is_null) {
+			csv_print("NULL", '\n');
+		} else {
+			printable = field2str(field);
+			csv_print(printable, '\n');
+			free(printable);
+		}
 	}
 
 	key_offset += strlen(field->key);
 	key[key_offset] = '.';
 	HASH_ITER(hh, field->children, child, tmp)
-		__fields_print_csv(name, child, key, key_offset + 1);
+		__fields_print_csv(name, child, key, key_offset + 1, is_null);
 }
 
 void
@@ -2231,5 +2252,5 @@ fields_print_csv(struct field const *fields, char const *name)
 	char key[FIELD_MAXLEN];
 
 	HASH_ITER(hh, fields->children, field, tmp)
-		__fields_print_csv(name, field, key, 0);
+		__fields_print_csv(name, field, key, 0, false);
 }

@@ -20,6 +20,8 @@ struct field;
 typedef char const *error_msg;
 typedef error_msg (*field_parser)(struct field *, struct kv_value *, void *);
 typedef void (*print_field)(struct dynamic_string *, void *);
+typedef void (*prepare_cb)(void *);
+typedef bool (*conditional_cb)(void *);
 
 struct field_type {
 	char const *name;
@@ -37,6 +39,14 @@ struct field {
 	/* AKA. "name" */
 	char const *key;
 	struct field_type const *type;
+
+	/* Gets called every time a descendant is overridden. */
+	prepare_cb prepare;
+	void *prepare_arg;
+
+	/* If this exists and returns false, the field should print NULL. */
+	conditional_cb cond;
+	void *cond_arg;
 
 	/* Memory location of the field's value */
 	void *address;
@@ -112,7 +122,8 @@ struct field *field_add_spki(struct field *, char const *,
 void field_add_file(struct field *, size_t, struct FileAndHash *, bool, bool);
 struct field *field_add_ad(struct field *, size_t, AccessDescription_t *);
 
-struct field *fields_find(struct field *, char const *);
+struct field *__fields_find(struct field *, char const *, bool);
+#define fields_find(r, k) __fields_find(r, k, false)
 struct field *fields_find_n(struct field *, size_t);
 bool fields_overridden(struct field *, char const *);
 

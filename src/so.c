@@ -76,20 +76,69 @@ content_info_finish(struct signed_object *so, asn_TYPE_descriptor_t *td)
 }
 
 static void
+set_iasn(void *arg)
+{
+	SignerIdentifier_t *si = arg;
+
+	if (si->present == SignerIdentifier_PR_issuerAndSerialNumber)
+		return;
+
+	si->present = SignerIdentifier_PR_issuerAndSerialNumber;
+	memset(&si->choice, 0, sizeof(si->choice));
+}
+
+static bool
+iasn_cond(void *arg)
+{
+	SignerIdentifier_t *si = arg;
+	return si->present == SignerIdentifier_PR_issuerAndSerialNumber;
+}
+
+static void
+set_ski(void *arg)
+{
+	SignerIdentifier_t *si = arg;
+
+	if (si->present == SignerIdentifier_PR_subjectKeyIdentifier)
+		return;
+
+	si->present = SignerIdentifier_PR_subjectKeyIdentifier;
+	memset(&si->choice, 0, sizeof(si->choice));
+}
+
+static bool
+ski_cond(void *arg)
+{
+	SignerIdentifier_t *si = arg;
+	return si->present == SignerIdentifier_PR_subjectKeyIdentifier;
+}
+
+static void
 init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 {
 	CMSAttribute_t *attr;
 	OBJECT_IDENTIFIER_t ct;
-	struct field *saf;
+	struct field *sidf, *iasnf, *skif, *saf;
 	Time_t st = { 0 };
 
 	init_INTEGER(&si->version, 3);
 	field_add(sif, "version", &ft_int, &si->version, 0);
 
-	/* TODO sid not implemented yet */
-//	"sid.issuerAndSerialNumber.", &ft_name, sid.choice.issuerAndSerialNumber.issuer
-//	"sid.issuerAndSerialNumber.serialNumber", &ft_int, sid.choice.issuerAndSerialNumber.serialNumber
-//	"sid.subjectKeyIdentifier", &ft_8str, sid.choice.subjectKeyIdentifier
+	/* sid */
+
+	sidf = field_add(sif, "sid", &ft_obj, &si->sid, 0);
+	iasnf = field_add(sidf, "issuerAndSerialNumber", &ft_obj, &si->sid.choice.issuerAndSerialNumber, 0);
+	iasnf->prepare = set_iasn;
+	iasnf->prepare_arg = &si->sid;
+	iasnf->cond = iasn_cond;
+	iasnf->cond_arg = &si->sid;
+	skif = field_add(sidf, "subjectKeyIdentifier", &ft_8str, &si->sid.choice.subjectKeyIdentifier, 0);
+	skif->prepare = set_ski;
+	skif->prepare_arg = &si->sid;
+	skif->cond = ski_cond;
+	skif->cond_arg = &si->sid;
+	field_add_name(iasnf, "issuer", &si->sid.choice.issuerAndSerialNumber.issuer);
+	field_add(iasnf, "serialNumber", &ft_int, &si->sid.choice.issuerAndSerialNumber.serialNumber, 0);
 
 	/* ski postponed */
 
