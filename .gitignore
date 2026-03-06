@@ -1,6 +1,7 @@
 # Binaries
 src/barry
 src/barry-delta
+src/barry-mtim
 *.o
 *.test
 

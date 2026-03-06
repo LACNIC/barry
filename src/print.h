@@ -58,7 +58,7 @@ void pr_end(FILE *);
 		fprintf(stderr, "[ERR %s:%d] " fmt,			\
 		    __func__, __LINE__, ##__VA_ARGS__);			\
 		pr_end(stderr);						\
-		exit(1);						\
+		exit(EXIT_FAILURE);					\
 	} while (0)
 
 #define enomem panic("Out of memory")
