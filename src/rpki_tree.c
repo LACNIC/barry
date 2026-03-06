@@ -726,6 +726,25 @@ rpkitree_print(struct rpki_tree *tree)
 	printf("\n");
 }
 
+static char *
+replace_basename(char const *path, char const *new_name)
+{
+	char *slash;
+	size_t dirlen;
+	char *result;
+
+	slash = strrchr(path, '/');
+	if (!slash)
+		return pstrdup(new_name);
+
+	dirlen = slash - path + 1;
+	result = pmalloc(dirlen + strlen(new_name) + 1);
+	strncpy(result, path, dirlen);
+	strcpy(result + dirlen, new_name);
+
+	return result;
+}
+
 static void
 default_paths(struct rrdp_notification *notif, char *notif_uri)
 {
@@ -733,7 +752,7 @@ default_paths(struct rrdp_notification *notif, char *notif_uri)
 	size_t rrdp_uri_len;
 
 	notif->uri = pstrdup(notif_uri);
-	notif->snapshot.uri = concat(notif_uri, ".snapshot");
+	notif->snapshot.uri = replace_basename(notif_uri, "snapshot.xml");
 	notif->session = "1";
 	init_INTEGER(&notif->serial, 1);
 
@@ -744,7 +763,7 @@ default_paths(struct rrdp_notification *notif, char *notif_uri)
 	notif->path = notif_uri + rrdp_uri_len;
 	while (*notif->path == '/')
 		notif->path++;
-	notif->snapshot.path = concat(notif->path, ".snapshot");
+	notif->snapshot.path = replace_basename(notif->path, "snapshot.xml");
 }
 
 static void
