@@ -178,7 +178,7 @@ str2ft(struct rpki_tree_node *node, char const *str)
 		return FT_MFT;
 	if (strcmp(str, "roa") == 0)
 		return FT_ROA;
-	if (strcmp(str, "asa") == 0 || strcmp(str, "aspa") == 0)
+	if (strcmp(str, "asa") == 0)
 		return FT_ASA;
 	return FT_UNKNOWN;
 }

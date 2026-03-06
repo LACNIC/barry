@@ -1001,6 +1001,7 @@ print_filetype(struct dynamic_string *dstr, void *val)
 	case FT_CRL:	str = "crl";	break;
 	case FT_MFT:	str = "mft";	break;
 	case FT_ROA:	str = "roa";	break;
+	case FT_ASA:	str = "asa";	break;
 	default:	str = "?";	break;
 	}
 
