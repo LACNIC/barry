@@ -2081,7 +2081,7 @@ __fields_find(struct field *root, char const *key, bool prepare)
 		if (!dot) {
 			keylen = strlen(key);
 			HASH_FIND(hh, parent->children, key, keylen, child);
-			if (prepare && (child->prepare != NULL))
+			if (child && prepare && (child->prepare != NULL))
 				child->prepare(child->prepare_arg);
 			return child;
 		}
