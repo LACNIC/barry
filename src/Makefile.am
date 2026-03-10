@@ -5,7 +5,7 @@ if BACKTRACE_ENABLED
 common_CFLAGS += -DBACKTRACE_ENABLED -rdynamic
 endif
 
-bin_PROGRAMS = barry barry-delta barry-mtim
+bin_PROGRAMS = barry barry-delta barry-mtim barry-rtr
 
 barry_SOURCES = main.c
 
@@ -53,3 +53,10 @@ barry_mtim_SOURCES += print.c print.h
 
 barry_mtim_CFLAGS = ${common_CFLAGS} ${XML2_CFLAGS}
 barry_mtim_LDADD  = ${XML2_LIBS}
+
+barry_rtr_SOURCES = rtr.c
+barry_rtr_SOURCES += alloc.c alloc.h
+barry_rtr_SOURCES += print.c print.h
+
+barry_rtr_CFLAGS = ${common_CFLAGS} ${XML2_CFLAGS}
+barry_rtr_LDADD  = ${XML2_LIBS}

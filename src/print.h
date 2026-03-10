@@ -13,6 +13,8 @@
 #define C_CYAN		"\x1B[36m"
 #define C_WHT		"\x1B[37m"
 #define C_RST		"\x1B[0m"
+#define C_BOLD		"\x1B[1m"
+#define C_UNDERLINE	"\x1B[4m"
 
 extern unsigned int verbosity;
 extern bool print_colors;
