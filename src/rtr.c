@@ -1072,7 +1072,7 @@ print_server_response(void)
 		if (print_pdu(hdr) != 0)
 			return;
 		printf("\n");
-	} while (is_terminating_pdu(hdr[1]));
+	} while (!is_terminating_pdu(hdr[1]));
 }
 
 static void *
