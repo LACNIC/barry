@@ -88,7 +88,7 @@ print_command_help(void)
 	printf("  Sets the default RTR version number sent by all subsequent PDUs.\n");
 	printf("  %s<VER>%s: unsigned 8-bit integer. Default: %s--version%s (%s-V%s)\n", var, rst, flg, rst, flg, rst);
 	printf("\n");
-	printf("%sreset%s [version %s<RV>%s] [pdu-type %s<RT>%s] [zero %s<RZ>%s] [length %s<RL>%s]\n",
+	printf("%sreset-query%s [version %s<RV>%s] [pdu-type %s<RT>%s] [zero %s<RZ>%s] [length %s<RL>%s]\n",
 	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
 	printf("  Sends a Reset Query PDU to the server. Arguments are header fields.\n");
 	printf("  %s<RV>%s: unsigned  8-bit integer. Default: %s<VER>%s\n", var, rst, var, rst);
@@ -96,8 +96,9 @@ print_command_help(void)
 	printf("  %s<RZ>%s: unsigned 16-bit integer. Default: 0\n", var, rst);
 	printf("  %s<RL>%s: unsigned 32-bit integer. Default: 8\n", var, rst);
 	printf("\n");
-	printf("%sserial%s [version %s<SV>%s] [pdu-type %s<ST>%s] [session %s<SS>%s] [length %s<SL>%s] [serial %s<SE>%s]\n",
-	    cmd, rst, var, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("%sserial-query%s [version %s<SV>%s] [pdu-type %s<ST>%s] [session %s<SS>%s] \\\n",
+	    cmd, rst, var, rst, var, rst, var, rst);
+	printf("             [length %s<SL>%s] [serial %s<SE>%s]\n", var, rst, var, rst);
 	printf("  Sends a Serial Query PDU to the server. Arguments are header fields.\n");
 	printf("  %s<SV>%s: unsigned  8-bit integer. Default: %s<VER>%s\n", var, rst, var, rst);
 	printf("  %s<ST>%s: unsigned  8-bit integer. Default: 1\n", var, rst);
@@ -477,9 +478,9 @@ send_stdin_commands(void)
 
 		if (strcmp(token, "version") == 0)
 			next_u8(&rdr, "version", &version);
-		else if (strcmp(token, "reset") == 0)
+		else if (strcmp(token, "reset-query") == 0 || strcmp(token, "reset") == 0)
 			send_reset_query(&rdr);
-		else if (strcmp(token, "serial") == 0)
+		else if (strcmp(token, "serial-query") == 0 || strcmp(token, "serial") == 0)
 			send_serial_query(&rdr);
 		else if (strcmp(token, "help") == 0)
 			print_command_help();
