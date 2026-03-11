@@ -300,26 +300,26 @@ parse_dec(char const *src, INTEGER_t *dst)
 }
 
 static error_msg
-parse_byte_array(struct kv_value *src, uint8_t **buf, size_t *size)
+__parse_byte_array(char const *src, uint8_t **buf, size_t *size)
 {
 	BIT_STRING_t bs;
 	INTEGER_t num;
 	error_msg error;
 
-	if (src->type != VALT_STR)
-		return NEED_STRING;
+	while (src[0] == ' ' || src[0] == '\t' || src[0] == '\n')
+		src++;
 
-	if (src->v.str[0] == '0' && src->v.str[1] == 'x') {
+	if (src[0] == '0' && src[1] == 'x') {
 		memset(&bs, 0, sizeof(bs));
-		error = parse_bitstr_hex(src->v.str, &bs);
+		error = parse_bitstr_hex(src, &bs);
 
-	} else if (src->v.str[0] == '0' && src->v.str[1] == 'b') {
+	} else if (src[0] == '0' && src[1] == 'b') {
 		memset(&bs, 0, sizeof(bs));
-		error = parse_bitstr_bin(src->v.str, &bs);
+		error = parse_bitstr_bin(src, &bs);
 
 	} else {
 		memset(&num, 0, sizeof(num));
-		if ((error = parse_dec(src->v.str, &num)) != NULL)
+		if ((error = parse_dec(src, &num)) != NULL)
 			return error;
 		*buf = num.buf;
 		*size = num.size;
@@ -334,6 +334,14 @@ parse_byte_array(struct kv_value *src, uint8_t **buf, size_t *size)
 	*buf = bs.buf;
 	*size = bs.size;
 	return NULL;
+}
+
+static error_msg
+parse_byte_array(struct kv_value *src, uint8_t **buf, size_t *size)
+{
+	return (src->type == VALT_STR)
+	    ? __parse_byte_array(src->v.str, buf, size)
+	    : NEED_STRING;
 }
 
 static error_msg
@@ -1531,6 +1539,38 @@ parse_asns_str(struct kv_value *src, ASIdentifierChoice_t *dst)
 }
 
 static error_msg
+parse_as_range(struct kv_value *src, ASRange_t *dst)
+{
+	char *str;
+	char *dash;
+	error_msg error;
+
+	if (src->type != VALT_STR)
+		return NEED_STRING;
+
+	str = pstrdup(src->v.str);
+
+	dash = strchr(str, '-');
+	if (!dash) {
+		free(str);
+		return "Range is missing a dash";
+	}
+	*dash = 0;
+
+	error = __parse_byte_array(str, &dst->min.buf, &dst->min.size);
+	if (error) {
+		free(str);
+		return error;
+	}
+
+	error = __parse_byte_array(dash + 1, &dst->max.buf, &dst->max.size);
+
+	free(str);
+	return error;
+
+}
+
+static error_msg
 parse_asns_set(struct kv_value *src, ASIdentifierChoice_t *aic)
 {
 	struct kv_node *node;
@@ -1547,9 +1587,18 @@ parse_asns_set(struct kv_value *src, ASIdentifierChoice_t *aic)
 
 	n = 0;
 	STAILQ_FOREACH(node, &src->v.set, hook) {
+		if (node->value.type != VALT_STR)
+			return NEED_STRING;
+
 		aor = aic->choice.asIdsOrRanges.list.array[n++];
-		aor->present = ASIdOrRange_PR_id;
-		error = __parse_int(&node->value, &aor->choice.id);
+		if (strchr(node->value.v.str, '-') != NULL) {
+			aor->present = ASIdOrRange_PR_range;
+			error = parse_as_range(&node->value, &aor->choice.range);
+		} else {
+			aor->present = ASIdOrRange_PR_id;
+			error = __parse_int(&node->value, &aor->choice.id);
+		}
+
 		if (error)
 			return error;
 	}
