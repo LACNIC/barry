@@ -1195,7 +1195,8 @@ parse_ip_node(char *str, struct ip_list_node **result)
 	ipnode->af = (strchr(str, ':') != NULL) ? AF_INET6 : AF_INET;
 
 	if (inet_pton(ipnode->af, str, ipnode->bits) < 1) {
-		*slash = '/';
+		if (slash != NULL)
+			*slash = '/';
 		return BAD_IP;
 	}
 
