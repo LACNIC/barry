@@ -102,6 +102,7 @@ parse_bitstr_hex(char const *src, BIT_STRING_t *dst)
 	size_t d;
 	size_t digits;
 	unsigned long plen;
+	char *endptr;
 	int chr;
 
 	unsigned int min_plen;
@@ -123,9 +124,11 @@ parse_bitstr_hex(char const *src, BIT_STRING_t *dst)
 
 	if (*cursor == '/') {
 		errno = 0;
-		plen = strtoul(cursor + 1, NULL, 10);
+		plen = strtoul(cursor + 1, &endptr, 10);
 		if ((plen == ULONG_MAX && errno == ERANGE) || plen > SIZE_MAX)
 			return PREF_LEN_2BIG;
+		if (cursor + 1 == endptr)
+			return DEC_EINVAL;
 		if (plen < min_plen)
 			return PREF_TRUNC;
 	} else {
@@ -178,6 +181,7 @@ parse_bitstr_bin(char const *src, BIT_STRING_t *dst)
 	size_t d, b;
 	size_t bits, min_plen;
 	unsigned long plen;
+	char *endptr;
 	int chr;
 
 	src += 2; /* Skip "0b" */
@@ -195,9 +199,11 @@ parse_bitstr_bin(char const *src, BIT_STRING_t *dst)
 
 	if (*cursor == '/') {
 		errno = 0;
-		plen = strtoul(cursor + 1, NULL, 10);
+		plen = strtoul(cursor + 1, &endptr, 10);
 		if ((plen == ULONG_MAX && errno == ERANGE) || plen > SIZE_MAX)
 			return PREF_LEN_2BIG;
+		if (cursor + 1 == endptr)
+			return DEC_EINVAL;
 		if (plen < min_plen)
 			return PREF_TRUNC;
 	} else {
@@ -317,13 +323,16 @@ __parse_byte_array(char const *src, uint8_t **buf, size_t *size)
 		memset(&bs, 0, sizeof(bs));
 		error = parse_bitstr_bin(src, &bs);
 
-	} else {
+	} else if ('0' <= src[0] && src[0] <= '9') {
 		memset(&num, 0, sizeof(num));
 		if ((error = parse_dec(src, &num)) != NULL)
 			return error;
 		*buf = num.buf;
 		*size = num.size;
 		return NULL;
+
+	} else {
+		return DEC_EINVAL;
 	}
 
 	if (error)
@@ -1182,7 +1191,7 @@ find_last_1_index(unsigned char *bits)
 static error_msg
 parse_ip_node(char *str, struct ip_list_node **result)
 {
-	char *slash, *dash;
+	char *slash, *dash, *endptr;
 	unsigned long plen;
 	struct ip_list_node *ipnode;
 	unsigned int index1;
@@ -1220,7 +1229,8 @@ parse_ip_node(char *str, struct ip_list_node **result)
 	plen = strtoul(slash + 1, &dash, 10);
 	if ((plen == ULONG_MAX && errno == ERANGE) || plen > UINT_MAX)
 		return PREF_LEN_2BIG;
-
+	if (slash + 1 == dash)
+		return DEC_EINVAL;
 	index1 = find_last_1_index(ipnode->bits);
 	if (index1 != UINT_MAX && index1 >= plen)
 		return PREF_TRUNC;
@@ -1232,9 +1242,11 @@ parse_ip_node(char *str, struct ip_list_node **result)
 	}
 
 	errno = 0;
-	plen = strtoul(dash + 1, NULL, 10);
+	plen = strtoul(dash + 1, &endptr, 10);
 	if ((plen == ULONG_MAX && errno == ERANGE) || plen > UINT_MAX)
 		return PREF_LEN_2BIG;
+	if (dash + 1 == endptr)
+		return DEC_EINVAL;
 
 	ipnode->has_maxlen = true;
 	ipnode->maxlen = plen;

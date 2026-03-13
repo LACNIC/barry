@@ -373,19 +373,6 @@ foreach_ss_publish(char const *path, snapshot_cb scb, publish_cb pcb,
 	xmlFreeTextReader(reader);
 }
 
-unsigned long
-get_serial(struct rrdp_meta *meta)
-{
-	unsigned long serial;
-
-	errno = 0;
-	serial = strtoul(meta->serial, NULL, 10);
-	if (serial == ULONG_MAX && errno == ERANGE)
-		panic("Serial is too big: %s", meta->serial);
-
-	return serial;
-}
-
 static void
 add_delta(struct deltas *deltas, enum delta_type type, struct publish *pub)
 {
