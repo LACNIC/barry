@@ -35,6 +35,8 @@ struct rpki_tree_node {
 	struct rpki_tree_node *children;
 	unsigned int depth;	/* aka. ancestor count */
 	unsigned int serial;	/* This node is parent's `serial`th child */
+	bool ip_overridden;
+	bool as_overridden;
 
 	/* Parent hash table hook */
 	UT_hash_handle phook;

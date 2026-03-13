@@ -484,6 +484,15 @@ ext_finish_cp(CertificatePolicies_t *cp)
 	init_oid(&cp->list.array[0]->policyIdentifier, NID_ipAddr_asNumber);
 }
 
+static void
+init_addr_family(OCTET_STRING_t *iaf, uint8_t proto)
+{
+	iaf->size = 2;
+	iaf->buf = pmalloc(iaf->size);
+	iaf->buf[0] = 0;
+	iaf->buf[1] = proto;
+}
+
 static uint8_t *
 get_serials(struct rpki_tree_node *node)
 {
@@ -520,33 +529,74 @@ serials2bitstr(uint8_t *serials, size_t addrn,
 		bs->buf[i] = serials[addrn - i - 1];
 }
 
-void
-ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_tree_node *node)
+static bool
+has_inheritable_addr(struct rpki_tree_node *node, int proto)
 {
-	OCTET_STRING_t *iaf;
+	struct ext_list_node *ext;
+	int f;
+	struct IPAddressFamily *iaf;
+
+	for (node = node->parent; node; node = node->parent)
+		if (IS_CER(node->type)) {
+			// TODO there might be more than one IP extension;
+			// this should be an iterator, not a find.
+			ext = cer_ext(node->obj, EXT_IP);
+			if (!ext)
+				return false;
+			for (f = 0; f < ext->v.ip.list.count; f++) {
+				iaf = ext->v.ip.list.array[f];
+				if (iaf->addressFamily.size == 2 &&
+				    iaf->addressFamily.buf[0] == 0 &&
+				    iaf->addressFamily.buf[1] == proto) {
+					switch (iaf->ipAddressChoice.present) {
+					case IPAddressChoice_PR_inherit:
+						return true;
+					case IPAddressChoice_PR_addressesOrRanges:
+						if (iaf->ipAddressChoice.choice.addressesOrRanges.list.count > 0)
+							return true;
+						break;
+					case IPAddressChoice_PR_NOTHING:
+						break;
+					}
+				}
+			}
+			return false;
+		}
+
+	return false;
+}
+
+void
+ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_certificate *cer)
+{
+	struct rpki_tree_node *node;
+	struct rpki_certificate *parent;
 	IPAddressChoice_t *iac;
 	IPAddressOrRange_t *iar;
 	uint8_t *serials;
+	bool v4, v6;
 
 	pr_trace("Autocompleting IP");
+	node = cer->meta->node;
 
-	INIT_ASN1_ARRAY(&ip->list, 2, IPAddressFamily_t);
+	switch (cer->meta->node->type) {
+	case FT_CER:
+	case FT_ROA:
+	case FT_TA:
+		parent = cer_parent(cer);
+		if (parent && parent->meta->node->ip_overridden) {
+			pr_debug("Parent IP is overridden; inheriting identical resources.");
+			node->ip_overridden = true;
+			*ip = cer_ext(parent, EXT_IP)->v.ip;
+			break;
+		}
 
-	/* IPv4 */
-	iaf = &ip->list.array[0]->addressFamily;
-	iaf->size = 2;
-	iaf->buf = pmalloc(iaf->size);
-	iaf->buf[0] = 0;
-	iaf->buf[1] = 1;
+		pr_debug("Allocating default resource distribution.");
 
-	/* IPv6 */
-	iaf = &ip->list.array[1]->addressFamily;
-	iaf->size = 2;
-	iaf->buf = pmalloc(iaf->size);
-	iaf->buf[0] = 0;
-	iaf->buf[1] = 2;
+		INIT_ASN1_ARRAY(&ip->list, 2, IPAddressFamily_t);
+		init_addr_family(&ip->list.array[0]->addressFamily, 1);
+		init_addr_family(&ip->list.array[1]->addressFamily, 2);
 
-	if (IS_CER(node->type) || node->type == FT_ROA) {
 		serials = get_serials(node);
 
 		/* IPv4 */
@@ -570,15 +620,26 @@ ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_tree_node *node)
 		    &iar->choice.addressPrefix, 16);
 
 		free(serials);
+		break;
 
-	} else {
-		/* IPv4 */
-		iac = &ip->list.array[0]->ipAddressChoice;
-		iac->present = IPAddressChoice_PR_inherit;
+	case FT_CRL:
+	case FT_MFT:
+	case FT_ASA:
+	case FT_UNKNOWN:
+		v4 = has_inheritable_addr(node, 1);
+		v6 = has_inheritable_addr(node, 2);
+		if (!v4 && !v6)
+			v4 = v6 = true;
 
-		/* IPv6 */
-		iac = &ip->list.array[1]->ipAddressChoice;
-		iac->present = IPAddressChoice_PR_inherit;
+		INIT_ASN1_ARRAY(&ip->list, v4 + v6, IPAddressFamily_t);
+		if (v4) {
+			iac = &ip->list.array[0]->ipAddressChoice;
+			iac->present = IPAddressChoice_PR_inherit;
+		}
+		if (v6) {
+			iac = &ip->list.array[v4]->ipAddressChoice;
+			iac->present = IPAddressChoice_PR_inherit;
+		}
 	}
 }
 
@@ -596,20 +657,94 @@ serials2asn(uint8_t *serials, size_t addrn, INTEGER_t *asn, uint8_t empty)
 		panic("Cannot convert %lu to INTEGER: %s", val, strerror(errno));
 }
 
-void
-ext_finish_as(ASIdentifiers_t *asn, struct rpki_tree_node *node)
+static ASId_t *
+find_first_ancestor_asn(struct rpki_tree_node *node)
 {
-	uint8_t *serials;
+	struct ext_list_node *ext;
+	ASIdentifierChoice_t *choice;
+	ASIdOrRange_t *aor;
+
+	for (node = node->parent; node; node = node->parent)
+		if (IS_CER(node->type)) {
+			ext = cer_ext(node->obj, EXT_ASN);
+			if (!ext)
+				return NULL;
+			choice = ext->v.as.asnum;
+			if (!choice)
+				return NULL;
+			switch (choice->present) {
+			case ASIdentifierChoice_PR_asIdsOrRanges:
+				if (choice->choice.asIdsOrRanges.list.count == 0)
+					return NULL;
+				aor = choice->choice.asIdsOrRanges.list.array[0];
+				switch (aor->present) {
+				case ASIdOrRange_PR_id:
+					return &aor->choice.id;
+				case ASIdOrRange_PR_range:
+					return &aor->choice.range.min;
+				case ASIdOrRange_PR_NOTHING:
+					;
+				}
+				break;
+			case ASIdentifierChoice_PR_inherit:
+				continue;
+			case ASIdentifierChoice_PR_NOTHING:
+				;
+			}
+			return NULL;
+		}
+
+	return NULL;
+}
+
+static struct ASIdentifierChoice *
+ext_finish_as_choice_asa(struct rpki_certificate *cer)
+{
+	struct ASIdentifierChoice *result;
+	ASId_t *asid;
 	ASIdOrRange_t *air;
 
-	pr_trace("Autocompleting ASN");
+	result = pzalloc(sizeof(ASIdentifierChoice_t));
 
-	asn->asnum = pzalloc(sizeof(ASIdentifierChoice_t));
-	asn->asnum->present = ASIdentifierChoice_PR_asIdsOrRanges;
-	INIT_ASN1_ARRAY(&asn->asnum->choice.asIdsOrRanges.list,
-	    1, ASIdOrRange_t);
+	asid = find_first_ancestor_asn(cer->meta->node);
+	if (asid) {
+		result->present = ASIdentifierChoice_PR_asIdsOrRanges;
+		INIT_ASN1_ARRAY(&result->choice.asIdsOrRanges.list,
+		    1, ASIdOrRange_t);
+		air = result->choice.asIdsOrRanges.list.array[0];
+		air->present = ASIdOrRange_PR_id;
+		air->choice.id = *asid;
 
-	air = asn->asnum->choice.asIdsOrRanges.list.array[0];
+	} else {
+		result->present = ASIdentifierChoice_PR_inherit;
+	}
+
+	return result;
+}
+
+static struct ASIdentifierChoice *
+ext_finish_as_choice_cer(struct rpki_certificate *cer)
+{
+	struct rpki_certificate *parent;
+	struct ASIdentifierChoice *result;
+	struct rpki_tree_node *node;
+	ASIdOrRange_t *air;
+	uint8_t *serials;
+
+	parent = cer_parent(cer);
+	if (parent && parent->meta->node->as_overridden) {
+		pr_debug("Parent AS is overridden; inheriting identical resources.");
+		cer->meta->node->as_overridden = true;
+		return cer_ext(parent, EXT_ASN)->v.as.asnum;
+	}
+
+	pr_debug("Allocating default resource distribution.");
+	result = pzalloc(sizeof(ASIdentifierChoice_t));
+	node = cer->meta->node;
+
+	result->present = ASIdentifierChoice_PR_asIdsOrRanges;
+	INIT_ASN1_ARRAY(&result->choice.asIdsOrRanges.list, 1, ASIdOrRange_t);
+	air = result->choice.asIdsOrRanges.list.array[0];
 
 	serials = get_serials(node);
 	if (node->depth < 4) {
@@ -621,6 +756,30 @@ ext_finish_as(ASIdentifiers_t *asn, struct rpki_tree_node *node)
 		serials2asn(serials, node->depth, &air->choice.id, 0);
 	}
 	free(serials);
+	return result;
+}
+
+void
+ext_finish_as(ASIdentifiers_t *asn, struct rpki_certificate *cer)
+{
+	pr_trace("Autocompleting AS");
+
+	switch (cer->meta->node->type) {
+	case FT_CER:
+	case FT_TA:
+		asn->asnum = ext_finish_as_choice_cer(cer);
+		break;
+	case FT_ASA:
+		asn->asnum = ext_finish_as_choice_asa(cer);
+		break;
+	case FT_CRL:
+	case FT_MFT:
+	case FT_ROA:
+	case FT_UNKNOWN:
+		asn->asnum = pzalloc(sizeof(ASIdentifierChoice_t));
+		asn->asnum->present = ASIdentifierChoice_PR_inherit;
+		break;
+	}
 }
 
 void

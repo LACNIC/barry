@@ -248,13 +248,17 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 			break;
 
 		case EXT_IP:
-			if (!fields_overridden(extnValuef, NULL))
-				ext_finish_ip(&ext->v.ip, cer->meta->node);
+			if (fields_overridden(extnValuef, NULL))
+				cer->meta->node->ip_overridden = true;
+			else
+				ext_finish_ip(&ext->v.ip, cer);
 			break;
 
 		case EXT_ASN:
-			if (!fields_overridden(extnValuef, "asnum"))
-				ext_finish_as(&ext->v.as, cer->meta->node);
+			if (fields_overridden(extnValuef, "asnum"))
+				cer->meta->node->as_overridden = true;
+			else
+				ext_finish_as(&ext->v.as, cer);
 			break;
 		}
 	}

@@ -2,7 +2,7 @@
 
 check_output_contains "aspa-min" -Fx \
 	"aspa.asa,obj.content.encapContentInfo.eContent.version,INTEGER,0x01" \
-	"aspa.asa,obj.content.encapContentInfo.eContent.customerASID,INTEGER,0x01000000" \
+	"aspa.asa,obj.content.encapContentInfo.eContent.customerASID,INTEGER,0x00" \
 	"aspa.asa,obj.content.encapContentInfo.eContent.providers,ASPA Providers,[ 0 ]"
 
 check_output_contains "aspa-max" -Fx \

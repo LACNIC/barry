@@ -333,8 +333,6 @@ Tree nodes below level 4 will inherit their parents' addresses:
 (Tree lvl 6)                        CA-F     # 1.1.1.1/32
 ```
 
-ROA EE certificates follow the same patterns. ROAs themselves inherit (explicitely) their EE addresses.
-
 IPv6 and AS numbers also follow the same patterns:
 
 ```
@@ -369,6 +367,31 @@ TA
                             CA7     # 0101:0101:0101:0100::/56
                                 ... # etc
 ```
+
+If you override one set of resources, children no longer rely on default distribution for that type of resource; rather, they inherit:
+
+```
+TA.cer                    # 0.0.0.0/0
+    CA1.cer               # 1.0.0.0/8
+        CA2.cer           # 6.6.6.0/24
+            CA3.cer       # 6.6.6.0/24
+                CA4.cer   # 6.6.6.0/24
+
+[node: CA2.cer]
+obj.tbsCertificate.extensions.ip.extnValue = [ 6.6.6.0/24 ]
+
+# The following are implied:
+# [node: CA3.cer]
+# obj.tbsCertificate.extensions.ip.extnValue = [ 6.6.6.0/24 ]
+# [node: CA4.cer]
+# obj.tbsCertificate.extensions.ip.extnValue = [ 6.6.6.0/24 ]
+```
+
+As for EE certificates:
+
+- ROA EE certificates follow the same patterns, and ROA `eContents` authorize all their EE addresses.
+- ASPA EE certificates inherit the first AS of their parents, and ASPA `eContent`s then employ it as their `customerASID`s.
+- Other EEs always default their resource extensions as `inherit`.
 
 ## Shell variable expansion
 

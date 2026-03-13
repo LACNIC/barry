@@ -47,6 +47,7 @@ static error_msg const NEED_SET = "Expected a set/array value ([brackets])";
 static error_msg const NEED_MAP = "Expected a map value ({braces})";
 static error_msg const NEED_STR_OR_MAP = "Expected a string or map ({braces})";
 static error_msg const NEED_SET_OR_MAP = "Expected a set/array ([brackets]) or map ({braces})";
+static error_msg const BAD_IPS = "Expected an array of IPs or 'inherit'";
 static error_msg const BAD_ASN = "Expected an array of AS identifiers or 'inherit'";
 
 static error_msg
@@ -1463,14 +1464,26 @@ convert_ips_cer(struct IPAddressFamily *family, int id,
 }
 
 static error_msg
-parse_ips_cer(struct field *fields, struct kv_value *src, void *arg)
+parse_ips_str(struct kv_value *src, IPAddrBlocks_t *dst)
 {
-	IPAddrBlocks_t *dst = arg;
+	if (strcmp("inherit", src->v.str) != 0)
+		return BAD_IPS;
+
+	INIT_ASN1_ARRAY(&dst->list, 2, struct IPAddressFamily);
+
+	init_af(&dst->list.array[0]->addressFamily, 1);
+	dst->list.array[0]->ipAddressChoice.present = IPAddressChoice_PR_inherit;
+	init_af(&dst->list.array[1]->addressFamily, 2);
+	dst->list.array[1]->ipAddressChoice.present = IPAddressChoice_PR_inherit;
+	return NULL;
+}
+
+static error_msg
+parse_ips_set(struct kv_value *src, IPAddrBlocks_t *dst)
+{
 	struct parsed_ips ips;
 	error_msg error;
 
-	if (src->type != VALT_SET)
-		return NEED_SET;
 	if ((error = kvs2ips(&src->v.set, &ips)) != NULL)
 		return error;
 
@@ -1481,6 +1494,21 @@ parse_ips_cer(struct field *fields, struct kv_value *src, void *arg)
 		convert_ips_cer(dst->list.array[ips.v4n ? 1 : 0], 2, &ips.v6list, ips.v6n);
 
 	return NULL;
+}
+
+static error_msg
+parse_ips_cer(struct field *fields, struct kv_value *src, void *arg)
+{
+	switch (src->type) {
+	case VALT_STR:
+		return parse_ips_str(src, arg);
+	case VALT_SET:
+		return parse_ips_set(src, arg);
+	case VALT_MAP:
+		break;
+	}
+
+	return BAD_IPS;
 }
 
 static void
@@ -1545,7 +1573,7 @@ static error_msg
 parse_asns_str(struct kv_value *src, ASIdentifierChoice_t *dst)
 {
 	if (strcmp("inherit", src->v.str) != 0)
-		return "Expected an array of AS identifiers or 'inherit'";
+		return BAD_ASN;
 
 	dst->present = ASIdentifierChoice_PR_inherit;
 	return NULL;

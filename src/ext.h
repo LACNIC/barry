@@ -95,8 +95,8 @@ void ext_finish_aia(AuthorityInfoAccessSyntax_t *, struct field *,
 void ext_finish_sia(SubjectInfoAccessSyntax_t *, struct field *,
     struct rpki_certificate *, char const *);
 void ext_finish_cp(CertificatePolicies_t *);
-void ext_finish_ip(IPAddrBlocks_t *, struct rpki_tree_node *);
-void ext_finish_as(ASIdentifiers_t *, struct rpki_tree_node *);
+void ext_finish_ip(IPAddrBlocks_t *, struct rpki_certificate *);
+void ext_finish_as(ASIdentifiers_t *, struct rpki_certificate *);
 
 void ext_compile(struct extensions *, Extensions_t **);
 
