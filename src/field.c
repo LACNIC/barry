@@ -323,7 +323,7 @@ __parse_byte_array(char const *src, uint8_t **buf, size_t *size)
 		memset(&bs, 0, sizeof(bs));
 		error = parse_bitstr_bin(src, &bs);
 
-	} else if ('0' <= src[0] && src[0] <= '9') {
+	} else if (('0' <= src[0] && src[0] <= '9') || src[0] == '-') {
 		memset(&num, 0, sizeof(num));
 		if ((error = parse_dec(src, &num)) != NULL)
 			return error;
