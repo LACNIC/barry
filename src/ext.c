@@ -580,9 +580,10 @@ ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_certificate *cer)
 	node = cer->meta->node;
 
 	switch (cer->meta->node->type) {
-	case FT_CER:
-	case FT_ROA:
 	case FT_TA:
+	case FT_CER:
+	case FT_MFT:
+	case FT_ROA:
 		parent = cer_parent(cer);
 		if (parent && parent->meta->node->ip_overridden) {
 			pr_debug("Parent IP is overridden; inheriting identical resources.");
@@ -623,7 +624,6 @@ ext_finish_ip(IPAddrBlocks_t *ip, struct rpki_certificate *cer)
 		break;
 
 	case FT_CRL:
-	case FT_MFT:
 	case FT_ASA:
 	case FT_UNKNOWN:
 		v4 = has_inheritable_addr(node, 1);
@@ -770,10 +770,10 @@ ext_finish_as(ASIdentifiers_t *asn, struct rpki_certificate *cer)
 		asn->asnum = ext_finish_as_choice_cer(cer);
 		break;
 	case FT_ASA:
+	case FT_MFT:
 		asn->asnum = ext_finish_as_choice_asa(cer);
 		break;
 	case FT_CRL:
-	case FT_MFT:
 	case FT_ROA:
 	case FT_UNKNOWN:
 		asn->asnum = pzalloc(sizeof(ASIdentifierChoice_t));

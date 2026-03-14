@@ -391,7 +391,6 @@ As for EE certificates:
 
 - ROA EE certificates follow the same patterns, and ROA `eContents` authorize all their EE addresses.
 - ASPA EE certificates inherit the first AS of their parents, and ASPA `eContent`s then employ it as their `customerASID`s.
-- Other EEs always default their resource extensions as `inherit`.
 
 ## Shell variable expansion
 
