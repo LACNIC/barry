@@ -39,3 +39,6 @@ test-driver
 .project
 .settings/
 /Debug/
+
+# ...
+.DS_Store

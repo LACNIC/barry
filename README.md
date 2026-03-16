@@ -387,10 +387,7 @@ obj.tbsCertificate.extensions.ip.extnValue = [ 6.6.6.0/24 ]
 # obj.tbsCertificate.extensions.ip.extnValue = [ 6.6.6.0/24 ]
 ```
 
-As for EE certificates:
-
-- ROA EE certificates follow the same patterns, and ROA `eContents` authorize all their EE addresses.
-- ASPA EE certificates inherit the first AS of their parents, and ASPA `eContent`s then employ it as their `customerASID`s.
+EE certificates follow the same patterns. The only exception is ASPA EEs, which only inherit the first AS of their corresponding block.
 
 ## Shell variable expansion
 

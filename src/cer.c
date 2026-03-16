@@ -59,7 +59,7 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 	exts_add_sia(&ee->exts, "sia", extf, sia_ee_defaults);
 	exts_add_cp(&ee->exts, "cp", extf);
 	switch (ee->meta->node->type) {
-	case FT_MFT: /* TODO ??? */
+	case FT_MFT:
 		exts_add_ip(&ee->exts, "ip", extf);
 		exts_add_as(&ee->exts, "as", extf);
 		break;

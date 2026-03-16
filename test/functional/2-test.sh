@@ -83,7 +83,8 @@ check_output_contains() {
 			SUCCESSES=$((SUCCESSES+1))
 		else
 			echo "ERR: Test '$TEST_RD' did not output '$1'"
-			echo "     (See $OUTPUT_FILE)"
+			echo "     See $OUTPUT_FILE"
+			echo "     Suggestion: grep -F \"$(echo "$1" | cut -d',' -f1-2 -)\" \"$OUTPUT_FILE\""
 			FAILS=$((FAILS+1))
 		fi
 

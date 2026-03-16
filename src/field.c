@@ -430,6 +430,10 @@ print_int(struct dynamic_string *dstr, void *val)
 		return;
 	}
 
+	/*
+	 * TODO (fine) Naive; "0xFFFFFFFF" prints as "0x00FFFFFFFF".
+	 * This is fine, but negative numbers are probably weirder.
+	 */
 	dstr_append(dstr, "0x");
 	for (i = 0; i < num->size; i++)
 		dstr_append(dstr, "%02X", num->buf[i]);
