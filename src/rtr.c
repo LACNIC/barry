@@ -12,9 +12,15 @@
 
 #include "print.h"
 
+enum output_format {
+	OF_PDU,
+	OF_RAPPORT,
+};
+
 static char *action;
 static char *server;
 static char *port = "323";
+static enum output_format format;
 static uint8_t version = 2;
 static atomic_uint session;
 static uint32_t serial;
@@ -52,7 +58,7 @@ static void
 print_help(void)
 {
 	printf("Usage:\n");
-	printf("  barry-rtr [%s-h%s][%s-v%s[%sv%s]][%s-c%s] \\\n", flg, rst, flg, rst, flg, rst, flg, rst);
+	printf("  barry-rtr [%s-h%s][%s-v%s[%sv%s]][%s-c%s][%s-f%s<format>%s] \\\n", flg, rst, flg, rst, flg, rst, flg, rst, flg, var, rst);
 	printf("      [%s-V%s<version>%s][%s-s%s<session>%s][%s-l%s<serial>%s] \\\n", flg, var, rst, flg, var, rst, flg, var, rst);
 	printf("      %s<action>%s %s<server>%s [%s<port>%s]\n", var, rst, var, rst, var, rst);
 	printf("\n");
@@ -74,6 +80,9 @@ print_help(void)
 	printf("  %s-h%s prints this wall of text\n", flg, rst);
 	printf("  %s-v%s increases verbosity\n", flg, rst);
 	printf("  %s-c%s colorizes output\n", flg, rst);
+	printf("  %s-f%s sets output format:\n", flg, rst);
+	printf("    * '%spdu%s': Print exhaustive PDU stream (default)\n", enm, rst);
+	printf("    * '%srapport%s': Print resources only\n", enm, rst);
 	printf("  %s-V%s sets RTR version number (Default: %u)\n", flg, rst, version);
 	printf("  %s-s%s sets the session ID (Default: %u)\n", flg, rst, atomic_load(&session));
 	printf("     (Effective in '%sserial%s' and '%sinteractive%s' modes only)\n", enm, rst, enm, rst);
@@ -213,6 +222,29 @@ enable_colors(void)
 }
 
 static void
+parse_getopt_format(void)
+{
+	if (strcmp(optarg, "pdu") == 0)
+		format = OF_PDU;
+	else if (strcmp(optarg, "rapport") == 0)
+		format = OF_RAPPORT;
+	else {
+		pr_err("-f (--format) must be 'pdu' (default) or 'rapport).");
+		exit(EXIT_FAILURE);
+	}
+}
+
+static char const *
+format2str(enum output_format f)
+{
+	switch (f) {
+	case OF_PDU:		return "pdu";
+	case OF_RAPPORT:	return "pdu";
+	default:		return NULL;
+	}
+}
+
+static void
 parse_getopt_version(void)
 {
 	if (parse_u8("version", optarg, &version) != 0)
@@ -242,6 +274,7 @@ parse_options(int argc, char **argv)
 		{ "help",    no_argument,       0, 'h' },
 		{ "verbose", no_argument,       0, 'v' },
 		{ "color",   no_argument,       0, 'c' },
+		{ "format",  required_argument, 0, 'f' },
 		{ "version", required_argument, 0, 'V' },
 		{ "session", required_argument, 0, 's' },
 		{ "serial",  required_argument, 0, 'l' },
@@ -252,17 +285,17 @@ parse_options(int argc, char **argv)
 
 	atomic_init(&session, 0);
 
-	while ((opt = getopt_long(argc, argv, "hvcV:s:l:", opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hvcf:V:s:l:", opts, NULL)) != -1)
 		switch (opt) {
 		case 'h':	help = true;		break;
 		case 'v':	verbosity++;		break;
 		case 'c':	enable_colors();	break;
+		case 'f':	parse_getopt_format();	break;
 		case 'V':	parse_getopt_version();	break;
 		case 's':	parse_getopt_session();	break;
 		case 'l':	parse_getopt_serial();	break;
 		case '?':	print_help();		exit(EXIT_FAILURE);
 		}
-	}
 
 	/* Do this outside of the switch to catch -c even if it's after -h */
 	if (help) {
@@ -290,6 +323,7 @@ parse_options(int argc, char **argv)
 	pr_debug("   port           = %s", port);
 	pr_debug("   --verbose (-v) = %u", verbosity);
 	pr_debug("   --color   (-c) = %u", print_colors);
+	pr_debug("   --format  (-f) = %s", format2str(format));
 	pr_debug("   --version (-V) = %u", version);
 	pr_debug("   --session (-s) = %u", session);
 	pr_debug("   --serial  (-l) = %u", serial);
@@ -585,41 +619,43 @@ print_u32(char const *pfx, size_t *remainder)
 	return 0;
 }
 
-static int
-print_addr4(char const *pfx, size_t *remainder)
+static void
+__print_addr4(unsigned char *buf)
 {
-	unsigned char buf[4];
 	struct in_addr addr;
 	char addr_strbuf[INET_ADDRSTRLEN];
 	char const *addr_str;
-	int error;
-
-	error = full_read(buf, sizeof(buf));
-	if (error)
-		return error;
 
 	addr.s_addr = htonl(assemble_u32(buf));
 	addr_str = inet_ntop(AF_INET, &addr, addr_strbuf, sizeof(addr_strbuf));
 	if (!addr_str)
 		pr_warn("Cannot convert addr4 to string: %s", strerror(errno));
-	printf("%s %s ", pfx, addr_str ? addr_str : "null");
-
-	*remainder -= 4;
-	return 0;
+	printf("%s ", addr_str ? addr_str : "null");
 }
 
 static int
-print_addr6(char const *pfx, size_t *remainder)
+print_addr4(char const *pfx, size_t *remainder)
 {
-	unsigned char buf[16];
-	struct in6_addr addr;
-	char addr_strbuf[INET6_ADDRSTRLEN];
-	char const *addr_str;
+	unsigned char buf[4];
 	int error;
 
 	error = full_read(buf, sizeof(buf));
 	if (error)
 		return error;
+
+	printf("%s ", pfx);
+	__print_addr4(buf);
+
+	*remainder -= 4;
+	return 0;
+}
+
+static void
+__print_addr6(unsigned char *buf)
+{
+	struct in6_addr addr;
+	char addr_strbuf[INET6_ADDRSTRLEN];
+	char const *addr_str;
 
 	addr.s6_addr32[0] = htonl(assemble_u32(buf));
 	addr.s6_addr32[1] = htonl(assemble_u32(&buf[4]));
@@ -628,7 +664,21 @@ print_addr6(char const *pfx, size_t *remainder)
 	addr_str = inet_ntop(AF_INET6, &addr, addr_strbuf, sizeof(addr_strbuf));
 	if (!addr_str)
 		pr_warn("Cannot convert addr6 to string: %s", strerror(errno));
-	printf("%s %s ", pfx, addr_str ? addr_str : "null");
+	printf("%s ", addr_str ? addr_str : "null");
+}
+
+static int
+print_addr6(char const *pfx, size_t *remainder)
+{
+	unsigned char buf[16];
+	int error;
+
+	error = full_read(buf, sizeof(buf));
+	if (error)
+		return error;
+
+	printf("%s ", pfx);
+	__print_addr6(buf);
 
 	*remainder -= 16;
 	return 0;
@@ -686,11 +736,7 @@ print_hdr1(unsigned char *bytes, char const *field3_what)
 	v = assemble_u8(&bytes[0]);
 	field3 = assemble_u16(&bytes[2]);
 	length = assemble_u32(&bytes[4]);
-
 	printf("version %u %s %u length %u ", v, field3_what, field3, length);
-
-	if (strcmp("session", field3_what) == 0)
-		atomic_store(&session, field3);
 
 	return (length >= 8) ? (length - 8) : 0;
 }
@@ -745,7 +791,7 @@ print_remainder(size_t remainder)
 }
 
 static int
-print_serial_notify(unsigned char *hdr)
+print_pdu_serial_notify(unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -763,7 +809,7 @@ done:	return print_remainder(remainder);
 }
 
 static int
-print_serial_query(unsigned char *hdr)
+print_pdu_serial_query(unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -781,21 +827,21 @@ done:	return print_remainder(remainder);
 }
 
 static int
-print_reset_query(unsigned char *hdr)
+print_pdu_reset_query(unsigned char *hdr)
 {
 	printf("reset-query    ");
 	return print_remainder(print_hdr1(hdr, "zero"));
 }
 
 static int
-print_cache_response(unsigned char *hdr)
+print_pdu_cache_response(unsigned char *hdr)
 {
 	printf("cache-response ");
 	return print_remainder(print_hdr1(hdr, "session"));
 }
 
 static int
-print_ipv4_prefix(unsigned char *hdr)
+print_pdu_ipv4_prefix(unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -843,7 +889,7 @@ done:	return print_remainder(remainder);
 }
 
 static int
-print_ipv6_prefix(unsigned char *hdr)
+print_pdu_ipv6_prefix(unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -891,7 +937,7 @@ done:	return print_remainder(remainder);
 }
 
 static int
-print_end_of_data(unsigned char *hdr)
+print_pdu_end_of_data(unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -927,14 +973,14 @@ done:	return print_remainder(remainder);
 }
 
 static int
-print_cache_reset(unsigned char *hdr)
+print_pdu_cache_reset(unsigned char *hdr)
 {
 	printf("cache-reset    ");
 	return print_remainder(print_hdr1(hdr, "zero"));
 }
 
 static int
-print_router_key(unsigned char *hdr)
+print_pdu_router_key(unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -961,7 +1007,7 @@ end:	return print_remainder(remainder);
 }
 
 static int
-print_aspa_pdu(unsigned char *hdr)
+print_pdu_aspa_pdu(unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -989,7 +1035,7 @@ end:	return print_remainder(remainder);
 }
 
 static int
-print_error_report(unsigned char *hdr)
+print_pdu_error_report(unsigned char *hdr)
 {
 	size_t remainder, sublen;
 	unsigned char subhdr[1024];
@@ -1029,29 +1075,233 @@ end:	return print_remainder(remainder);
 }
 
 static int
-print_unknown(unsigned char *hdr)
+print_pdu_unknown(unsigned char *hdr)
 {
 	printf("unknown        ");
 	return print_remainder(print_hdr1(hdr, "?"));
 }
 
 static int
+print_rapport_vrp4(unsigned char *hdr)
+{
+	uint32_t len;
+	unsigned char payload[12];
+	int error;
+
+	len = assemble_u32(&hdr[4]);
+	if (len != 20) {
+		pr_err("IPv4 PDU length != 20: %u", len);
+		return EINVAL;
+	}
+
+	error = full_read(payload, sizeof(payload));
+	if (error)
+		return error;
+
+	switch (assemble_u8(&payload[0])) {
+	case 0:
+		printf("VRP-\t");
+		break;
+	case 1:
+		printf("VRP+\t");
+		break;
+	default:
+		printf("VRP!\t");
+	}
+
+	__print_addr4(&payload[4]);
+	printf("/%u-%u => %u",
+	    assemble_u8(&payload[1]),
+	    assemble_u8(&payload[2]),
+	    assemble_u32(&payload[8]));
+	return 0;
+}
+
+static int
+print_rapport_vrp6(unsigned char *hdr)
+{
+	uint32_t len;
+	unsigned char payload[24];
+	int error;
+
+	len = assemble_u32(&hdr[4]);
+	if (len != 32) {
+		pr_err("IPv6 PDU length != 32: %u", len);
+		return EINVAL;
+	}
+
+	error = full_read(payload, sizeof(payload));
+	if (error)
+		return error;
+
+	switch (assemble_u8(&payload[0])) {
+	case 0:
+		printf("VRP-\t");
+		break;
+	case 1:
+		printf("VRP+\t");
+		break;
+	default:
+		printf("VRP!\t");
+	}
+
+	__print_addr6(&payload[4]);
+	printf("/%u-%u => %u",
+	    assemble_u8(&payload[1]),
+	    assemble_u8(&payload[2]),
+	    assemble_u32(&payload[20]));
+	return 0;
+}
+
+static int
+print_rapport_errpdu(unsigned char *hdr)
+{
+	size_t len, sublen, msglen;
+	unsigned char buf[1024];
+	unsigned char *cursor;
+	int error;
+
+	len = assemble_u32(&hdr[4]);
+	if (len < 16) {
+		pr_err("Error Report PDU length is too small: %zu", len);
+		return EINVAL;
+	}
+	len -= 8;
+	if (len > 1024) {
+		pr_err("Error Report PDU payload length is too big: %zu", len);
+		return EINVAL;
+	}
+
+	error = full_read(buf, len);
+	if (error)
+		return error;
+
+	sublen = assemble_u32(buf);
+	if (sublen > len - 8) {
+		pr_err("Bad Error Report lengths: %zu, %zu, ?",
+		    len + 8, sublen);
+		return error;
+	}
+
+	cursor = buf + 4 + sublen;
+	msglen = assemble_u32(cursor);
+	if (8 + sublen + msglen != len) {
+		pr_err("Bad Error Report lengths: %zu, %zu, %zu",
+		    len + 8, sublen, msglen);
+	}
+
+	pr_err("Error Report: %.*s", (int)msglen, (char *)(cursor + 4));
+	return 0;
+}
+
+static int
+print_rapport_aspa(unsigned char *hdr)
+{
+	uint32_t len;
+	unsigned char buf[4];
+	uint32_t p;
+	int error;
+
+	len = assemble_u32(&hdr[4]);
+	if (len < 12) {
+		pr_err("ASPA PDU length is too small: %u", len);
+		return EINVAL;
+
+	}
+	if ((len % 4) != 0) {
+		pr_err("ASPA PDU length is not a multiple of 4: %u", len);
+		return EINVAL;
+	}
+	len -= 12;
+
+	error = full_read(buf, sizeof(buf));
+	if (error)
+		return error;
+
+	printf("ASPA\t%u:[", assemble_u32(buf));
+	for (p = 0; p < len; p += 4) {
+		error = full_read(buf, sizeof(buf));
+		if (error)
+			return error;
+		printf("%u", assemble_u32(buf));
+		if (p != len - 4)
+			printf(",");
+	}
+	printf("]");
+
+	return 0;
+}
+
+static int
+skip_pdu(unsigned char *hdr)
+{
+	uint32_t len;
+	unsigned char buf[128];
+	size_t n;
+	int error;
+
+	len = assemble_u32(&hdr[4]);
+	if (len < 8) {
+		pr_err("PDU length too small: %u", len);
+		return EINVAL;
+	}
+
+	for (len -= 8; len != 0; len -= n) {
+		n = len < sizeof(buf) ? len : sizeof(buf);
+		error = full_read(buf, n);
+		if (error)
+			return error;
+	}
+
+	return 0;
+}
+
+static int
 print_pdu(unsigned char *hdr)
 {
+	int error = EINVAL;
+
+	/* Pre-print */
 	switch (hdr[1]) {
-	case 0:  return print_serial_notify(hdr);
-	case 1:  return print_serial_query(hdr);
-	case 2:  return print_reset_query(hdr);
-	case 3:  return print_cache_response(hdr);
-	case 4:  return print_ipv4_prefix(hdr);
-	case 6:  return print_ipv6_prefix(hdr);
-	case 8:  return print_cache_reset(hdr);
-	case 7:  return print_end_of_data(hdr);
-	case 9:  return print_router_key(hdr);
-	case 10: return print_error_report(hdr);
-	case 11: return print_aspa_pdu(hdr);
-	default: return print_unknown(hdr);
+	case 0:
+	case 1:
+	case 3:
+	case 7:
+		atomic_store(&session, assemble_u16(&hdr[2]));
 	}
+
+	switch (format) {
+	case OF_PDU:
+		switch (hdr[1]) {
+		case 0:  error = print_pdu_serial_notify(hdr);	break;
+		case 1:  error = print_pdu_serial_query(hdr);	break;
+		case 2:  error = print_pdu_reset_query(hdr);	break;
+		case 3:  error = print_pdu_cache_response(hdr);	break;
+		case 4:  error = print_pdu_ipv4_prefix(hdr);	break;
+		case 6:  error = print_pdu_ipv6_prefix(hdr);	break;
+		case 8:  error = print_pdu_cache_reset(hdr);	break;
+		case 7:  error = print_pdu_end_of_data(hdr);	break;
+		case 9:  error = print_pdu_router_key(hdr);	break;
+		case 10: error = print_pdu_error_report(hdr);	break;
+		case 11: error = print_pdu_aspa_pdu(hdr);	break;
+		default: error = print_pdu_unknown(hdr);	break;
+		}
+		break;
+
+	case OF_RAPPORT:
+		switch (hdr[1]) {
+		case 4:  error = print_rapport_vrp4(hdr);	break;
+		case 6:  error = print_rapport_vrp6(hdr);	break;
+		case 10: error = print_rapport_errpdu(hdr);	break;
+		case 11: error = print_rapport_aspa(hdr);	break;
+		case 9:  /* Format still undecided */
+		default: return skip_pdu(hdr);
+		}
+	}
+
+	if (!error)
+		printf("\n");
+	return error;
 }
 
 static bool
@@ -1072,7 +1322,6 @@ print_server_response(void)
 		pr_trace("PDU received.");
 		if (print_pdu(hdr) != 0)
 			return;
-		printf("\n");
 	} while (!is_terminating_pdu(hdr[1]));
 }
 
@@ -1087,7 +1336,6 @@ handle_server_pdus(void *arg)
 		pr_trace("PDU received.");
 		if (print_pdu(hdr) != 0)
 			return NULL;
-		printf("\n");
 	} while (true);
 }
 
