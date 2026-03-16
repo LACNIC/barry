@@ -3,11 +3,13 @@
 #include <getopt.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include "print.h"
@@ -24,6 +26,9 @@ static enum output_format format;
 static uint8_t version = 2;
 static atomic_uint session;
 static uint32_t serial;
+char const *input;
+
+static FILE *infile; /* (Interactive) input file */
 
 unsigned int verbosity;
 bool print_colors;
@@ -36,7 +41,7 @@ static char const *man = "";
 static char const *ref = "";
 static char const *rst = "";
 
-static int fd;
+static int rtrfd; /* RTR socket file descriptor */
 static pthread_t socket_thread;
 
 struct line_reader {
@@ -58,8 +63,8 @@ static void
 print_help(void)
 {
 	printf("Usage:\n");
-	printf("  barry-rtr [%s-h%s][%s-v%s[%sv%s]][%s-c%s][%s-f%s<format>%s] \\\n", flg, rst, flg, rst, flg, rst, flg, rst, flg, var, rst);
-	printf("      [%s-V%s<version>%s][%s-s%s<session>%s][%s-l%s<serial>%s] \\\n", flg, var, rst, flg, var, rst, flg, var, rst);
+	printf("  barry-rtr [%s-h%s] [%s-v%s[%sv%s]] [%s-c%s] [%s-f%s<format>%s] [%s-i%s<input-source>%s] \\\n", flg, rst, flg, rst, flg, rst, flg, rst, flg, var, rst, flg, var, rst);
+	printf("      [%s-V%s<version>%s] [%s-s%s<session>%s] [%s-l%s<serial>%s] \\\n", flg, var, rst, flg, var, rst, flg, var, rst);
 	printf("      %s<action>%s %s<server>%s [%s<port>%s]\n", var, rst, var, rst, var, rst);
 	printf("\n");
 	printf("%s<action>%s is either '%sreset%s', '%sserial%s' or '%sinteractive%s'.\n", var, rst, enm, rst, enm, rst, enm, rst);
@@ -67,8 +72,8 @@ print_help(void)
 	printf("    and exits once a %sterminating PDU%s is received.\n", ref, rst);
 	printf("  - '%sserial%s' connects, sends one Serial Query PDU, prints all received PDUs,\n", enm, rst);
 	printf("    and exits once a %sterminating PDU%s is received.\n", ref, rst);
-	printf("  - '%sinteractive%s' connects, then expects commands from standard input.\n", enm, rst);
-	printf("    Run 'help' during interactive mode for more information.\n");
+	printf("  - '%sinteractive%s' connects, then expects commands from %s-i%s.\n", enm, rst, flg, rst);
+	printf("    Input 'help' during interactive mode for more information.\n");
 	printf("\n");
 	printf("The %sterminating PDU%ss are End Of Data, Cache Reset, Error Report and unknown.\n", ref, rst);
 	printf("\n");
@@ -88,6 +93,11 @@ print_help(void)
 	printf("     (Effective in '%sserial%s' and '%sinteractive%s' modes only)\n", enm, rst, enm, rst);
 	printf("  %s-l%s sets the request's serial\n", flg, rst);
 	printf("     (Effective in '%sserial%s' mode only)\n", enm, rst);
+	printf("  %s-i%s sets the input Unix socket name, or '-' (default) for standard input.\n", flg, rst);
+	printf("     (Effective in '%sinteractive%s' mode only)\n", enm, rst);
+	printf("\n");
+	printf("Sample connect to Unix socket:\n");
+	printf("    $ nc %s-uU%s %s<input-source>%s\n", flg, rst, var, rst);
 }
 
 static void
@@ -278,6 +288,7 @@ parse_options(int argc, char **argv)
 		{ "version", required_argument, 0, 'V' },
 		{ "session", required_argument, 0, 's' },
 		{ "serial",  required_argument, 0, 'l' },
+		{ "input",   required_argument, 0, 'i' },
 		{ 0 }
 	};
 	int opt;
@@ -285,7 +296,7 @@ parse_options(int argc, char **argv)
 
 	atomic_init(&session, 0);
 
-	while ((opt = getopt_long(argc, argv, "hvcf:V:s:l:", opts, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "hvcf:V:s:l:i:", opts, NULL)) != -1)
 		switch (opt) {
 		case 'h':	help = true;		break;
 		case 'v':	verbosity++;		break;
@@ -294,6 +305,7 @@ parse_options(int argc, char **argv)
 		case 'V':	parse_getopt_version();	break;
 		case 's':	parse_getopt_session();	break;
 		case 'l':	parse_getopt_serial();	break;
+		case 'i':	input = optarg;		break;
 		case '?':	print_help();		exit(EXIT_FAILURE);
 		}
 
@@ -327,7 +339,66 @@ parse_options(int argc, char **argv)
 	pr_debug("   --version (-V) = %u", version);
 	pr_debug("   --session (-s) = %u", session);
 	pr_debug("   --serial  (-l) = %u", serial);
+	pr_debug("   --input   (-i) = %s", input);
 	pr_debug("");
+}
+
+static void
+sigterm_handler(int signum)
+{
+	unlink(input);
+
+	signal(signum, SIG_DFL);
+	kill(getpid(), signum);
+}
+
+static void
+open_infile(void)
+{
+	struct sigaction action;
+	struct sockaddr_un srv;
+	int clientfd;
+
+	if (!input || strcmp(input, "-") == 0) {
+		input = NULL;
+		return;
+	}
+
+	pr_trace("Setting up input socket.");
+
+	unlink(input);
+
+	if (strlen(input) > sizeof(srv.sun_path) - 1)
+		panic("--input is too long. (max is %zu characters)",
+		    sizeof(srv.sun_path) - 1);
+	srv.sun_family = AF_UNIX;
+	strcpy(srv.sun_path, input);
+
+	memset(&action, 0, sizeof(action));
+	action.sa_handler = sigterm_handler;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+	if (sigaction(SIGTERM, &action, NULL) == -1)
+		pr_err("SIGTERM handler registration failure: %s",
+		    strerror(errno));
+
+	clientfd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (clientfd < 0)
+		panic("Unable to create socket: %s", strerror(errno));
+	if (bind(clientfd, (struct sockaddr *)&srv, sizeof(srv)) < 0)
+		panic("Cannot bind socket: %s", strerror(errno));
+	if ((infile = fdopen(clientfd, "r")) == NULL)
+		panic("Cannot convert fd to in FILE: %s", strerror(errno));
+}
+
+static void
+close_infile(void)
+{
+	if (input) {
+		pr_trace("Closing input socket.");
+		fclose(infile);
+		unlink(input);
+	}
 }
 
 static void
@@ -337,7 +408,7 @@ connect_socket(void)
 	struct addrinfo *alternatives, *alt;
 	int error;
 
-	pr_trace("Connecting to server...");
+	pr_trace("Connecting to RTR server.");
 
 	hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
 	hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
@@ -345,30 +416,34 @@ connect_socket(void)
 	hints.ai_protocol = 0;
 
 	error = getaddrinfo(server, port, &hints, &alternatives);
-	if (error) {
+	if (error)
 		panic("getaddrinfo: %s", gai_strerror(error));
-		exit(EXIT_FAILURE);
-	}
 
 	for (alt = alternatives; alt != NULL; alt = alt->ai_next) {
-		fd = socket(alt->ai_family, alt->ai_socktype, alt->ai_protocol);
-		if (fd < 0) {
-			panic("socket(%s, %s): %s\n", server, port,
+		rtrfd = socket(alt->ai_family, alt->ai_socktype, alt->ai_protocol);
+		if (rtrfd < 0) {
+			pr_err("socket(%s, %s): %s\n", server, port,
 			    strerror(errno));
 			continue;
 		}
-		if (connect(fd, alt->ai_addr, alt->ai_addrlen) != -1)
+		if (connect(rtrfd, alt->ai_addr, alt->ai_addrlen) != -1)
 			break; /* Success */
 
-		panic("connect(%s, %s): %s\n", server, port, strerror(errno));
-		close(fd);
+		pr_err("connect(%s, %s): %s\n", server, port, strerror(errno));
+		close(rtrfd);
 	}
 
 	freeaddrinfo(alternatives);
 
 	if (!alt)
 		panic("None of the addrinfo candidates could connect.\n");
-	pr_trace("Done.");
+}
+
+static void
+close_socket(void)
+{
+	pr_trace("Closing RTR socket.");
+	close(rtrfd);
 }
 
 static void
@@ -399,7 +474,7 @@ full_write(unsigned char *msg, size_t len)
 	ssize_t written;
 
 	for (; len > 0; len -= written) {
-		written = write(fd, msg, len);
+		written = write(rtrfd, msg, len);
 		if (written < 0)
 			panic("write(): %s", strerror(errno));
 	}
@@ -499,13 +574,15 @@ send_serial_query(struct line_reader *rdr)
 }
 
 static int
-send_stdin_commands(void)
+send_infile_commands(void)
 {
 	struct line_reader rdr = { 0 };
 	char *token;
 	int error;
 
-	while (getline(&rdr.line, &rdr.lsize, stdin) != -1) {
+	pr_trace("Ready.");
+
+	while (getline(&rdr.line, &rdr.lsize, infile) != -1) {
 		token = next_token(&rdr, true);
 		if (!token)
 			continue;
@@ -525,19 +602,19 @@ send_stdin_commands(void)
 	}
 	free(rdr.line);
 
-	pr_trace("Cancelling socket thread.");
+	pr_trace("Canceling socket thread.");
 	error = pthread_cancel(socket_thread);
 	if (error)
 		pr_err("Cound not cancel socket thread: %s. "
 		    "IDK; try interrupting the process.",
 		    strerror(error));
 
-	if (feof(stdin)) {
-		pr_trace("End of standard input reached.");
+	if (feof(infile)) {
+		pr_trace("End of input stream reached.");
 		return 0;
 	}
-	if (ferror(stdin)) {
-		pr_err("Looks like there was some error reading stdin.");
+	if (ferror(infile)) {
+		pr_err("Looks like there was some error reading the input stream.");
 		return EINVAL;
 	}
 
@@ -551,7 +628,7 @@ full_read(unsigned char *buf, size_t size)
 	int error;
 
 	do {
-		consumed = read(fd, buf, size);
+		consumed = read(rtrfd, buf, size);
 		if (consumed < 0) {
 			error = errno;
 			pr_err("Cannot read server response: %s",
@@ -707,7 +784,7 @@ print_str(char const *pfx, size_t *remainder)
 	if (len > 0) {
 		printf("%s ", pfx);
 		while (len > 0) {
-			consumed = read(fd, buf, 1024 < len ? 1024 : len);
+			consumed = read(rtrfd, buf, 1024 < len ? 1024 : len);
 			if (consumed < 0) {
 				error = errno;
 				pr_err("Cannot read server response: %s",
@@ -769,7 +846,7 @@ print_hex(char const *pfx, size_t len)
 
 	printf("%s ", pfx);
 	while (len > 0) {
-		consumed = read(fd, buf, len < sizeof(buf) ? len : sizeof(buf));
+		consumed = read(rtrfd, buf, len < sizeof(buf) ? len : sizeof(buf));
 		if (consumed < 0) {
 			error = errno;
 			pr_err("Cannot read server response: %s",
@@ -1344,7 +1421,7 @@ start_socket_listener(void)
 {
 	int error;
 
-	pr_trace("Starting socket thread.");
+	pr_trace("Starting RTR socket listener thread.");
 	error = pthread_create(&socket_thread, NULL, handle_server_pdus, NULL);
 	if (error)
 		panic("pthread_create(): %s", strerror(error));
@@ -1355,19 +1432,18 @@ stop_socket_listener(void)
 {
 	int error;
 
-	pr_trace("Joining socket thread.");;
+	pr_trace("Joining RTR socket listener thread.");;
 	error = pthread_join(socket_thread, NULL);
 	if (error)
 		pr_err("pthread_join(): %s", strerror(error));
-
-	pr_trace("Closing socket.");
-	close(fd);
 }
 
 int
 main(int argc, char **argv)
 {
 	int error = 0;
+
+	infile = stdin;
 
 	register_signal_handlers();
 
@@ -1377,19 +1453,22 @@ main(int argc, char **argv)
 		connect_socket();
 		__send_reset_query(version, 2, 0, 8);
 		print_server_response();
-		close(fd);
+		close_socket();
 
 	} else if (strcmp(action, "serial") == 0) {
 		connect_socket();
 		__send_serial_query(version, 1, atomic_load(&session), 12, serial);
 		print_server_response();
-		close(fd);
+		close_socket();
 
 	} else if (strcmp(action, "interactive") == 0) {
 		connect_socket();
 		start_socket_listener();
-		error = send_stdin_commands();
+		open_infile();
+		error = send_infile_commands();
+		close_infile();
 		stop_socket_listener();
+		close_socket();
 
 	} else {
 		pr_err("Unknown action: %s", action);
