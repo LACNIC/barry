@@ -96,8 +96,8 @@ print_help(void)
 	printf("  %s-i%s sets the input Unix socket name, or '-' (default) for standard input.\n", flg, rst);
 	printf("     (Effective in '%sinteractive%s' mode only)\n", enm, rst);
 	printf("\n");
-	printf("Sample connect to Unix socket:\n");
-	printf("    $ nc %s-uU%s %s<input-source>%s\n", flg, rst, var, rst);
+	printf("Sample send command to Unix socket:\n");
+	printf("    $ echo \"reset-query\" | barry-ncu %s<input-source>%s\n", var, rst);
 }
 
 static void
