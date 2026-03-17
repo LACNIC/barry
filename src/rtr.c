@@ -598,7 +598,7 @@ send_infile_commands(void)
 		else if (strcmp(token, "exit") == 0)
 			break;
 		else
-			pr_err("Unrecognized command.");
+			pr_err("Unrecognized command: %s", token);
 	}
 	free(rdr.line);
 
@@ -1376,8 +1376,14 @@ print_pdu(unsigned char *hdr)
 		}
 	}
 
-	if (!error)
+	if (!error) {
 		printf("\n");
+		/*
+		 * Newline does not always imply a flush, but we do need it
+		 * because interactive mode often terminates by SIGTERM.
+		 */
+		fflush(stdout);
+	}
 	return error;
 }
 
