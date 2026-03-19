@@ -1135,7 +1135,7 @@ print_pdu_error_report(unsigned char *hdr)
 	sublen = assemble_u32(&subhdr[4]);
 	if (remainder < sublen)
 		goto end;
-	printf("encapsulated-pdu [");
+	printf("encapsulated-pdu [ ");
 	error = print_pdu(subhdr);
 	if (error)
 		return error;
@@ -1376,14 +1376,6 @@ print_pdu(unsigned char *hdr)
 		}
 	}
 
-	if (!error) {
-		printf("\n");
-		/*
-		 * Newline does not always imply a flush, but we do need it
-		 * because interactive mode often terminates by SIGTERM.
-		 */
-		fflush(stdout);
-	}
 	return error;
 }
 
@@ -1405,6 +1397,7 @@ print_server_response(void)
 		pr_trace("PDU received.");
 		if (print_pdu(hdr) != 0)
 			return;
+		printf("\n");
 	} while (!is_terminating_pdu(hdr[1]));
 }
 
@@ -1419,6 +1412,12 @@ handle_server_pdus(void *arg)
 		pr_trace("PDU received.");
 		if (print_pdu(hdr) != 0)
 			return NULL;
+		printf("\n");
+		/*
+		 * Newline does not always imply a flush, but we do need it
+		 * because interactive mode often terminates by SIGTERM.
+		 */
+		fflush(stdout);
 	} while (true);
 }
 
