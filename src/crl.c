@@ -46,9 +46,9 @@ crl_new(struct rpki_tree_node *node)
 	init_time_now(&tbs->thisUpdate);
 	field_add(tbsf, "thisUpdate", &ft_time, &tbs->thisUpdate, 0);
 
-	tbs->nextUpdate = pzalloc(sizeof(Time_t)); // TODO Needs to be nullable
+	tbs->nextUpdate = pzalloc(sizeof(X509Time_t)); // TODO Needs to be nullable
 	init_time_later(tbs->nextUpdate);
-	field_add(tbsf, "nextUpdate", &ft_time, &tbs->nextUpdate, sizeof(struct Time));
+	field_add(tbsf, "nextUpdate", &ft_time, &tbs->nextUpdate, sizeof(struct X509Time));
 
 	/* revokedCertificates: TODO not implemented yet */
 	field_add(tbsf, "revokedCertificates", &ft_revoked,

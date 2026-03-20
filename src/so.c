@@ -119,7 +119,7 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 	CMSAttribute_t *attr;
 	OBJECT_IDENTIFIER_t ct;
 	struct field *sidf, *iasnf, *skif, *saf;
-	Time_t st = { 0 };
+	X509Time_t st = { 0 };
 
 	init_INTEGER(&si->version, 3);
 	field_add(sif, "version", &ft_int, &si->version, 0);
@@ -164,7 +164,7 @@ init_signer_info(SignerInfo_t *si, int nid, struct field *sif)
 	init_oid(&attr->attrType, NID_pkcs9_signingTime);
 	INIT_ASN1_ARRAY(&attr->attrValues.list, 1, CMSAttributeValue_t);
 	init_time_now(&st);
-	der_encode_any(&asn_DEF_Time, &st, attr->attrValues.list.array[0]);
+	der_encode_any(&asn_DEF_X509Time, &st, attr->attrValues.list.array[0]);
 //	field_add(saf, "signing-time", ct_any_time, &attr->attrValues, 0);
 
 	/* TODO signedAttrs field not implemented yet */

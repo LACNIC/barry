@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <libasn1fort/GeneralizedTime.h>
-#include <libasn1fort/Time.h>
+#include <libasn1fort/X509Time.h>
 #include <libxml/globals.h>
 #include <libxml/xmlreader.h>
 #include <limits.h>

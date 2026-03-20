@@ -981,13 +981,13 @@ print_gtime(struct dynamic_string *dstr, void *arg)
 static void
 print_time(struct dynamic_string *dstr, void *val)
 {
-	Time_t *time = val;
+	X509Time_t *time = val;
 
 	switch (time->present) {
-	case Time_PR_utcTime:
+	case X509Time_PR_utcTime:
 		print_utcTime(dstr, &time->choice.utcTime);
 		break;
-	case Time_PR_generalTime:
+	case X509Time_PR_generalTime:
 		print_gtime(dstr, &time->choice.generalTime);
 		break;
 	default:

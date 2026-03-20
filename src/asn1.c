@@ -123,21 +123,21 @@ str2tm(char const *str, struct tm *tm)
 }
 
 void
-init_time_tm(Time_t *time, struct tm *tm)
+init_time_tm(X509Time_t *time, struct tm *tm)
 {
 	if (tm->tm_year < 150) {
-		time->present = Time_PR_utcTime;
+		time->present = X509Time_PR_utcTime;
 		if (asn_time2UT(&time->choice.utcTime, tm, true) == NULL)
 			panic("UTCTime");
 	} else {
-		time->present = Time_PR_generalTime;
+		time->present = X509Time_PR_generalTime;
 		if (asn_time2GT(&time->choice.generalTime, tm, true) == NULL)
 			panic("GeneralizedTime");
 	}
 }
 
 void
-init_time_str(Time_t *time, char const *str)
+init_time_str(X509Time_t *time, char const *str)
 {
 	struct tm tm;
 	str2tm(str, &tm);
@@ -145,25 +145,25 @@ init_time_str(Time_t *time, char const *str)
 }
 
 void
-init_time_now(Time_t *time)
+init_time_now(X509Time_t *time)
 {
-	extern Time_t default_now;
+	extern X509Time_t default_now;
 	*time = default_now;
 }
 
 void
-init_time_later(Time_t *time)
+init_time_later(X509Time_t *time)
 {
-	extern Time_t default_later;
+	extern X509Time_t default_later;
 	*time = default_later;
 }
 
-Time_t *
+X509Time_t *
 create_time(char const *str)
 {
-	Time_t *result;
+	X509Time_t *result;
 
-	result = pzalloc(sizeof(Time_t));
+	result = pzalloc(sizeof(X509Time_t));
 	init_time_str(result, str);
 	return result;
 }

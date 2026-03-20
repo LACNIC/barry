@@ -9,7 +9,7 @@
 #include <libasn1fort/Name.h>
 #include <libasn1fort/OBJECT_IDENTIFIER.h>
 #include <libasn1fort/OCTET_STRING.h>
-#include <libasn1fort/Time.h>
+#include <libasn1fort/X509Time.h>
 #include <time.h>
 
 #include "alloc.h"
@@ -36,11 +36,11 @@ void init_oid(OBJECT_IDENTIFIER_t *, int);
 ANY_t *create_null(void);
 void init_name(Name_t *, char const *);
 void init_any_str(ANY_t *, char const *);
-void init_time_str(Time_t *, char const *);
-void init_time_tm(Time_t *, struct tm *);
-void init_time_now(Time_t *);
-void init_time_later(Time_t *);
-Time_t *create_time(char const *);
+void init_time_str(X509Time_t *, char const *);
+void init_time_tm(X509Time_t *, struct tm *);
+void init_time_now(X509Time_t *);
+void init_time_later(X509Time_t *);
+X509Time_t *create_time(char const *);
 void init_gtime_str(GeneralizedTime_t *, char const *);
 void init_gtime_tm(GeneralizedTime_t *, struct tm *);
 void init_gtime_now(GeneralizedTime_t *);
