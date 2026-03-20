@@ -32,32 +32,25 @@
 #include "oid.h"
 #include "rpki_tree.h"
 
-static error_msg const HEX_EMPTY = "Hexadecimal string is empty";
-static error_msg const HEX_ODD_DIGITS = "Hexadecimal numbers need an even number of digits";
-static error_msg const BIN_EMPTY = "Binary string is empty";
-static error_msg const DEC_EINVAL = "Not a number";
-static error_msg const PREF_TRUNC = "There are enabled bits after the prefix length";
-static error_msg const PREF_LEN_2BIG = "Prefix length too long";
-static error_msg const BAD_BITCOUNT = "Bit count is not a multiple of 8";
-static error_msg const BITSTR_FORMAT = "Unknown BIT_STRING format";
-static error_msg const BAD_OID = "Unparseable OBJECT_IDENTIFIER";
-static error_msg const BAD_IP = "Unparseable IP address";
-static error_msg const NEED_STRING = "Expected a string value";
-static error_msg const NEED_SET = "Expected a set/array value ([brackets])";
-static error_msg const NEED_MAP = "Expected a map value ({braces})";
-static error_msg const NEED_STR_OR_MAP = "Expected a string or map ({braces})";
-static error_msg const NEED_SET_OR_MAP = "Expected a set/array ([brackets]) or map ({braces})";
-static error_msg const BAD_IPS = "Expected an array of IPs or 'inherit'";
-static error_msg const BAD_ASN = "Expected an array of AS identifiers or 'inherit'";
+#define DEC_EINVAL(k, v) panic("'%s' cannot be parsed as a number: %s", k, v)
+#define PREF_TRUNC(k, v) panic("'%s' has enabled bits after the prefix length: %s", k, v)
+#define PREF_LEN_2BIG(k, v) panic("'%s' prefix length is too long: %s", k, v)
+#define BAD_OID(k, v) panic("'%s' is an unparseable OBJECT_IDENTIFIER: %s", k, v)
+#define NEED_STRING(k) panic("'%s': Expected a string value.", k)
+#define NEED_SET(k) panic("'%s': Expected a set/array value. ([brackets])", k)
+#define NEED_MAP(k) panic("'%s': Expected a map value. ({braces})", k)
+#define NEED_STR_OR_MAP(k) panic("'%s': Expected a string or map. ({braces})", k)
+#define NEED_SET_OR_MAP(k) panic("'%s': Expected a set/array ([brackets]) or map ({braces}).", k)
+#define BAD_IPS(k) panic("'%s': Expected an array of IPs or 'inherit'", k)
+#define BAD_ASN(k) panic("'%s': Expected an array of AS identifiers or 'inherit'", k)
 
-static error_msg
-parse_obj(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_obj(struct field *field, struct kv_value *src, void *dst)
 {
 	if (src->type != VALT_MAP)
-		return NEED_MAP;
+		NEED_MAP(field->key);
 
-	fields_apply_keyvals(fields, &src->v.map);
-	return NULL;
+	fields_apply_keyvals(field, &src->v.map);
 }
 
 static int
@@ -96,9 +89,10 @@ get_last_1_bit(int chr)
 	return 0;
 }
 
-static error_msg
-parse_bitstr_hex(char const *src, BIT_STRING_t *dst)
+static void
+parse_bitstr_hex(struct field *field, char const *_src, BIT_STRING_t *dst)
 {
+	char const *src;
 	char const *cursor;
 	size_t d;
 	size_t digits;
@@ -108,7 +102,7 @@ parse_bitstr_hex(char const *src, BIT_STRING_t *dst)
 
 	unsigned int min_plen;
 
-	src += 2; /* Skip "0x" */
+	src = _src + 2; /* Skip "0x" */
 	digits = 0;
 	min_plen = 0;
 
@@ -119,19 +113,21 @@ parse_bitstr_hex(char const *src, BIT_STRING_t *dst)
 	}
 
 	if (digits == 0)
-		return HEX_EMPTY;
+		panic("'%s' hexadecimal string is empty: %s",
+		    field->key, _src);
 	if (digits & 1)
-		return HEX_ODD_DIGITS;
+		panic("'%s' hex number needs an even number of digits: %s",
+		    field->key, _src);
 
 	if (*cursor == '/') {
 		errno = 0;
 		plen = strtoul(cursor + 1, &endptr, 10);
 		if ((plen == ULONG_MAX && errno == ERANGE) || plen > SIZE_MAX)
-			return PREF_LEN_2BIG;
+			PREF_LEN_2BIG(field->key, _src);
 		if (cursor + 1 == endptr)
-			return DEC_EINVAL;
+			DEC_EINVAL(field->key, cursor + 1);
 		if (plen < min_plen)
-			return PREF_TRUNC;
+			PREF_TRUNC(field->key, _src);
 	} else {
 		plen = 4 * digits;
 	}
@@ -151,8 +147,6 @@ parse_bitstr_hex(char const *src, BIT_STRING_t *dst)
 			break;
 		dst->buf[d] |= chr;
 	}
-
-	return NULL;
 }
 
 static int
@@ -175,9 +169,10 @@ next_bin_digit(char const **_str)
 	return -1;
 }
 
-static error_msg
-parse_bitstr_bin(char const *src, BIT_STRING_t *dst)
+static void
+parse_bitstr_bin(struct field *field, char const *_src, BIT_STRING_t *dst)
 {
+	char const *src;
 	char const *cursor;
 	size_t d, b;
 	size_t bits, min_plen;
@@ -185,7 +180,7 @@ parse_bitstr_bin(char const *src, BIT_STRING_t *dst)
 	char *endptr;
 	int chr;
 
-	src += 2; /* Skip "0b" */
+	src = _src + 2; /* Skip "0b" */
 	bits = 0;
 	min_plen = 0;
 
@@ -196,17 +191,17 @@ parse_bitstr_bin(char const *src, BIT_STRING_t *dst)
 	}
 
 	if (bits == 0)
-		return BIN_EMPTY;
+		panic("'%s' binary string is empty: %s", field->key, _src);
 
 	if (*cursor == '/') {
 		errno = 0;
 		plen = strtoul(cursor + 1, &endptr, 10);
 		if ((plen == ULONG_MAX && errno == ERANGE) || plen > SIZE_MAX)
-			return PREF_LEN_2BIG;
+			PREF_LEN_2BIG(field->key, _src);
 		if (cursor + 1 == endptr)
-			return DEC_EINVAL;
+			DEC_EINVAL(field->key, cursor + 1);
 		if (plen < min_plen)
-			return PREF_TRUNC;
+			PREF_TRUNC(field->key, _src);
 	} else {
 		plen = bits;
 	}
@@ -219,24 +214,29 @@ parse_bitstr_bin(char const *src, BIT_STRING_t *dst)
 		for (b = 0; b < 8; b++) {
 			chr = next_bin_digit(&src);
 			if (chr == -1)
-				return NULL;
+				return;
 			dst->buf[d] |= chr << (7 - b);
 		}
-
-	return NULL;
 }
 
-static error_msg
-parse_bitstr(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_bitstr(struct field *field, struct kv_value *src, void *dst)
 {
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
-	if (src->v.str[0] == '0' && src->v.str[1] == 'x')
-		return parse_bitstr_hex(src->v.str, dst);
-	if (src->v.str[0] == '0' && src->v.str[1] == 'b')
-		return parse_bitstr_bin(src->v.str, dst);
-	return BITSTR_FORMAT;
+	if (src->v.str[0] == '0' && src->v.str[1] == 'x') {
+		parse_bitstr_hex(field, src->v.str, dst);
+		return;
+	}
+
+	if (src->v.str[0] == '0' && src->v.str[1] == 'b') {
+		parse_bitstr_bin(field, src->v.str, dst);
+		return;
+	}
+
+	panic("'%s' has an unknown BIT_STRING format: %s",
+	    field->key, src->v.str);
 }
 
 static int
@@ -264,8 +264,8 @@ print_bitstr(struct dynamic_string *dstr, void *val)
 		dstr_append(dstr, "/%d", bitstr_prefix(str));
 }
 
-static error_msg
-parse_dec(char const *src, INTEGER_t *dst)
+static void
+parse_dec(char const *key, char const *src, INTEGER_t *dst)
 {
 	BIGNUM *bn;
 	ASN1_INTEGER *asn1;
@@ -276,19 +276,17 @@ parse_dec(char const *src, INTEGER_t *dst)
 	bn = BN_new();
 	if (!bn)
 		enomem;
-	if (BN_dec2bn(&bn, src) < 0) {
-		BN_free(bn);
-		return DEC_EINVAL;
-	}
+	if (BN_dec2bn(&bn, src) < 0)
+		DEC_EINVAL(key, src);
 	asn1 = BN_to_ASN1_INTEGER(bn, NULL);
 	if (!asn1)
 		enomem;
 	derlen = i2d_ASN1_INTEGER(asn1, &der);
 	if (derlen < 0)
-		panic("i2d_ASN1_INTEGER(): %d", derlen);
+		panic("i2d_ASN1_INTEGER(%s): %d", key, derlen);
 	if (derlen > 127)
 		/* Multi-byte length. Legal, but not considered below */
-		panic("Number too big!");
+		panic("'%s' number is too big: %s", key, src);
 	if (derlen < 2)
 		panic("Bad DER header length: %d", derlen);
 	if (der[0] != 2 || der[1] != (derlen - 2))
@@ -302,101 +300,90 @@ parse_dec(char const *src, INTEGER_t *dst)
 	OPENSSL_free(der);
 	ASN1_INTEGER_free(asn1);
 	BN_free(bn);
-
-	return NULL;
 }
 
-static error_msg
-__parse_byte_array(char const *src, uint8_t **buf, size_t *size)
+static void
+__parse_byte_array(struct field *field, char const *src,
+    uint8_t **buf, size_t *size)
 {
 	BIT_STRING_t bs;
 	INTEGER_t num;
-	error_msg error;
 
 	while (src[0] == ' ' || src[0] == '\t' || src[0] == '\n')
 		src++;
 
 	if (src[0] == '0' && src[1] == 'x') {
 		memset(&bs, 0, sizeof(bs));
-		error = parse_bitstr_hex(src, &bs);
+		parse_bitstr_hex(field, src, &bs);
 
 	} else if (src[0] == '0' && src[1] == 'b') {
 		memset(&bs, 0, sizeof(bs));
-		error = parse_bitstr_bin(src, &bs);
+		parse_bitstr_bin(field, src, &bs);
 
 	} else if (('0' <= src[0] && src[0] <= '9') || src[0] == '-') {
 		memset(&num, 0, sizeof(num));
-		if ((error = parse_dec(src, &num)) != NULL)
-			return error;
+		parse_dec(field->key, src, &num);
 		*buf = num.buf;
 		*size = num.size;
-		return NULL;
+		return;
 
 	} else {
-		return DEC_EINVAL;
+		DEC_EINVAL(field->key, src);
 	}
 
-	if (error)
-		return error;
 	if ((bs.bits_unused & 7) != 0)
-		return BAD_BITCOUNT;
+		panic("'%s' bit count is not a multiple of 8: %s",
+		    field->key, src);
 
 	*buf = bs.buf;
 	*size = bs.size;
-	return NULL;
 }
 
-static error_msg
-parse_byte_array(struct kv_value *src, uint8_t **buf, size_t *size)
+static void
+parse_byte_array(struct field *field, struct kv_value *src,
+    uint8_t **buf, size_t *size)
 {
-	return (src->type == VALT_STR)
-	    ? __parse_byte_array(src->v.str, buf, size)
-	    : NEED_STRING;
+	if (src->type != VALT_STR)
+		NEED_STRING(field->key);
+
+	__parse_byte_array(field, src->v.str, buf, size);
 }
 
-static error_msg
-parse_long_int(struct kv_value *src, long int *result)
+static void
+parse_long_int(struct field *field, struct kv_value *src, long int *result)
 {
 	INTEGER_t integer;
 	long int longint;
-	error_msg error;
 
-	error = parse_byte_array(src, &integer.buf, &integer.size);
-	if (error)
-		return error;
+	parse_byte_array(field, src, &integer.buf, &integer.size);
 	if (asn_INTEGER2long(&integer, &longint) < 0)
-		return "Not a number";
+		DEC_EINVAL(field->key, src->v.str);
 
 	*result = longint;
-	return NULL;
 }
 
-static error_msg
-parse_bool(struct field *fields, struct kv_value *src, void *oid)
+static void
+parse_bool(struct field *field, struct kv_value *src, void *oid)
 {
 	BOOLEAN_t *boolean = oid;
 	long int longint;
-	error_msg error;
 
 	if (src->type == VALT_STR) {
 		if (strcmp(src->v.str, "true") == 0) {
 			*boolean = 0xFF;
-			return NULL;
+			return;
 		}
 		if (strcmp(src->v.str, "false") == 0) {
 			*boolean = 0;
-			return NULL;
+			return;
 		}
 	}
 
-	error = parse_long_int(src, &longint);
-	if (error)
-		return error;
+	parse_long_int(field, src, &longint);
 	if (longint < INT_MIN || INT_MAX < longint)
-		return "Boolean out of range";
+		panic("Boolean out of range: %ld", longint);
 
 	*boolean = (int)longint;
-	return NULL;
 }
 
 static void
@@ -407,16 +394,16 @@ print_bool(struct dynamic_string *dstr, void *val)
 		dstr_append(dstr, (*boolean) ? "true" : "false");
 }
 
-static error_msg
-__parse_int(struct kv_value *src, INTEGER_t *dst)
+static void
+__parse_int(struct field *field, struct kv_value *src, INTEGER_t *dst)
 {
-	return parse_byte_array(src, &dst->buf, &dst->size);
+	parse_byte_array(field, src, &dst->buf, &dst->size);
 }
 
-static error_msg
-parse_int(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_int(struct field *field, struct kv_value *src, void *dst)
 {
-	return __parse_int(src, dst);
+	__parse_int(field, src, dst);
 }
 
 static void
@@ -453,8 +440,8 @@ print_int_dec(struct dynamic_string *dstr, void *val)
 	INTEGER_print(&asn_DEF_INTEGER, val, 0, just_print, dstr);
 }
 
-static error_msg
-parse_oid_str(char const *src, OBJECT_IDENTIFIER_t *oid)
+static void
+parse_oid_str(struct field *field, char const *src, OBJECT_IDENTIFIER_t *oid)
 {
 	ssize_t narcs;
 	asn_oid_arc_t *arcs;
@@ -466,12 +453,12 @@ parse_oid_str(char const *src, OBJECT_IDENTIFIER_t *oid)
 		oid->buf[0] = 0x55;
 		oid->buf[1] = 0x04;
 		oid->buf[2] = 0x03;
-		return NULL;
+		return;
 	}
 
 	narcs = OBJECT_IDENTIFIER_parse_arcs(src, -1, NULL, 0, NULL);
 	if (narcs < 0)
-		return BAD_OID;
+		BAD_OID(field->key, src);
 
 	arcs = calloc(narcs, sizeof(asn_oid_arc_t));
 	if (!arcs)
@@ -479,20 +466,19 @@ parse_oid_str(char const *src, OBJECT_IDENTIFIER_t *oid)
 
 	narcs = OBJECT_IDENTIFIER_parse_arcs(src, -1, arcs, narcs, NULL);
 	if (narcs < 0)
-		return BAD_OID;
+		BAD_OID(field->key, src);
 
 	if (OBJECT_IDENTIFIER_set_arcs(oid, arcs, narcs) < 0)
-		return BAD_OID;
-
-	return NULL;
+		BAD_OID(field->key, src);
 }
 
-static error_msg
-parse_oid(struct field *fields, struct kv_value *src, void *oid)
+static void
+parse_oid(struct field *field, struct kv_value *src, void *oid)
 {
-	return (src->type == VALT_STR)
-	    ? parse_oid_str(src->v.str, oid)
-	    : NEED_STRING;
+	if (src->type != VALT_STR)
+		NEED_STRING(field->key);
+
+	parse_oid_str(field, src->v.str, oid);
 }
 
 static int
@@ -530,45 +516,42 @@ print_oid(struct dynamic_string *dstr, void *val)
 	free(tmp.buf);
 }
 
-static error_msg
+static void
 parse_8str(struct field *field, struct kv_value *src, void *dst)
 {
 	OCTET_STRING_t *result = dst;
 	size_t size;
-	error_msg error;
 
 	switch (src->type) {
 	case VALT_STR:
 		result = dst;
-		error = parse_byte_array(src, &result->buf, &size);
-		if (error)
-			return error;
+		parse_byte_array(field, src, &result->buf, &size);
 
 		result->size = size;
 		field->children = NULL;
-		return NULL;
+		return;
 
 	case VALT_MAP:
 		if (!field->address2)
-			return NEED_STRING;
+			NEED_STRING(field->key);
 		field->overridden = false;
-		return parse_obj(field, src, field->address2);
+		parse_obj(field, src, field->address2);
+		return;
 
 	default:
-		return NEED_STR_OR_MAP;
+		NEED_STR_OR_MAP(field->key);
 	}
 }
 
-static error_msg
-parse_utf8str(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_utf8str(struct field *field, struct kv_value *src, void *dst)
 {
 	OCTET_STRING_t *str = dst;
 
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
 	init_8str(str, src->v.str);
-	return NULL;
 }
 
 static void
@@ -578,10 +561,10 @@ print_utf8str(struct dynamic_string *dstr, void *val)
 	dstr_append(dstr, "%.*s", (int)str->size, (char *)str->buf);
 }
 
-static error_msg
-parse_ia5str(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_ia5str(struct field *field, struct kv_value *src, void *dst)
 {
-	return parse_utf8str(fields, src, dst);
+	parse_utf8str(field, src, dst);
 }
 
 static void
@@ -590,18 +573,17 @@ print_ia5str(struct dynamic_string *dstr, void *val)
 	print_utf8str(dstr, val);
 }
 
-static error_msg
-parse_anystr(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_anystr(struct field *field, struct kv_value *src, void *dst)
 {
 	ANY_t *anystr = dst;
 	PrintableString_t ps;
 
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
 	init_8str(&ps, src->v.str);
 	der_encode_any(&asn_DEF_PrintableString, &ps, anystr);
-	return NULL;
 }
 
 static void
@@ -619,16 +601,15 @@ print_anystr(struct dynamic_string *dstr, void *val)
 	    (char *)(anystr->buf + 2));
 }
 
-static error_msg
-parse_cstr(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_cstr(struct field *field, struct kv_value *src, void *dst)
 {
 	char **cstr = dst;
 
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
 	*cstr = src->v.str;
-	return NULL;
 }
 
 static void
@@ -680,32 +661,30 @@ print_8str(struct dynamic_string *dstr, void *val)
 	print_maybe_string(dstr, str->buf, str->size);
 }
 
-static error_msg
+static void
 parse_any(struct field *field, struct kv_value *src, void *dst)
 {
 	ANY_t *any;
 	size_t size;
-	error_msg error;
 
 	switch (src->type) {
 	case VALT_STR:
 		any = dst;
-		error = parse_byte_array(src, &any->buf, &size);
-		if (error)
-			return error;
+		parse_byte_array(field, src, &any->buf, &size);
 
 		any->size = size;
 		field->children = NULL;
-		return NULL;
+		return;
 
 	case VALT_MAP:
 		if (!field->address2)
-			return NEED_STRING;
+			NEED_STRING(field->key);
 		field->overridden = false;
-		return parse_obj(field, src, field->address2);
+		parse_obj(field, src, field->address2);
+		return;
 
 	default:
-		return NEED_STR_OR_MAP;
+		NEED_STR_OR_MAP(field->key);
 	}
 }
 
@@ -716,19 +695,14 @@ print_any(struct dynamic_string *dstr, void *val)
 	print_maybe_string(dstr, any->buf, any->size);
 }
 
-static error_msg
-parse_any_oid(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_any_oid(struct field *field, struct kv_value *src, void *dst)
 {
 	OBJECT_IDENTIFIER_t oid = { 0 };
 	ANY_t *any = dst;
-	error_msg error;
 
-	error = parse_oid(fields, src, &oid);
-	if (error)
-		return error;
-
+	parse_oid(field, src, &oid);
 	der_encode_any(&asn_DEF_OBJECT_IDENTIFIER, &oid, any);
-	return NULL;
 }
 
 static void
@@ -753,8 +727,8 @@ print_any_oid(struct dynamic_string *dstr, void *val)
 	}
 }
 
-static error_msg
-parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_rdnseq(struct field *field, struct kv_value *src, void *dst)
 {
 	struct kv_node *rdn_src;
 	struct kv_node *atv_src;
@@ -768,13 +742,11 @@ parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
 
 	size_t r, a;
 
-	error_msg error;
-
 	if (src->type != VALT_SET)
-		return NEED_SET;
+		NEED_SET(field->key);
 
 	name->present = Name_PR_rdnSequence;
-	fields->children = NULL;
+	field->children = NULL;
 
 	r = 0;
 	STAILQ_FOREACH(rdn_src, &src->v.set, hook)
@@ -784,7 +756,7 @@ parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
 	r = 0;
 	STAILQ_FOREACH(rdn_src, &src->v.set, hook) {
 		if (rdn_src->value.type != VALT_SET)
-			return NEED_SET;
+			NEED_SET(field->key);
 
 		a = 0;
 		STAILQ_FOREACH(atv_src, &rdn_src->value.v.set, hook)
@@ -792,7 +764,7 @@ parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
 
 		rdn_dst = name->choice.rdnSequence.list.array[r];
 		INIT_ASN1_ARRAY(&rdn_dst->list, a, AttributeTypeAndValue_t);
-		rdnf = field_addn(fields, r, NULL, rdn_dst, 0);
+		rdnf = field_addn(field, r, NULL, rdn_dst, 0);
 
 		a = 0;
 		STAILQ_FOREACH(atv_src, &rdn_src->value.v.set, hook) {
@@ -802,17 +774,13 @@ parse_rdnseq(struct field *fields, struct kv_value *src, void *dst)
 			field_add(atvf, "type", &ft_oid, &atv_dst->type, 0);
 			field_add(atvf, "value", &ft_anystr, &atv_dst->value, 0);
 
-			error = parse_obj(atvf, &atv_src->value, atv_dst);
-			if (error)
-				return error;
+			parse_obj(atvf, &atv_src->value, atv_dst);
 
 			a++;
 		}
 
 		r++;
 	}
-
-	return NULL;
 }
 
 static void
@@ -853,15 +821,15 @@ print_rdnseq(struct dynamic_string *dstr, void *arg)
 	dstr_append(dstr, " ]");
 }
 
-static error_msg
-parse_gname_type(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_gname_type(struct field *field, struct kv_value *src, void *dst)
 {
 	GeneralName_PR present;
 	struct field_type const *ft;
 	GeneralName_t *gname = dst;
 
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
 	if (strcmp(src->v.str, "rfc822Name") == 0) {
 		present = GeneralName_PR_rfc822Name;
@@ -879,17 +847,16 @@ parse_gname_type(struct field *fields, struct kv_value *src, void *dst)
 		present = GeneralName_PR_registeredID;
 		ft = &ft_oid;
 	} else {
-		panic("Unknown GeneralName variant: %s", fields->key);
+		panic("'%s' has unknown GeneralName variant: %s",
+		    field->key, src->v.str);
 	}
 
 	if (gname->present == present)
-		return NULL;
+		return;
 
 	gname->present = present;
 	memset(&gname->choice, 0, sizeof(gname->choice));
-	field_add(fields->parent, "value", ft, &gname->choice, 0);
-
-	return NULL;
+	field_add(field->parent, "value", ft, &gname->choice, 0);
 }
 
 static void
@@ -934,14 +901,13 @@ print_gname_type(struct dynamic_string *dstr, void *arg)
 		dstr_append(dstr, value);
 }
 
-static error_msg
-parse_time(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_time(struct field *field, struct kv_value *src, void *dst)
 {
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
 	init_time_str(dst, src->v.str);
-	return NULL;
 }
 
 static void
@@ -995,20 +961,19 @@ print_time(struct dynamic_string *dstr, void *val)
 	}
 }
 
-static error_msg
-parse_gtime(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_gtime(struct field *field, struct kv_value *src, void *dst)
 {
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
 	init_gtime_str(dst, src->v.str);
-	return NULL;
 }
 
-static error_msg
-parse_filetype(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
+static void
+parse_filetype(struct field *field, struct kv_value *src_exts, void *_dst_exts)
 {
-	return NULL; /* Actually done elsewhere */
+	/* Actually done elsewhere */
 }
 
 static void
@@ -1051,67 +1016,64 @@ get_sia_defaults(struct field *field)
 	return sia_empty_defaults; /* CRL is known to fall through here */
 }
 
-static error_msg
+static void
 add_ext(char const *type, char const *name,
-    struct extensions *exts, struct field *fields)
+    struct extensions *exts, struct field *field)
 {
 	if (strncmp(type, "bc", 2) == 0)
-		exts_add_bc(exts, name, fields);
+		exts_add_bc(exts, name, field);
 	else if (strncmp(type, "ski", 3) == 0)
-		exts_add_ski(exts, name, fields);
+		exts_add_ski(exts, name, field);
 	else if (strncmp(type, "aki", 3) == 0)
-		exts_add_aki(exts, name, fields);
+		exts_add_aki(exts, name, field);
 	else if (strncmp(type, "ku", 2) == 0)
-		exts_add_ku(exts, name, fields);
+		exts_add_ku(exts, name, field);
 	else if (strncmp(type, "cdp", 3) == 0)
-		exts_add_cdp(exts, name, fields);
+		exts_add_cdp(exts, name, field);
 	else if (strncmp(type, "aia", 3) == 0)
-		exts_add_aia(exts, name, fields);
+		exts_add_aia(exts, name, field);
 	else if (strncmp(type, "sia", 3) == 0)
-		exts_add_sia(exts, name, fields, get_sia_defaults(fields));
+		exts_add_sia(exts, name, field, get_sia_defaults(field));
 	else if (strncmp(type, "cp", 2) == 0)
-		exts_add_cp(exts, name, fields);
+		exts_add_cp(exts, name, field);
 	else if (strncmp(type, "ip", 2) == 0)
-		exts_add_ip(exts, name, fields);
+		exts_add_ip(exts, name, field);
 	else if (strncmp(type, "as", 2) == 0)
-		exts_add_as(exts, name, fields);
+		exts_add_as(exts, name, field);
 	else if (strncmp(type, "cn", 2) == 0)
-		exts_add_crln(exts, name, fields);
+		exts_add_crln(exts, name, field);
 	else
-		return "Unknown extension type";
-
-	return NULL;
+		panic("'%s' has an unknown extension type: %s",
+		    field->key, type);
 }
 
-static error_msg
-parse_exts(struct field *fields, struct kv_value *src_exts, void *_dst_exts)
+static void
+parse_exts(struct field *field, struct kv_value *src_exts, void *_dst_exts)
 {
 	struct extensions *dst_exts;
 	struct kv_node *node;
-	error_msg error;
 
 	switch (src_exts->type) {
 	case VALT_SET:
-		fields->children = NULL;
+		field->children = NULL;
 		dst_exts = _dst_exts;
 		STAILQ_INIT(dst_exts);
 
 		STAILQ_FOREACH(node, &src_exts->v.set, hook) {
 			if (node->value.type != VALT_STR)
-				return NEED_STRING;
-			error = add_ext(node->value.v.str, node->value.v.str,
-			    dst_exts, fields);
-			if (error)
-				return error;
+				NEED_STRING(field->key);
+			add_ext(node->value.v.str, node->value.v.str,
+			    dst_exts, field);
 		}
 
-		return NULL;
+		return;
 
 	case VALT_MAP:
-		return parse_obj(fields, src_exts, _dst_exts);
+		parse_obj(field, src_exts, _dst_exts);
+		return;
 
 	default:
-		return NEED_SET_OR_MAP;
+		NEED_SET_OR_MAP(field->key);
 	}
 }
 
@@ -1140,20 +1102,19 @@ struct ip_list_node {
 	STAILQ_ENTRY(ip_list_node) hook;
 };
 
-static error_msg
-parse_ads(struct field *fields, struct kv_value *src, void *dst)
+static void
+parse_ads(struct field *field, struct kv_value *src, void *dst)
 {
 	SubjectInfoAccessSyntax_t *sia = dst;
 	struct kv_node *src_node;
 	AccessDescription_t *dst_ad;
 	struct field *adf;
 	size_t a;
-	error_msg error;
 
 	if (src->type != VALT_SET)
-		return NEED_SET;
+		NEED_SET(field->key);
 
-	fields->children = NULL;
+	field->children = NULL;
 
 	a = 0;
 	STAILQ_FOREACH(src_node, &src->v.set, hook)
@@ -1165,15 +1126,11 @@ parse_ads(struct field *fields, struct kv_value *src, void *dst)
 		dst_ad = sia->list.array[a];
 		dst_ad->accessLocation.present = GeneralName_PR_uniformResourceIdentifier;
 
-		adf = field_add_ad(fields, a, dst_ad);
-		error = parse_obj(adf, &src_node->value, dst_ad);
-		if (error)
-			return error;
+		adf = field_add_ad(field, a, dst_ad);
+		parse_obj(adf, &src_node->value, dst_ad);
 
 		a++;
 	}
-
-	return NULL;
 }
 
 STAILQ_HEAD(ip_list, ip_list_node);
@@ -1193,8 +1150,8 @@ find_last_1_index(unsigned char *bits)
 	return -1;
 }
 
-static error_msg
-parse_ip_node(char *str, struct ip_list_node **result)
+static void
+parse_ip_node(struct field *field, char *str, struct ip_list_node **result)
 {
 	char *slash, *dash, *endptr;
 	unsigned long plen;
@@ -1211,7 +1168,7 @@ parse_ip_node(char *str, struct ip_list_node **result)
 	if (inet_pton(ipnode->af, str, ipnode->bits) < 1) {
 		if (slash != NULL)
 			*slash = '/';
-		return BAD_IP;
+		panic("'%s' has an unparseable IP address: %s", field->key, str);
 	}
 
 	if (slash == NULL) {
@@ -1224,7 +1181,7 @@ parse_ip_node(char *str, struct ip_list_node **result)
 			break;
 		}
 		*result = ipnode;
-		return NULL;
+		return;
 	}
 
 	*slash = '/';
@@ -1233,30 +1190,29 @@ parse_ip_node(char *str, struct ip_list_node **result)
 	errno = 0;
 	plen = strtoul(slash + 1, &dash, 10);
 	if ((plen == ULONG_MAX && errno == ERANGE) || plen > UINT_MAX)
-		return PREF_LEN_2BIG;
+		PREF_LEN_2BIG(field->key, str);
 	if (slash + 1 == dash)
-		return DEC_EINVAL;
+		DEC_EINVAL(field->key, slash + 1);
 	index1 = find_last_1_index(ipnode->bits);
 	if (index1 != UINT_MAX && index1 >= plen)
-		return PREF_TRUNC;
+		PREF_TRUNC(field->key, str);
 
 	ipnode->plen = plen;
 	if ((*dash) != '-') {
 		*result = ipnode;
-		return NULL;
+		return;
 	}
 
 	errno = 0;
 	plen = strtoul(dash + 1, &endptr, 10);
 	if ((plen == ULONG_MAX && errno == ERANGE) || plen > UINT_MAX)
-		return PREF_LEN_2BIG;
+		PREF_LEN_2BIG(field->key, str);
 	if (dash + 1 == endptr)
-		return DEC_EINVAL;
+		DEC_EINVAL(field->key, dash + 1);
 
 	ipnode->has_maxlen = true;
 	ipnode->maxlen = plen;
 	*result = ipnode;
-	return NULL;
 }
 
 struct parsed_ips {
@@ -1267,12 +1223,11 @@ struct parsed_ips {
 	unsigned int v6n;
 };
 
-static error_msg
-kvs2ips(struct kv_set *kvs, struct parsed_ips *ips)
+static void
+kvs2ips(struct field *field, struct kv_set *kvs, struct parsed_ips *ips)
 {
 	struct kv_node *node;
 	struct ip_list_node *ipnode;
-	error_msg error;
 
 	STAILQ_INIT(&ips->v4list);
 	ips->v4n = 0;
@@ -1281,9 +1236,8 @@ kvs2ips(struct kv_set *kvs, struct parsed_ips *ips)
 
 	STAILQ_FOREACH(node, kvs, hook) {
 		if (node->value.type != VALT_STR)
-			return NEED_STRING;
-		if ((error = parse_ip_node(node->value.v.str, &ipnode)) != NULL)
-			return error;
+			NEED_STRING(field->key);
+		parse_ip_node(field, node->value.v.str, &ipnode);
 
 		switch (ipnode->af) {
 		case AF_INET:
@@ -1295,11 +1249,10 @@ kvs2ips(struct kv_set *kvs, struct parsed_ips *ips)
 			ips->v6n++;
 			break;
 		default:
-			panic("Unknown AF: %u\n", ipnode->af);
+			panic("'%s' has an unknown AF: %u\n",
+			    field->key, ipnode->af);
 		}
 	}
-
-	return NULL;
 }
 
 static void
@@ -1339,25 +1292,21 @@ convert_ips(struct ROAIPAddressFamily *family, int id,
 	}
 }
 
-static error_msg
-parse_ips_roa(struct field *fields, struct kv_value *src, void *arg)
+static void
+parse_ips_roa(struct field *field, struct kv_value *src, void *arg)
 {
 	struct RouteOriginAttestation__ipAddrBlocks *dst = arg;
 	struct parsed_ips ips;
-	error_msg error;
 
 	if (src->type != VALT_SET)
-		return NEED_SET;
-	if ((error = kvs2ips(&src->v.set, &ips)) != NULL)
-		return error;
+		NEED_SET(field->key);
+	kvs2ips(field, &src->v.set, &ips);
 
 	INIT_ASN1_ARRAY(&dst->list, !!ips.v4n + !!ips.v6n, struct ROAIPAddressFamily);
 	if (ips.v4n)
 		convert_ips(dst->list.array[0], 1, &ips.v4list, ips.v4n);
 	if (ips.v6n)
 		convert_ips(dst->list.array[ips.v4n ? 1 : 0], 2, &ips.v6list, ips.v6n);
-
-	return NULL;
 }
 
 static bool
@@ -1467,11 +1416,11 @@ convert_ips_cer(struct IPAddressFamily *family, int id,
 	}
 }
 
-static error_msg
-parse_ips_str(struct kv_value *src, IPAddrBlocks_t *dst)
+static void
+parse_ips_str(struct field *field, struct kv_value *src, IPAddrBlocks_t *dst)
 {
 	if (strcmp("inherit", src->v.str) != 0)
-		return BAD_IPS;
+		BAD_IPS(field->key);
 
 	INIT_ASN1_ARRAY(&dst->list, 2, struct IPAddressFamily);
 
@@ -1479,40 +1428,37 @@ parse_ips_str(struct kv_value *src, IPAddrBlocks_t *dst)
 	dst->list.array[0]->ipAddressChoice.present = IPAddressChoice_PR_inherit;
 	init_af(&dst->list.array[1]->addressFamily, 2);
 	dst->list.array[1]->ipAddressChoice.present = IPAddressChoice_PR_inherit;
-	return NULL;
 }
 
-static error_msg
-parse_ips_set(struct kv_value *src, IPAddrBlocks_t *dst)
+static void
+parse_ips_set(struct field *field, struct kv_value *src, IPAddrBlocks_t *dst)
 {
 	struct parsed_ips ips;
-	error_msg error;
 
-	if ((error = kvs2ips(&src->v.set, &ips)) != NULL)
-		return error;
+	kvs2ips(field, &src->v.set, &ips);
 
 	INIT_ASN1_ARRAY(&dst->list, !!ips.v4n + !!ips.v6n, struct IPAddressFamily);
 	if (ips.v4n)
 		convert_ips_cer(dst->list.array[0], 1, &ips.v4list, ips.v4n);
 	if (ips.v6n)
 		convert_ips_cer(dst->list.array[ips.v4n ? 1 : 0], 2, &ips.v6list, ips.v6n);
-
-	return NULL;
 }
 
-static error_msg
-parse_ips_cer(struct field *fields, struct kv_value *src, void *arg)
+static void
+parse_ips_cer(struct field *field, struct kv_value *src, void *arg)
 {
 	switch (src->type) {
 	case VALT_STR:
-		return parse_ips_str(src, arg);
+		parse_ips_str(field, src, arg);
+		return;
 	case VALT_SET:
-		return parse_ips_set(src, arg);
+		parse_ips_set(field, src, arg);
+		return;
 	case VALT_MAP:
 		break;
 	}
 
-	return BAD_IPS;
+	BAD_IPS(field->key);
 }
 
 static void
@@ -1573,55 +1519,46 @@ print_cer_ips(struct dynamic_string *dstr, void *arg)
 	dstr_append(dstr, "]");
 }
 
-static error_msg
-parse_asns_str(struct kv_value *src, ASIdentifierChoice_t *dst)
+static void
+parse_asns_str(struct field *field, struct kv_value *src,
+    ASIdentifierChoice_t *dst)
 {
 	if (strcmp("inherit", src->v.str) != 0)
-		return BAD_ASN;
+		BAD_ASN(field->key);
 
 	dst->present = ASIdentifierChoice_PR_inherit;
-	return NULL;
 }
 
-static error_msg
-parse_as_range(struct kv_value *src, ASRange_t *dst)
+static void
+parse_as_range(struct field *field, struct kv_value *src, ASRange_t *dst)
 {
 	char *str;
 	char *dash;
-	error_msg error;
 
 	if (src->type != VALT_STR)
-		return NEED_STRING;
+		NEED_STRING(field->key);
 
 	str = pstrdup(src->v.str);
 
 	dash = strchr(str, '-');
-	if (!dash) {
-		free(str);
-		return "Range is missing a dash";
-	}
+	if (!dash)
+		panic("'%s' range is missing a dash: %s", field->key, src->v.str);
 	*dash = 0;
 
-	error = __parse_byte_array(str, &dst->min.buf, &dst->min.size);
-	if (error) {
-		free(str);
-		return error;
-	}
-
-	error = __parse_byte_array(dash + 1, &dst->max.buf, &dst->max.size);
+	__parse_byte_array(field, str, &dst->min.buf, &dst->min.size);
+	__parse_byte_array(field, dash + 1, &dst->max.buf, &dst->max.size);
 
 	free(str);
-	return error;
 
 }
 
-static error_msg
-parse_asns_set(struct kv_value *src, ASIdentifierChoice_t *aic)
+static void
+parse_asns_set(struct field *field, struct kv_value *src,
+    ASIdentifierChoice_t *aic)
 {
 	struct kv_node *node;
 	ASIdOrRange_t *aor;
 	int n;
-	error_msg error;
 
 	n = 0;
 	STAILQ_FOREACH(node, &src->v.set, hook)
@@ -1633,37 +1570,34 @@ parse_asns_set(struct kv_value *src, ASIdentifierChoice_t *aic)
 	n = 0;
 	STAILQ_FOREACH(node, &src->v.set, hook) {
 		if (node->value.type != VALT_STR)
-			return NEED_STRING;
+			NEED_STRING(field->key);
 
 		aor = aic->choice.asIdsOrRanges.list.array[n++];
 		if (strchr(node->value.v.str, '-') != NULL) {
 			aor->present = ASIdOrRange_PR_range;
-			error = parse_as_range(&node->value, &aor->choice.range);
+			parse_as_range(field, &node->value, &aor->choice.range);
 		} else {
 			aor->present = ASIdOrRange_PR_id;
-			error = __parse_int(&node->value, &aor->choice.id);
+			__parse_int(field, &node->value, &aor->choice.id);
 		}
-
-		if (error)
-			return error;
 	}
-
-	return NULL;
 }
 
-static error_msg
-parse_asns(struct field *fields, struct kv_value *src, void *arg)
+static void
+parse_asns(struct field *field, struct kv_value *src, void *arg)
 {
 	switch (src->type) {
 	case VALT_STR:
-		return parse_asns_str(src, arg);
+		parse_asns_str(field, src, arg);
+		return;
 	case VALT_SET:
-		return parse_asns_set(src, arg);
+		parse_asns_set(field, src, arg);
+		return;
 	case VALT_MAP:
 		break;
 	}
 
-	return BAD_ASN;
+	BAD_ASN(field->key);
 }
 
 static void
@@ -1709,16 +1643,15 @@ print_asns(struct dynamic_string *dstr, void *arg)
 	}
 }
 
-static error_msg
-parse_revoked_list(struct field *fields, struct kv_value *src, void *arg)
+static void
+parse_revoked_list(struct field *field, struct kv_value *src, void *arg)
 {
 	struct TBSCertList__revokedCertificates *rcs;
 	struct kv_node *node;
 	int n;
-	error_msg error;
 
 	if (src->type != VALT_SET)
-		return NEED_SET;
+		NEED_SET(field->key);
 
 	n = 0;
 	STAILQ_FOREACH(node, &src->v.set, hook)
@@ -1734,16 +1667,13 @@ parse_revoked_list(struct field *fields, struct kv_value *src, void *arg)
 
 	n = 0;
 	STAILQ_FOREACH(node, &src->v.set, hook) {
-		error = __parse_int(
+		__parse_int(
+		    field,
 		    &node->value,
 		    &rcs->list.array[n]->userCertificate
 		);
-		if (error)
-			return error;
 		n++;
 	}
-
-	return NULL;
 }
 
 static void
@@ -1777,25 +1707,21 @@ add_filelist_fields(struct field *parentf, struct Manifest__fileList *filelist,
 		    name_overridden, hash_overridden);
 }
 
-static error_msg
+static void
 parse_filelist_str(struct field *rootf, struct kv_value *src,
     struct Manifest__fileList *filelist)
 {
 	long int count;
-	error_msg error;
 
-	error = parse_long_int(src, &count);
-	if (error)
-		return error;
+	parse_long_int(rootf, src, &count);
 	if (count < 0 || SIZE_MAX < count)
-		return "Filelist length out of range";
+		panic("filelist length out of range: %ld", count);
 
 	INIT_ASN1_ARRAY(&filelist->list, count, FileAndHash_t);
 	add_filelist_fields(rootf, filelist, false, false);
-	return NULL;
 }
 
-static error_msg
+static void
 parse_filelist_set(struct field *rootf, struct kv_value *src,
     struct Manifest__fileList *filelist)
 {
@@ -1805,7 +1731,7 @@ parse_filelist_set(struct field *rootf, struct kv_value *src,
 	f = 0;
 	STAILQ_FOREACH(node, &src->v.set, hook) {
 		if (node->value.type != VALT_STR)
-			return "fileList entry is not a string";
+			panic("%s: fileList entry is not a string", rootf->key);
 		f++;
 	}
 
@@ -1815,10 +1741,9 @@ parse_filelist_set(struct field *rootf, struct kv_value *src,
 		init_8str(&filelist->list.array[f++]->file, node->value.v.str);
 
 	add_filelist_fields(rootf, filelist, true, false);
-	return NULL;
 }
 
-static error_msg
+static void
 parse_filelist_map(struct field *rootf, struct kv_value *src,
     struct Manifest__fileList *filelist)
 {
@@ -1829,7 +1754,7 @@ parse_filelist_map(struct field *rootf, struct kv_value *src,
 	f = 0;
 	STAILQ_FOREACH(kv, &src->v.map, hook) {
 		if (kv->value.type != VALT_STR)
-			return "fileList entry is not a string";
+			panic("%s: fileList entry is not a string", rootf->key);
 		f++;
 	}
 
@@ -1842,23 +1767,18 @@ parse_filelist_map(struct field *rootf, struct kv_value *src,
 	}
 
 	add_filelist_fields(rootf, filelist, true, true);
-	return NULL;
 }
 
-static error_msg
+static void
 parse_filelist(struct field *rootf, struct kv_value *src, void *arg)
 {
-	error_msg error = NULL;
-
 	rootf->children = NULL;
 
 	switch (src->type) {
-	case VALT_STR:	error = parse_filelist_str(rootf, src, arg);	break;
-	case VALT_SET:	error = parse_filelist_set(rootf, src, arg);	break;
-	case VALT_MAP:	error = parse_filelist_map(rootf, src, arg);	break;
+	case VALT_STR:	parse_filelist_str(rootf, src, arg);	break;
+	case VALT_SET:	parse_filelist_set(rootf, src, arg);	break;
+	case VALT_MAP:	parse_filelist_map(rootf, src, arg);	break;
 	}
-
-	return error;
 }
 
 static void
@@ -1882,16 +1802,15 @@ print_filelist(struct dynamic_string *dstr, void *arg)
 	dstr_append(dstr, "}");
 }
 
-static error_msg
+static void
 parse_providers(struct field *rootf, struct kv_value *src, void *arg)
 {
 	ProviderASSet_t *providers = arg;
 	struct kv_node *kv;
-	error_msg error;
 	int p;
 
 	if (src->type != VALT_SET)
-		return "Providers list is not an array";
+		panic("%s: Providers list is not an array.", rootf->key);
 
 	p = 0;
 	STAILQ_FOREACH(kv, &src->v.set, hook)
@@ -1900,17 +1819,13 @@ parse_providers(struct field *rootf, struct kv_value *src, void *arg)
 	INIT_ASN1_ARRAY(&providers->list, p, ASId_t);
 	p = 0;
 	STAILQ_FOREACH(kv, &src->v.set, hook) {
-		error = __parse_int(&kv->value, providers->list.array[p]);
-		if (error)
-			return error;
+		__parse_int(rootf, &kv->value, providers->list.array[p]);
 
 //		field_addn(rootf, p, &ft_int, providers->list.array[p],
 //		    sizeof(ASId_t));
 
 		p++;
 	}
-
-	return NULL;
 }
 
 static void
@@ -1928,7 +1843,7 @@ print_providers(struct dynamic_string *dstr, void *arg)
 	dstr_append(dstr, " ]");
 }
 
-static error_msg
+static void
 parse_files(struct field *rootf, struct kv_value *src, void *dst)
 {
 	struct kv_node *node;
@@ -1936,19 +1851,17 @@ parse_files(struct field *rootf, struct kv_value *src, void *dst)
 	struct rrdp_files *files = dst;
 
 	if (src->type != VALT_SET)
-		return NEED_SET;
+		NEED_SET(rootf->key);
 
 	STAILQ_FOREACH(node, &src->v.set, hook) {
 		if (node->value.type != VALT_STR)
-			return NEED_STRING;
+			NEED_STRING(rootf->key);
 
 		pr_trace("Adding %s to Notification", node->value.v.str);
 		file = pzalloc(sizeof(struct rrdp_file));
 		file->name = node->value.v.str;
 		STAILQ_INSERT_TAIL(files, file, hook);
 	}
-
-	return NULL;
 }
 
 static void
@@ -2230,7 +2143,6 @@ fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 	struct keyval *kv;
 	struct field *field;
 	unsigned char **value;
-	error_msg error;
 
 	STAILQ_FOREACH(kv, kvs, hook) {
 		pr_trace("keyval: %s", kv->key);
@@ -2251,12 +2163,10 @@ fields_apply_keyvals(struct field *root, struct keyvals *kvs)
 			}
 			if (*value == NULL)
 				*value = pzalloc(field->size);
-			error = field->type->parser(field, &kv->value, *value);
+			field->type->parser(field, &kv->value, *value);
 		} else {
-			error = field->type->parser(field, &kv->value, value);
+			field->type->parser(field, &kv->value, value);
 		}
-		if (error)
-			panic("%s", error);
 	}
 }
 
