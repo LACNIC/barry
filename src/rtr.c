@@ -730,15 +730,10 @@ print_addr4(char const *pfx, size_t *remainder)
 static void
 __print_addr6(unsigned char *buf)
 {
-	struct in6_addr addr;
 	char addr_strbuf[INET6_ADDRSTRLEN];
 	char const *addr_str;
 
-	addr.s6_addr32[0] = htonl(assemble_u32(buf));
-	addr.s6_addr32[1] = htonl(assemble_u32(&buf[4]));
-	addr.s6_addr32[2] = htonl(assemble_u32(&buf[8]));
-	addr.s6_addr32[3] = htonl(assemble_u32(&buf[12]));
-	addr_str = inet_ntop(AF_INET6, &addr, addr_strbuf, sizeof(addr_strbuf));
+	addr_str = inet_ntop(AF_INET6, buf, addr_strbuf, sizeof(addr_strbuf));
 	if (!addr_str)
 		pr_warn("Cannot convert addr6 to string: %s", strerror(errno));
 	printf("%s ", addr_str ? addr_str : "null");

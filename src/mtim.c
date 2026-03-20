@@ -198,8 +198,14 @@ update_date(char const *new_file)
 		if (stat(old_file, &st1) < 0)
 			panic("stat(%s): %s", old_file, strerror(errno));
 
+#if defined(__APPLE__)
+		times[0] = st1.st_atimespec;
+		times[1] = st1.st_mtimespec;
+#else
 		times[0] = st1.st_atim;
 		times[1] = st1.st_mtim;
+#endif
+
 		if (utimensat(AT_FDCWD, new_file, times, AT_SYMLINK_NOFOLLOW) < 0)
 			panic("utimensat(%s): %s", new_file, strerror(errno));
 	}

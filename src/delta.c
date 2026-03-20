@@ -321,7 +321,7 @@ collect_publish(xmlChar *uri, xmlChar *content, void *_args)
 	free(bin);
 }
 
-typedef void (*snapshot_cb)();
+typedef void (*snapshot_cb)(xmlTextReaderPtr, void *);
 typedef void (*publish_cb)(xmlChar *, xmlChar *, void *);
 
 static void
