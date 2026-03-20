@@ -2,6 +2,7 @@
 src/barry
 src/barry-delta
 src/barry-mtim
+src/barry-ncu
 src/barry-rtr
 *.o
 *.test
