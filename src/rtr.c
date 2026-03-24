@@ -127,6 +127,28 @@ print_command_help(void)
 	printf("  %s<SL>%s: unsigned 32-bit integer. Default: 12\n", var, rst);
 	printf("  %s<SE>%s: unsigned 32-bit integer. Default: 0\n", var, rst);
 	printf("\n");
+	printf("%sserial-notify%s [version %su8%s] [pdu-type %su8%s] [session %su16%s] [length %su32%s] \\\n",
+	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("              [serial %su32%s]\n", var, rst);
+	printf("  Sends a Serial Notify PDU to the server.\n  Arguments are header fields.\n\n");
+	printf("%scache-response%s [version %su8%s] [pdu-type %su8%s] [session %su16%s] [length %su32%s]\n",
+	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("  Sends a Cache Response PDU to the server.\n  Arguments are header fields.\n\n");
+	printf("%sipv4-prefix%s [version %su8%s] [pdu-type %su8%s] [zero1 %su16%s] [length %su32%s] \\\n",
+	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("            [flags %su8%s] [plen %su8%s] [maxlen %su8%s] [zero2 %su8%s] \\\n",
+	    var, rst, var, rst, var, rst, var, rst);
+	printf("            [prefix %saddr4%s] [as %su32%s]\n", var, rst, var, rst);
+	printf("  Sends an IPv4 Prefix PDU to the server.\n  Arguments are header fields.\n\n");
+	printf("%sipv6-prefix%s [version %su8%s] [pdu-type %su8%s] [zero1 %su16%s] [length %su32%s] \\\n",
+	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("            [flags %su8%s] [plen %su8%s] [maxlen %su8%s] [zero2 %su8%s] \\\n",
+	    var, rst, var, rst, var, rst, var, rst);
+	printf("            [prefix %saddr6%s] [as %su32%s]\n", var, rst, var, rst);
+	printf("  Sends an IPv6 Prefix PDU to the server.\n  Arguments are header fields.\n\n");
+	printf("%scache-reset%s [version %su8%s] [pdu-type %su8%s] [zero %su16%s] [length %su32%s]\n",
+	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("  Sends a Cache Reset PDU to the server.\n  Arguments are header fields.\n\n");
 	printf("%shelp%s\n", cmd, rst);
 	printf("  Prints this wall of text.\n");
 	printf("\n");
@@ -216,6 +238,30 @@ static int
 next_u32(struct line_reader *rdr, char const *what, uint32_t *value)
 {
 	return parse_u32(what, next_token(rdr, false), value);
+}
+
+static int
+next_addr(struct line_reader *rdr, char const *what, int af, void *value)
+{
+	char *token;
+	int res;
+
+	token = next_token(rdr, false);
+	res = inet_pton(af, token, value);
+	switch (res) {
+	case 1:
+		return 0;
+	case 0:
+		pr_err("Cannot parse as an IPv%u address: %s",
+		    (af == AF_INET) ? 4 : 6, token);
+		return EINVAL;
+	case -1:
+		pr_err("Address family unknown: %s", strerror(errno));
+		return EINVAL;
+	}
+
+	pr_err("Unknown inet_pton() result: %d", res);
+	return EINVAL;
 }
 
 static void
@@ -490,16 +536,15 @@ __send_reset_query(uint8_t version, uint8_t type, uint16_t zero, uint32_t len)
 	add_u16(&msg[2], zero);
 	add_u32(&msg[4], len);
 
-	pr_trace("Sending Reset Query PDU.");
+	pr_trace("Sending 8-byte PDU.");
 	full_write(msg, sizeof(msg));
 }
 
 static void
-send_reset_query(struct line_reader *rdr)
+send_reset_query(struct line_reader *rdr, uint8_t pdu_type,
+    char const *key3, uint16_t val3)
 {
 	uint8_t _version = version;
-	uint8_t pdu_type = 2;
-	uint16_t zero = 0;
 	uint32_t length = 8;
 	char *token;
 	int error = 0;
@@ -509,8 +554,8 @@ send_reset_query(struct line_reader *rdr)
 			error = next_u8(rdr, "version", &_version);
 		else if (strcmp(token, "pdu-type") == 0)
 			error = next_u8(rdr, "pdu-type", &pdu_type);
-		else if (strcmp(token, "zero") == 0)
-			error = next_u16(rdr, "zero", &zero);
+		else if (strcmp(token, key3) == 0)
+			error = next_u16(rdr, key3, &val3);
 		else if (strcmp(token, "length") == 0)
 			error = next_u32(rdr, "length", &length);
 		else {
@@ -521,7 +566,7 @@ send_reset_query(struct line_reader *rdr)
 			return;
 	}
 
-	__send_reset_query(_version, pdu_type, zero, length);
+	__send_reset_query(_version, pdu_type, val3, length);
 }
 
 static void
@@ -536,15 +581,14 @@ __send_serial_query(uint8_t version, uint8_t type, uint16_t session,
 	add_u32(&msg[4], len);
 	add_u32(&msg[8], serial);
 
-	pr_trace("Sending Serial Query PDU.");
+	pr_trace("Sending 12-byte PDU.");
 	full_write(msg, sizeof(msg));
 }
 
 static void
-send_serial_query(struct line_reader *rdr)
+send_serial_query(struct line_reader *rdr, uint8_t pdu_type)
 {
 	uint8_t _version = version;
-	uint8_t pdu_type = 1;
 	uint16_t _session = atomic_load(&session);
 	uint32_t length = 12;
 	uint32_t serial = 0;
@@ -573,6 +617,83 @@ send_serial_query(struct line_reader *rdr)
 	__send_serial_query(_version, pdu_type, _session, length, serial);
 }
 
+static void
+send_ip_prefix(struct line_reader *rdr, int af)
+{
+	uint8_t _version = version;
+	uint8_t pdu_type = (af == AF_INET) ? 4 : 6;
+	uint16_t zero1 = 0;
+	uint32_t length = (af == AF_INET) ? 20 : 32;
+	uint8_t flags = 1;
+	uint8_t plen = 0;
+	uint8_t maxlen = 0;
+	uint8_t zero2 = 0;
+	union {
+		struct in_addr v4;
+		struct in6_addr v6;
+	} pref = { 0 };
+	uint32_t as = 0;
+	char *token;
+	int error = 0;
+	size_t i;
+
+	unsigned char msg[32];
+
+	while ((token = next_token(rdr, false)) != NULL) {
+		if (strcmp(token, "version") == 0)
+			error = next_u8(rdr, "version", &_version);
+		else if (strcmp(token, "pdu-type") == 0)
+			error = next_u8(rdr, "pdu-type", &pdu_type);
+		else if (strcmp(token, "zero1") == 0)
+			error = next_u16(rdr, "zero1", &zero1);
+		else if (strcmp(token, "length") == 0)
+			error = next_u32(rdr, "length", &length);
+		else if (strcmp(token, "flags") == 0)
+			error = next_u8(rdr, "flags", &flags);
+		else if (strcmp(token, "plen") == 0)
+			error = next_u8(rdr, "plen", &plen);
+		else if (strcmp(token, "maxlen") == 0)
+			error = next_u8(rdr, "maxlen", &maxlen);
+		else if (strcmp(token, "zero2") == 0)
+			error = next_u8(rdr, "zero2", &zero2);
+		else if (strcmp(token, "prefix") == 0)
+			error = next_addr(rdr, "prefix", af, &pref);
+		else if (strcmp(token, "as") == 0)
+			error = next_u32(rdr, "as", &as);
+		else {
+			pr_err("Unknown token: %s", token);
+			return;
+		}
+		if (error)
+			return;
+	}
+
+	add_u8(&msg[0], _version);
+	add_u8(&msg[1], pdu_type);
+	add_u16(&msg[2], zero1);
+	add_u32(&msg[4], length);
+	add_u8(&msg[8], flags);
+	add_u8(&msg[9], plen);
+	add_u8(&msg[10], maxlen);
+	add_u8(&msg[11], zero2);
+
+	switch (af) {
+	case AF_INET:
+		add_u32(&msg[12], ntohl(pref.v4.s_addr));
+		add_u32(&msg[16], as);
+		pr_trace("Sending IPv4 Prefix PDU.");
+		full_write(msg, 20);
+		break;
+	case AF_INET6:
+		for (i = 0; i < 16; i++)
+			add_u8(&msg[12 + i], pref.v6.s6_addr[i]);
+		add_u32(&msg[28], as);
+		pr_trace("Sending IPv6 Prefix PDU.");
+		full_write(msg, 32);
+		break;
+	}
+}
+
 static int
 send_infile_commands(void)
 {
@@ -590,9 +711,19 @@ send_infile_commands(void)
 		if (strcmp(token, "version") == 0)
 			next_u8(&rdr, "version", &version);
 		else if (strcmp(token, "reset-query") == 0 || strcmp(token, "reset") == 0)
-			send_reset_query(&rdr);
+			send_reset_query(&rdr, 2, "zero", 0);
 		else if (strcmp(token, "serial-query") == 0 || strcmp(token, "serial") == 0)
-			send_serial_query(&rdr);
+			send_serial_query(&rdr, 1);
+		else if (strcmp(token, "serial-notify") == 0)
+			send_serial_query(&rdr, 0);
+		else if (strcmp(token, "cache-response") == 0)
+			send_reset_query(&rdr, 3, "session", atomic_load(&session));
+		else if (strcmp(token, "ipv4-prefix") == 0)
+			send_ip_prefix(&rdr, AF_INET);
+		else if (strcmp(token, "ipv6-prefix") == 0)
+			send_ip_prefix(&rdr, AF_INET6);
+		else if (strcmp(token, "cache-reset") == 0)
+			send_reset_query(&rdr, 8, "zero", 0);
 		else if (strcmp(token, "help") == 0)
 			print_command_help();
 		else if (strcmp(token, "exit") == 0)
@@ -924,7 +1055,7 @@ print_pdu_ipv4_prefix(unsigned char *hdr)
 	int error;
 
 	printf("ipv4-prefix    ");
-	remainder = print_hdr1(hdr, "zero");
+	remainder = print_hdr1(hdr, "zero1");
 
 	if (remainder < 1)
 		goto done;
@@ -946,7 +1077,7 @@ print_pdu_ipv4_prefix(unsigned char *hdr)
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("zero", &remainder);
+	error = print_u8("zero2", &remainder);
 	if (error)
 		return error;
 
@@ -972,7 +1103,7 @@ print_pdu_ipv6_prefix(unsigned char *hdr)
 	int error;
 
 	printf("ipv6-prefix    ");
-	remainder = print_hdr1(hdr, "zero");
+	remainder = print_hdr1(hdr, "zero1");
 
 	if (remainder < 1)
 		goto done;
@@ -994,7 +1125,7 @@ print_pdu_ipv6_prefix(unsigned char *hdr)
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("zero", &remainder);
+	error = print_u8("zero2", &remainder);
 	if (error)
 		return error;
 
