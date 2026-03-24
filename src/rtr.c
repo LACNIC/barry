@@ -295,7 +295,7 @@ format2str(enum output_format f)
 {
 	switch (f) {
 	case OF_PDU:		return "pdu";
-	case OF_RAPPORT:	return "pdu";
+	case OF_RAPPORT:	return "rapport";
 	default:		return NULL;
 	}
 }
