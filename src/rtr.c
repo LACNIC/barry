@@ -12,6 +12,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "alloc.h"
 #include "print.h"
 
 enum output_format {
@@ -63,8 +64,8 @@ static void
 print_help(void)
 {
 	printf("Usage:\n");
-	printf("  barry-rtr [%s-h%s] [%s-v%s[%sv%s]] [%s-c%s] [%s-f%s<format>%s] [%s-i%s<input-source>%s] \\\n", flg, rst, flg, rst, flg, rst, flg, rst, flg, var, rst, flg, var, rst);
-	printf("      [%s-V%s<version>%s] [%s-s%s<session>%s] [%s-l%s<serial>%s] \\\n", flg, var, rst, flg, var, rst, flg, var, rst);
+	printf("  barry-rtr [%s-h%s] [%s-v%s[%sv%s]] [%s-c%s] [%s-f%s<format>%s] [%s-i%s<input-source>%s]\n", flg, rst, flg, rst, flg, rst, flg, rst, flg, var, rst, flg, var, rst);
+	printf("      [%s-V%s<version>%s] [%s-s%s<session>%s] [%s-l%s<serial>%s]\n", flg, var, rst, flg, var, rst, flg, var, rst);
 	printf("      %s<action>%s %s<server>%s [%s<port>%s]\n", var, rst, var, rst, var, rst);
 	printf("\n");
 	printf("%s<action>%s is either '%sreset%s', '%sserial%s' or '%sinteractive%s'.\n", var, rst, enm, rst, enm, rst, enm, rst);
@@ -88,7 +89,7 @@ print_help(void)
 	printf("  %s-f%s sets output format:\n", flg, rst);
 	printf("    * '%spdu%s': Print exhaustive PDU stream (default)\n", enm, rst);
 	printf("    * '%srapport%s': Print resources only\n", enm, rst);
-	printf("  %s-V%s sets RTR version number (Default: %u)\n", flg, rst, version);
+	printf("  %s-V%s sets RTR version number (Default: Latest supported)\n", flg, rst);
 	printf("  %s-s%s sets the session ID (Default: %u)\n", flg, rst, atomic_load(&session));
 	printf("     (Effective in '%sserial%s' and '%sinteractive%s' modes only)\n", enm, rst, enm, rst);
 	printf("  %s-l%s sets the request's serial\n", flg, rst);
@@ -103,57 +104,69 @@ print_help(void)
 static void
 print_command_help(void)
 {
-	printf("%sversion%s %s<VER>%s\n", cmd, rst, var, rst);
-	printf("  Sets the default RTR version number sent by all subsequent PDUs.\n");
-	printf("  %s<VER>%s: unsigned 8-bit integer. Default: %s--version%s (%s-V%s)\n", var, rst, flg, rst, flg, rst);
+	printf("Values surrounded by %s<angular quotation marks>%s are defaults.\n", var, rst);
 	printf("\n");
-	printf("%sreset-query%s [version %s<RV>%s] [pdu-type %s<RT>%s] [zero %s<RZ>%s] [length %s<RL>%s]\n",
-	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
-	printf("  Sends a Reset Query PDU to the server. Arguments are header fields.\n");
-	printf("  %s<RV>%s: unsigned  8-bit integer. Default: %s<VER>%s\n", var, rst, var, rst);
-	printf("  %s<RT>%s: unsigned  8-bit integer. Default: 2\n", var, rst);
-	printf("  %s<RZ>%s: unsigned 16-bit integer. Default: 0\n", var, rst);
-	printf("  %s<RL>%s: unsigned 32-bit integer. Default: 8\n", var, rst);
+
+	printf("Metacommands:\n");
 	printf("\n");
-	printf("%sserial-query%s [version %s<SV>%s] [pdu-type %s<ST>%s] [session %s<SS>%s] \\\n",
-	    cmd, rst, var, rst, var, rst, var, rst);
-	printf("             [length %s<SL>%s] [serial %s<SE>%s]\n", var, rst, var, rst);
-	printf("  Sends a Serial Query PDU to the server. Arguments are header fields.\n");
-	printf("  %s<SV>%s: unsigned  8-bit integer. Default: %s<VER>%s\n", var, rst, var, rst);
-	printf("  %s<ST>%s: unsigned  8-bit integer. Default: 1\n", var, rst);
-	printf("  %s<SS>%s: unsigned 16-bit integer. Default: 0\n", var, rst);
-	printf("    The default value is overridden by the actual session number\n");
-	printf("    whenever the server announces it.\n");
-	printf("  %s<SL>%s: unsigned 32-bit integer. Default: 12\n", var, rst);
-	printf("  %s<SE>%s: unsigned 32-bit integer. Default: 0\n", var, rst);
-	printf("\n");
-	printf("%sserial-notify%s [version %su8%s] [pdu-type %su8%s] [session %su16%s] [length %su32%s] \\\n",
-	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
-	printf("              [serial %su32%s]\n", var, rst);
-	printf("  Sends a Serial Notify PDU to the server.\n  Arguments are header fields.\n\n");
-	printf("%scache-response%s [version %su8%s] [pdu-type %su8%s] [session %su16%s] [length %su32%s]\n",
-	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
-	printf("  Sends a Cache Response PDU to the server.\n  Arguments are header fields.\n\n");
-	printf("%sipv4-prefix%s [version %su8%s] [pdu-type %su8%s] [zero1 %su16%s] [length %su32%s] \\\n",
-	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
-	printf("            [flags %su8%s] [plen %su8%s] [maxlen %su8%s] [zero2 %su8%s] \\\n",
-	    var, rst, var, rst, var, rst, var, rst);
-	printf("            [prefix %saddr4%s] [as %su32%s]\n", var, rst, var, rst);
-	printf("  Sends an IPv4 Prefix PDU to the server.\n  Arguments are header fields.\n\n");
-	printf("%sipv6-prefix%s [version %su8%s] [pdu-type %su8%s] [zero1 %su16%s] [length %su32%s] \\\n",
-	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
-	printf("            [flags %su8%s] [plen %su8%s] [maxlen %su8%s] [zero2 %su8%s] \\\n",
-	    var, rst, var, rst, var, rst, var, rst);
-	printf("            [prefix %saddr6%s] [as %su32%s]\n", var, rst, var, rst);
-	printf("  Sends an IPv6 Prefix PDU to the server.\n  Arguments are header fields.\n\n");
-	printf("%scache-reset%s [version %su8%s] [pdu-type %su8%s] [zero %su16%s] [length %su32%s]\n",
-	    cmd, rst, var, rst, var, rst, var, rst, var, rst);
-	printf("  Sends a Cache Reset PDU to the server.\n  Arguments are header fields.\n\n");
+
+	printf("%sversion%s %s<%s-V%s>%s\n", cmd, rst, var, flg, var, rst);
+	printf("   Sets the default RTR version number sent by all subsequent PDUs.\n");
 	printf("%shelp%s\n", cmd, rst);
-	printf("  Prints this wall of text.\n");
-	printf("\n");
+	printf("   Prints this wall of text.\n");
 	printf("%sexit%s\n", cmd, rst);
-	printf("  Quits.\n");
+	printf("   Quits.\n");
+	printf("\n");
+
+	printf("PDU dispatching:\n");
+	printf("\n");
+
+	printf("%sreset-query%s    [version %s<%s-V%s>%s] [type %s<2>%s] [zero       %s<0>%s] [length  %s<8>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("%sserial-query%s   [version %s<%s-V%s>%s] [type %s<1>%s] [session %s<auto>%s] [length %s<12>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("               [serial %s<1>%s]\n", var, rst);
+	printf("%sserial-notify%s  [version %s<%s-V%s>%s] [type %s<0>%s] [session %s<auto>%s] [length %s<12>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("               [serial %s<1>%s]\n", var, rst);
+	printf("%scache-response%s [version %s<%s-V%s>%s] [type %s<3>%s] [session %s<auto>%s] [length  %s<8>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("%sipv4-prefix%s    [version %s<%s-V%s>%s] [type %s<4>%s] [zero1      %s<0>%s] [length %s<20>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("               [flags %s<1>%s] [plen %s<0>%s] [maxlen %s<0>%s] [zero2 %s<0>%s]\n",
+	    var, rst, var, rst, var, rst, var, rst);
+	printf("               [prefix %s<0.0.0.0>%s] [as %s<0>%s]\n", var, rst, var, rst);
+	printf("%sipv6-prefix%s    [version %s<%s-V%s>%s] [type %s<6>%s] [zero1      %s<0>%s] [length %s<32>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("               [flags %s<1>%s] [plen %s<0>%s] [maxlen %s<0>%s] [zero2 %s<0>%s]\n",
+	    var, rst, var, rst, var, rst, var, rst);
+	printf("               [prefix %s<::>%s] [as %s<0>%s]\n", var, rst, var, rst);
+	printf("%send-of-data%s    [version %s<%s-V%s>%s] [type %s<7>%s] [session %s<auto>%s] [length %s<auto>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("               [serial %s<1>%s] [refresh %s<3600>%s] [retry %s<600>%s] [expire %s<7200>%s]\n",
+	    var, rst, var, rst, var, rst, var, rst);
+	printf("%scache-reset%s    [version %s<%s-V%s>%s] [type %s<8>%s] [zero %s<0>%s] [length %s<8>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("%srouter-key%s     [version %s<%s-V%s>%s] [type %s<9>%s] [flags %s<1>%s] [zero %s<0>%s] [length %s<auto>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("               [ski %s<0x00/160>%s] [as %s<0>%s] [spki %s<>%s]\n", var, rst, var, rst, var, rst);
+	printf("\n");
+
+	printf("The default value of %s-V%s is the latest supported RTR version.\n", flg, rst);
+	printf("At the moment, this is 2.\n");
+	printf("\n");
+
+	printf("The default value of 'session' is overridden by the actual session number\n");
+	printf("whenever the server announces it.\n");
+	printf("\n");
+
+	printf("If 'serial', 'refresh', 'retry' and/or 'expire' are defined in %send-of-data%s,\n", enm, rst);
+	printf("they are all included. Otherwise they are all excluded.\n");
+	printf("The default value of 'length' automatically adapts.\n");
+	printf("\n");
+
+	printf("The default value of %srouter-key%s 'length' is 32 + 'ski' length.\n", enm, rst);
+	printf("\n");
 }
 
 static int
@@ -262,6 +275,45 @@ next_addr(struct line_reader *rdr, char const *what, int af, void *value)
 
 	pr_err("Unknown inet_pton() result: %d", res);
 	return EINVAL;
+}
+
+static unsigned int
+chr2hex(char chr)
+{
+	if ('0' <= chr && chr <= '9')
+		return chr - '0';
+	if ('a' <= chr && chr <= 'f')
+		return chr - 'a' + 10;
+	if ('A' <= chr && chr <= 'F')
+		return chr - 'A' + 10;
+	return 32;
+}
+
+static int
+next_bytes(struct line_reader *rdr, char const *what,
+    unsigned char **res, size_t *reslen)
+{
+	char *token;
+	size_t token_len;
+	unsigned char *buf;
+	size_t buflen;
+	size_t i;
+
+	token = next_token(rdr, false);
+	token_len = strlen(token);
+	if (token_len & 1) {
+		pr_err("Byte array '%s' needs an even number of digits.", what);
+		return EINVAL;
+	}
+
+	buflen = token_len / 2;
+	buf = pmalloc(buflen);
+	for (i = 0; i < buflen; i++)
+		buf[i] = (chr2hex(token[2*i]) << 4) + chr2hex(token[2*i + 1]);
+
+	*res = buf;
+	*reslen = buflen;
+	return 0;
 }
 
 static void
@@ -515,6 +567,15 @@ add_u32(unsigned char *msg, uint32_t u32)
 }
 
 static void
+add_hdr(unsigned char *msg, uint8_t v, uint8_t t, uint16_t f3, uint32_t l)
+{
+	add_u8(&msg[0], v);
+	add_u8(&msg[1], t);
+	add_u16(&msg[2], f3);
+	add_u32(&msg[4], l);
+}
+
+static void
 full_write(unsigned char *msg, size_t len)
 {
 	ssize_t written;
@@ -526,15 +587,18 @@ full_write(unsigned char *msg, size_t len)
 	}
 }
 
+static bool
+is_type(char const *token)
+{
+	return (strcmp(token, "type") == 0) || (strcmp(token, "pdu-type") == 0);
+}
+
 static void
 __send_reset_query(uint8_t version, uint8_t type, uint16_t zero, uint32_t len)
 {
 	unsigned char msg[8];
 
-	add_u8(&msg[0], version);
-	add_u8(&msg[1], type);
-	add_u16(&msg[2], zero);
-	add_u32(&msg[4], len);
+	add_hdr(msg, version, type, zero, len);
 
 	pr_trace("Sending 8-byte PDU.");
 	full_write(msg, sizeof(msg));
@@ -552,7 +616,7 @@ send_reset_query(struct line_reader *rdr, uint8_t pdu_type,
 	while ((token = next_token(rdr, false)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
-		else if (strcmp(token, "pdu-type") == 0)
+		else if (is_type(token))
 			error = next_u8(rdr, "pdu-type", &pdu_type);
 		else if (strcmp(token, key3) == 0)
 			error = next_u16(rdr, key3, &val3);
@@ -575,10 +639,7 @@ __send_serial_query(uint8_t version, uint8_t type, uint16_t session,
 {
 	unsigned char msg[12];
 
-	add_u8(&msg[0], version);
-	add_u8(&msg[1], type);
-	add_u16(&msg[2], session);
-	add_u32(&msg[4], len);
+	add_hdr(msg, version, type, session, len);
 	add_u32(&msg[8], serial);
 
 	pr_trace("Sending 12-byte PDU.");
@@ -591,14 +652,14 @@ send_serial_query(struct line_reader *rdr, uint8_t pdu_type)
 	uint8_t _version = version;
 	uint16_t _session = atomic_load(&session);
 	uint32_t length = 12;
-	uint32_t serial = 0;
+	uint32_t serial = 1;
 	char *token;
 	int error = 0;
 
 	while ((token = next_token(rdr, false)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
-		else if (strcmp(token, "pdu-type") == 0)
+		else if (is_type(token))
 			error = next_u8(rdr, "pdu-type", &pdu_type);
 		else if (strcmp(token, "session") == 0)
 			error = next_u16(rdr, "session", &_session);
@@ -642,7 +703,7 @@ send_ip_prefix(struct line_reader *rdr, int af)
 	while ((token = next_token(rdr, false)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
-		else if (strcmp(token, "pdu-type") == 0)
+		else if (is_type(token))
 			error = next_u8(rdr, "pdu-type", &pdu_type);
 		else if (strcmp(token, "zero1") == 0)
 			error = next_u16(rdr, "zero1", &zero1);
@@ -668,10 +729,7 @@ send_ip_prefix(struct line_reader *rdr, int af)
 			return;
 	}
 
-	add_u8(&msg[0], _version);
-	add_u8(&msg[1], pdu_type);
-	add_u16(&msg[2], zero1);
-	add_u32(&msg[4], length);
+	add_hdr(msg, _version, pdu_type, zero1, length);
 	add_u8(&msg[8], flags);
 	add_u8(&msg[9], plen);
 	add_u8(&msg[10], maxlen);
@@ -692,6 +750,137 @@ send_ip_prefix(struct line_reader *rdr, int af)
 		full_write(msg, 32);
 		break;
 	}
+}
+
+static void
+send_end_of_data(struct line_reader *rdr)
+{
+	uint8_t _version = version;
+	uint8_t pdu_type = 7;
+	uint16_t _session = atomic_load(&session);
+	uint32_t length = 8;
+	bool length_overridden = false;
+	bool extended = false;
+	uint32_t serial = 1;
+	uint32_t refresh = 3600;
+	uint32_t retry = 600;
+	uint32_t expire = 7200;
+	char *token;
+	int error = 0;
+	unsigned char msg[24];
+
+	while ((token = next_token(rdr, false)) != NULL) {
+		if (strcmp(token, "version") == 0)
+			error = next_u8(rdr, "version", &_version);
+		else if (is_type(token))
+			error = next_u8(rdr, "pdu-type", &pdu_type);
+		else if (strcmp(token, "session") == 0)
+			error = next_u16(rdr, "session", &_session);
+		else if (strcmp(token, "length") == 0) {
+			error = next_u32(rdr, "length", &length);
+			length_overridden = true;
+		} else if (strcmp(token, "serial") == 0) {
+			error = next_u32(rdr, "serial", &serial);
+			extended = true;
+		} else if (strcmp(token, "refresh") == 0) {
+			error = next_u32(rdr, "refresh", &refresh);
+			extended = true;
+		} else if (strcmp(token, "retry") == 0) {
+			error = next_u32(rdr, "retry", &retry);
+			extended = true;
+		} else if (strcmp(token, "expire") == 0) {
+			error = next_u32(rdr, "expire", &expire);
+			extended = true;
+		} else {
+			pr_err("Unknown token: %s", token);
+			return;
+		}
+		if (error)
+			return;
+	}
+
+	if (!length_overridden)
+		length = extended ? 24 : 8;
+	add_hdr(msg, version, pdu_type, _session, length);
+	if (extended) {
+		add_u32(&msg[8], serial);
+		add_u32(&msg[12], refresh);
+		add_u32(&msg[16], retry);
+		add_u32(&msg[20], expire);
+		pr_trace("Sending extended End of Data PDU.");
+		full_write(msg, 24);
+	} else {
+		pr_trace("Sending simple End of Data PDU.");
+		full_write(msg, 8);
+	}
+}
+
+static void
+send_router_key(struct line_reader *rdr)
+{
+	uint8_t _version = version;
+	uint8_t pdu_type = 9;
+	uint8_t flags = 1;
+	uint8_t zero = 0;
+	uint32_t length = 0;
+	bool length_overridden = false;
+	unsigned char *ski = NULL;
+	size_t ski_len = 0;
+	uint32_t as = 0;
+	unsigned char *spki = NULL;
+	size_t spki_len = 0;
+	char *token;
+	size_t i;
+	int error = 0;
+	unsigned char *msg;
+
+	while ((token = next_token(rdr, false)) != NULL) {
+		if (strcmp(token, "version") == 0)
+			error = next_u8(rdr, "version", &_version);
+		else if (is_type(token))
+			error = next_u8(rdr, "pdu-type", &pdu_type);
+		else if (strcmp(token, "flags") == 0)
+			error = next_u8(rdr, "flags", &flags);
+		else if (strcmp(token, "zero") == 0)
+			error = next_u8(rdr, "zero", &zero);
+		else if (strcmp(token, "length") == 0) {
+			error = next_u32(rdr, "length", &length);
+			length_overridden = true;
+		} else if (strcmp(token, "ski") == 0)
+			error = next_bytes(rdr, "ski", &ski, &ski_len);
+		else if (strcmp(token, "as") == 0)
+			error = next_u32(rdr, "as", &as);
+		else if (strcmp(token, "spki") == 0)
+			error = next_bytes(rdr, "spki", &spki, &spki_len);
+		else {
+			pr_err("Unknown token: %s", token);
+			return;
+		}
+		if (error)
+			return;
+	}
+
+	if (!length_overridden)
+		length = 32 + spki_len;
+	if (ski_len > 20) {
+		pr_warn("The Subject Key Identifier is too long; truncating.");
+		ski_len = 20;
+	}
+
+	msg = pzalloc(32 + spki_len);
+	add_hdr(msg, version, pdu_type, (flags << 8) | zero, length);
+	for (i = 0; i < ski_len; i++)
+		msg[8 + i] = ski[i];
+	free(ski);
+	add_u32(&msg[28], as);
+	for (i = 0; i < spki_len; i++)
+		msg[32 + i] = spki[i];
+	free(spki);
+
+	pr_trace("Sending Router Key PDU.");
+	full_write(msg, 32 + spki_len);
+
+	free(msg);
 }
 
 static int
@@ -722,8 +911,16 @@ send_infile_commands(void)
 			send_ip_prefix(&rdr, AF_INET);
 		else if (strcmp(token, "ipv6-prefix") == 0)
 			send_ip_prefix(&rdr, AF_INET6);
+		else if (strcmp(token, "end-of-data") == 0)
+			send_end_of_data(&rdr);
 		else if (strcmp(token, "cache-reset") == 0)
 			send_reset_query(&rdr, 8, "zero", 0);
+		else if (strcmp(token, "router-key") == 0)
+			send_router_key(&rdr);
+//		else if (strcmp(token, "error-report") == 0)
+//			send_error_report(&rdr);
+//		else if (strcmp(token, "aspa-pdu") == 0)
+//			send_aspa_pdu(&rdr);
 		else if (strcmp(token, "help") == 0)
 			print_command_help();
 		else if (strcmp(token, "exit") == 0)
@@ -988,6 +1185,7 @@ print_hex(char const *pfx, size_t len)
 			printf("%02x", buf[i]);
 		len -= consumed;
 	}
+	printf(" ");
 
 	return 0;
 }
@@ -1198,10 +1396,10 @@ print_pdu_router_key(unsigned char *hdr)
 
 	if (remainder < 24)
 		goto end;
-	error = print_hex("ski", 24);
+	error = print_hex("ski", 20);
 	if (error)
 		return error;
-	remainder -= 24;
+	remainder -= 20;
 
 	if (remainder < 4)
 		goto end;
