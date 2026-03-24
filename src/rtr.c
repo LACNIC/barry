@@ -468,21 +468,21 @@ connect_socket(void)
 	for (alt = alternatives; alt != NULL; alt = alt->ai_next) {
 		rtrfd = socket(alt->ai_family, alt->ai_socktype, alt->ai_protocol);
 		if (rtrfd < 0) {
-			pr_err("socket(%s, %s): %s\n", server, port,
+			pr_err("socket(%s, %s): %s", server, port,
 			    strerror(errno));
 			continue;
 		}
 		if (connect(rtrfd, alt->ai_addr, alt->ai_addrlen) != -1)
 			break; /* Success */
 
-		pr_err("connect(%s, %s): %s\n", server, port, strerror(errno));
+		pr_err("connect(%s, %s): %s", server, port, strerror(errno));
 		close(rtrfd);
 	}
 
 	freeaddrinfo(alternatives);
 
 	if (!alt)
-		panic("None of the addrinfo candidates could connect.\n");
+		panic("None of the addrinfo candidates could connect.");
 }
 
 static void
