@@ -10,6 +10,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#define STACK_SIZE 64
+
+void
+print_stack_trace(void)
+{
+	void *array[STACK_SIZE];
+	size_t size;
+
+	size = backtrace(array, STACK_SIZE);
+	backtrace_symbols_fd(array, size, STDERR_FILENO);
+}
+
 static void
 sigsegv_handler(int signum)
 {
@@ -24,12 +36,7 @@ sigsegv_handler(int signum)
 	 * (Man, I wish POSIX standards were easier to link to.)
 	 */
 
-#define STACK_SIZE 64
-	void *array[STACK_SIZE];
-	size_t size;
-
-	size = backtrace(array, STACK_SIZE);
-	backtrace_symbols_fd(array, size, STDERR_FILENO);
+	print_stack_trace();
 
 	/* Trigger default handler. */
 	signal(signum, SIG_DFL);

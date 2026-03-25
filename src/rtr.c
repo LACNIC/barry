@@ -27,7 +27,7 @@ static enum output_format format;
 static uint8_t version = 2;
 static atomic_uint session;
 static uint32_t serial;
-char const *input;
+static char const *input;
 
 static FILE *infile; /* (Interactive) input file */
 
@@ -49,7 +49,29 @@ struct line_reader {
 	char *line;
 	size_t lsize;
 	char *saveptr;
+	unsigned int lvl;
 };
+
+#define PDUBUFLEN 1024
+
+struct pdu {
+	int fd;
+	unsigned char buf[PDUBUFLEN];
+	size_t len;
+	size_t offset; /* read offset */
+};
+
+typedef struct pdu *(*create_pdu_cb)(struct line_reader *);
+typedef int (*print_pdu_cb)(struct pdu *, unsigned char *);
+
+static create_pdu_cb get_create_pdu_cb(char const *);
+static print_pdu_cb get_print_pdu_cb(unsigned char);
+
+static bool
+streq(char const *str1, char const *str2)
+{
+	return strcmp(str1, str2) == 0;
+}
 
 static char *
 next_token(struct line_reader *rdr, bool first)
@@ -57,7 +79,7 @@ next_token(struct line_reader *rdr, bool first)
 	char *token;
 	token = strtok_r(first ? rdr->line : NULL, " \t\n", &rdr->saveptr);
 	pr_trace("Received token: %s", token);
-	return token;
+	return (rdr->lvl > 0 && streq(token, "]")) ? NULL : token;
 }
 
 static void
@@ -251,6 +273,13 @@ static int
 next_u32(struct line_reader *rdr, char const *what, uint32_t *value)
 {
 	return parse_u32(what, next_token(rdr, false), value);
+}
+
+static int
+next_string(struct line_reader *rdr, char const *what, char const **value)
+{
+	*value = next_token(rdr, false); /* TODO Fast-assed */
+	return 0;
 }
 
 static int
@@ -544,35 +573,29 @@ close_socket(void)
 	close(rtrfd);
 }
 
-static void
-add_u8(unsigned char *msg, uint8_t u8)
+static size_t
+add_u8(struct pdu *pdu, size_t offset, uint8_t u8)
 {
-	msg[0] = u8;
+	pdu->buf[offset] = u8;
+	return 1;
 }
 
-static void
-add_u16(unsigned char *msg, uint16_t u16)
+static size_t
+add_u16(struct pdu *pdu, size_t offset, uint16_t u16)
 {
-	msg[0] = (u16 >> 8) & 0xFFu;
-	msg[1] = (u16 >> 0) & 0xFFu;
+	pdu->buf[offset    ] = (u16 >> 8) & 0xFFu;
+	pdu->buf[offset + 1] = (u16 >> 0) & 0xFFu;
+	return 2;
 }
 
-static void
-add_u32(unsigned char *msg, uint32_t u32)
+static size_t
+add_u32(struct pdu *pdu, size_t offset, uint32_t u32)
 {
-	msg[0] = (u32 >> 24) & 0xFFu;
-	msg[1] = (u32 >> 16) & 0xFFu;
-	msg[2] = (u32 >>  8) & 0xFFu;
-	msg[3] = (u32 >>  0) & 0xFFu;
-}
-
-static void
-add_hdr(unsigned char *msg, uint8_t v, uint8_t t, uint16_t f3, uint32_t l)
-{
-	add_u8(&msg[0], v);
-	add_u8(&msg[1], t);
-	add_u16(&msg[2], f3);
-	add_u32(&msg[4], l);
+	pdu->buf[offset    ] = (u32 >> 24) & 0xFFu;
+	pdu->buf[offset + 1] = (u32 >> 16) & 0xFFu;
+	pdu->buf[offset + 2] = (u32 >>  8) & 0xFFu;
+	pdu->buf[offset + 3] = (u32 >>  0) & 0xFFu;
+	return 4;
 }
 
 static void
@@ -593,19 +616,29 @@ is_type(char const *token)
 	return (strcmp(token, "type") == 0) || (strcmp(token, "pdu-type") == 0);
 }
 
-static void
-__send_reset_query(uint8_t version, uint8_t type, uint16_t zero, uint32_t len)
+static struct pdu *
+create_pdu(size_t size, uint8_t v, uint8_t t, uint16_t f3, uint32_t l)
 {
-	unsigned char msg[8];
+	struct pdu *res;
 
-	add_hdr(msg, version, type, zero, len);
+	if (size > PDUBUFLEN)
+		panic("PDU length %zu > %u", size, PDUBUFLEN);
 
-	pr_trace("Sending 8-byte PDU.");
-	full_write(msg, sizeof(msg));
+	res = pmalloc(sizeof(struct pdu));
+	res->fd = -1;
+	res->len = size;
+	res->offset = 0;
+
+	add_u8(res, 0, v);
+	add_u8(res, 1, t);
+	add_u16(res, 2, f3);
+	add_u32(res, 4, l);
+
+	return res;
 }
 
-static void
-send_reset_query(struct line_reader *rdr, uint8_t pdu_type,
+static struct pdu *
+create_8pdu(struct line_reader *rdr, uint8_t pdu_type,
     char const *key3, uint16_t val3)
 {
 	uint8_t _version = version;
@@ -624,36 +657,24 @@ send_reset_query(struct line_reader *rdr, uint8_t pdu_type,
 			error = next_u32(rdr, "length", &length);
 		else {
 			pr_err("Unknown token: %s", token);
-			return;
+			return NULL;
 		}
 		if (error)
-			return;
+			return NULL;
 	}
 
-	__send_reset_query(_version, pdu_type, val3, length);
+	return create_pdu(8, _version, pdu_type, val3, length);
 }
 
-static void
-__send_serial_query(uint8_t version, uint8_t type, uint16_t session,
-    uint32_t len, uint32_t serial)
-{
-	unsigned char msg[12];
-
-	add_hdr(msg, version, type, session, len);
-	add_u32(&msg[8], serial);
-
-	pr_trace("Sending 12-byte PDU.");
-	full_write(msg, sizeof(msg));
-}
-
-static void
-send_serial_query(struct line_reader *rdr, uint8_t pdu_type)
+static struct pdu *
+create_12pdu(struct line_reader *rdr, uint8_t pdu_type)
 {
 	uint8_t _version = version;
 	uint16_t _session = atomic_load(&session);
 	uint32_t length = 12;
 	uint32_t serial = 1;
 	char *token;
+	struct pdu *pdu;
 	int error = 0;
 
 	while ((token = next_token(rdr, false)) != NULL) {
@@ -669,17 +690,19 @@ send_serial_query(struct line_reader *rdr, uint8_t pdu_type)
 			error = next_u32(rdr, "serial", &serial);
 		else {
 			pr_err("Unknown token: %s", token);
-			return;
+			return NULL;
 		}
 		if (error)
-			return;
+			return NULL;
 	}
 
-	__send_serial_query(_version, pdu_type, _session, length, serial);
+	pdu = create_pdu(12, _version, pdu_type, _session, length);
+	add_u32(pdu, 8, serial);
+	return pdu;
 }
 
-static void
-send_ip_prefix(struct line_reader *rdr, int af)
+static struct pdu *
+create_ip_prefix_pdu(struct line_reader *rdr, int af)
 {
 	uint8_t _version = version;
 	uint8_t pdu_type = (af == AF_INET) ? 4 : 6;
@@ -695,10 +718,9 @@ send_ip_prefix(struct line_reader *rdr, int af)
 	} pref = { 0 };
 	uint32_t as = 0;
 	char *token;
-	int error = 0;
+	struct pdu *pdu;
 	size_t i;
-
-	unsigned char msg[32];
+	int error = 0;
 
 	while ((token = next_token(rdr, false)) != NULL) {
 		if (strcmp(token, "version") == 0)
@@ -723,37 +745,80 @@ send_ip_prefix(struct line_reader *rdr, int af)
 			error = next_u32(rdr, "as", &as);
 		else {
 			pr_err("Unknown token: %s", token);
-			return;
+			return NULL;
 		}
 		if (error)
-			return;
+			return NULL;
 	}
-
-	add_hdr(msg, _version, pdu_type, zero1, length);
-	add_u8(&msg[8], flags);
-	add_u8(&msg[9], plen);
-	add_u8(&msg[10], maxlen);
-	add_u8(&msg[11], zero2);
 
 	switch (af) {
 	case AF_INET:
-		add_u32(&msg[12], ntohl(pref.v4.s_addr));
-		add_u32(&msg[16], as);
-		pr_trace("Sending IPv4 Prefix PDU.");
-		full_write(msg, 20);
+		pdu = create_pdu(20, _version, pdu_type, zero1, length);
+		add_u8(pdu, 8, flags);
+		add_u8(pdu, 9, plen);
+		add_u8(pdu, 10, maxlen);
+		add_u8(pdu, 11, zero2);
+		add_u32(pdu, 12, ntohl(pref.v4.s_addr));
+		add_u32(pdu, 16, as);
 		break;
+
 	case AF_INET6:
+		pdu = create_pdu(32, _version, pdu_type, zero1, length);
+		add_u8(pdu, 8, flags);
+		add_u8(pdu, 9, plen);
+		add_u8(pdu, 10, maxlen);
+		add_u8(pdu, 11, zero2);
 		for (i = 0; i < 16; i++)
-			add_u8(&msg[12 + i], pref.v6.s6_addr[i]);
-		add_u32(&msg[28], as);
-		pr_trace("Sending IPv6 Prefix PDU.");
-		full_write(msg, 32);
+			add_u8(pdu, 12 + i, pref.v6.s6_addr[i]);
+		add_u32(pdu, 28, as);
 		break;
+
+	default:
+		pr_err("Unknown address family: %d", af);
+		pdu = NULL;
 	}
+
+	return pdu;
 }
 
-static void
-send_end_of_data(struct line_reader *rdr)
+static struct pdu *
+create_serial_notify_pdu(struct line_reader *rdr)
+{
+	return create_12pdu(rdr, 0);
+}
+
+static struct pdu *
+create_serial_query_pdu(struct line_reader *rdr)
+{
+	return create_12pdu(rdr, 1);
+}
+
+static struct pdu *
+create_reset_query_pdu(struct line_reader *rdr)
+{
+	return create_8pdu(rdr, 2, "zero", 0);
+}
+
+static struct pdu *
+create_cache_response_pdu(struct line_reader *rdr)
+{
+	return create_8pdu(rdr, 3, "session", atomic_load(&session));
+}
+
+static struct pdu *
+create_ipv4_prefix_pdu(struct line_reader *rdr)
+{
+	return create_ip_prefix_pdu(rdr, AF_INET);
+}
+
+static struct pdu *
+create_ipv6_prefix_pdu(struct line_reader *rdr)
+{
+	return create_ip_prefix_pdu(rdr, AF_INET6);
+}
+
+static struct pdu *
+create_end_of_data_pdu(struct line_reader *rdr)
 {
 	uint8_t _version = version;
 	uint8_t pdu_type = 7;
@@ -766,8 +831,8 @@ send_end_of_data(struct line_reader *rdr)
 	uint32_t retry = 600;
 	uint32_t expire = 7200;
 	char *token;
+	struct pdu *pdu;
 	int error = 0;
-	unsigned char msg[24];
 
 	while ((token = next_token(rdr, false)) != NULL) {
 		if (strcmp(token, "version") == 0)
@@ -793,33 +858,40 @@ send_end_of_data(struct line_reader *rdr)
 			extended = true;
 		} else {
 			pr_err("Unknown token: %s", token);
-			return;
+			return NULL;
 		}
 		if (error)
-			return;
+			return NULL;
 	}
 
-	if (!length_overridden)
-		length = extended ? 24 : 8;
-	add_hdr(msg, version, pdu_type, _session, length);
 	if (extended) {
-		add_u32(&msg[8], serial);
-		add_u32(&msg[12], refresh);
-		add_u32(&msg[16], retry);
-		add_u32(&msg[20], expire);
-		pr_trace("Sending extended End of Data PDU.");
-		full_write(msg, 24);
+		if (!length_overridden)
+			length = 24;
+		pdu = create_pdu(24, version, pdu_type, _session, length);
+		add_u32(pdu, 8, serial);
+		add_u32(pdu, 12, refresh);
+		add_u32(pdu, 16, retry);
+		add_u32(pdu, 20, expire);
 	} else {
-		pr_trace("Sending simple End of Data PDU.");
-		full_write(msg, 8);
+		if (!length_overridden)
+			length = 8;
+		pdu = create_pdu(8, version, pdu_type, _session, length);
 	}
+
+	return pdu;
 }
 
-static void
-send_router_key(struct line_reader *rdr)
+static struct pdu *
+create_cache_reset_pdu(struct line_reader *rdr)
+{
+	return create_8pdu(rdr, 8, "zero", 0);
+}
+
+static struct pdu *
+create_router_key_pdu(struct line_reader *rdr)
 {
 	uint8_t _version = version;
-	uint8_t pdu_type = 9;
+	uint8_t type = 9;
 	uint8_t flags = 1;
 	uint8_t zero = 0;
 	uint32_t length = 0;
@@ -830,15 +902,14 @@ send_router_key(struct line_reader *rdr)
 	unsigned char *spki = NULL;
 	size_t spki_len = 0;
 	char *token;
-	size_t i;
+	struct pdu *pdu;
 	int error = 0;
-	unsigned char *msg;
 
 	while ((token = next_token(rdr, false)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
 		else if (is_type(token))
-			error = next_u8(rdr, "pdu-type", &pdu_type);
+			error = next_u8(rdr, "pdu-type", &type);
 		else if (strcmp(token, "flags") == 0)
 			error = next_u8(rdr, "flags", &flags);
 		else if (strcmp(token, "zero") == 0)
@@ -854,10 +925,10 @@ send_router_key(struct line_reader *rdr)
 			error = next_bytes(rdr, "spki", &spki, &spki_len);
 		else {
 			pr_err("Unknown token: %s", token);
-			return;
+			return NULL;
 		}
 		if (error)
-			return;
+			return NULL;
 	}
 
 	if (!length_overridden)
@@ -867,20 +938,175 @@ send_router_key(struct line_reader *rdr)
 		ski_len = 20;
 	}
 
-	msg = pzalloc(32 + spki_len);
-	add_hdr(msg, version, pdu_type, (flags << 8) | zero, length);
-	for (i = 0; i < ski_len; i++)
-		msg[8 + i] = ski[i];
+	pdu = create_pdu(32 + spki_len, version, type, (flags << 8) | zero, length);
+	memcpy(pdu->buf + 8, ski, ski_len);
 	free(ski);
-	add_u32(&msg[28], as);
-	for (i = 0; i < spki_len; i++)
-		msg[32 + i] = spki[i];
+	add_u32(pdu, 28, as);
+	memcpy(pdu->buf + 32, spki, spki_len);
 	free(spki);
 
-	pr_trace("Sending Router Key PDU.");
-	full_write(msg, 32 + spki_len);
+	return pdu;
+}
 
-	free(msg);
+static struct pdu *
+create_error_report_pdu(struct line_reader *rdr)
+{
+	uint8_t _version = version;
+	uint8_t type = 10;
+	uint16_t code = 1;
+	uint32_t length = 0; /* "Length" field's value */
+	bool length_overridden = false;
+	uint32_t sublen = 0; /* "Length of Encapsulated PDU" field's value */
+	bool sublen_overridden = false;
+	struct pdu *subpdu = NULL;
+	uint32_t msglen = 0; /* "Length of Arbitrary Text" field's value */
+	bool msglen_overridden = false;
+	char const *msg = NULL;
+
+	char *token;
+	size_t size; /* Actual PDU size */
+	size_t subsize; /* Actual sub-PDU size */
+	size_t msgsize; /* Actual text length */
+	struct pdu *pdu;
+	create_pdu_cb cb;
+	int error = 0;
+
+	while ((token = next_token(rdr, false)) != NULL) {
+		if (strcmp(token, "version") == 0)
+			error = next_u8(rdr, token, &_version);
+		else if (is_type(token))
+			error = next_u8(rdr, token, &type);
+		else if (strcmp(token, "error-code") == 0)
+			error = next_u16(rdr, token, &code);
+		else if (strcmp(token, "length") == 0) {
+			error = next_u32(rdr, token, &length);
+			length_overridden = true;
+		} else if (strcmp(token, "encapsulated-pdu-length") == 0) {
+			error = next_u32(rdr, token, &sublen);
+			sublen_overridden = true;
+		} else if (strcmp(token, "encapsulated-pdu") == 0) {
+			if (subpdu != NULL)
+				free(subpdu);
+
+			token = next_token(rdr, false);
+			if (!streq(token, "[")) {
+				pr_err("Expected '[' after 'encapsulated-pdu'.");
+				goto fail;
+			}
+
+			rdr->lvl++;
+			token = next_token(rdr, false);
+			if ((cb = get_create_pdu_cb(token)) == NULL) {
+				pr_err("Unknown PDU type: %s", token);
+				goto fail;
+			}
+			subpdu = cb(rdr);
+			if (!subpdu)
+				goto fail;
+			rdr->lvl--;
+
+		} else if (strcmp(token, "error-text-length") == 0) {
+			error = next_u32(rdr, token, &msglen);
+			msglen_overridden = true;
+		} else if (streq(token, "error-text"))
+			error = next_string(rdr, token, &msg);
+		else {
+			pr_err("Unknown token: %s", token);
+			goto fail;
+		}
+		if (error)
+			goto fail;
+	}
+
+	subsize = subpdu ? subpdu->len : 0;
+	if (!sublen_overridden)
+		sublen = subsize;
+	msgsize = msg ? strlen(msg) : 0;
+	if (!msglen_overridden)
+		msglen = msgsize;
+	size = 16 + subsize + msgsize;
+	if (!length_overridden)
+		length = size;
+
+	pdu = create_pdu(size, version, type, code, length);
+	add_u32(pdu, 8, sublen);
+	if (subpdu) {
+		memcpy(pdu->buf + 12, subpdu->buf, subsize);
+		free(subpdu);
+	}
+	add_u32(pdu, 12 + subsize, msglen);
+	memcpy(pdu->buf + 16 + subsize, msg, msgsize);
+
+	return pdu;
+
+fail:	if (subpdu != NULL)
+		free(subpdu);
+	return NULL;
+}
+
+static create_pdu_cb
+get_create_pdu_cb(char const *name)
+{
+	if (streq(name, "serial-notify") || streq(name, "notify"))
+		return create_serial_notify_pdu;
+	if (streq(name, "serial-query") || streq(name, "serial"))
+		return create_serial_query_pdu;
+	if (streq(name, "reset-query") || streq(name, "reset"))
+		return &create_reset_query_pdu;
+	if (streq(name, "cache-response") || streq(name, "response"))
+		return &create_cache_response_pdu;
+	if (streq(name, "ipv4-prefix") || streq(name, "4"))
+		return &create_ipv4_prefix_pdu;
+	if (streq(name, "ipv6-prefix") || streq(name, "6"))
+		return &create_ipv6_prefix_pdu;
+	if (streq(name, "end-of-data") || streq(name, "eod"))
+		return &create_end_of_data_pdu;
+	if (streq(name, "cache-reset"))
+		return &create_cache_reset_pdu;
+	if (streq(name, "router-key") || streq(name, "rk"))
+		return &create_router_key_pdu;
+	if (streq(name, "error-report") || streq(name, "error"))
+		return &create_error_report_pdu;
+//	if (streq(name, "aspa-pdu") || streq(name, "aspa"))
+//		return &aspa;
+	return NULL;
+}
+
+static void
+send_pdu(struct pdu *pdu)
+{
+	print_pdu_cb printer;
+	size_t i;
+
+	if (!pdu)
+		return;
+
+	if (verbosity >= 2) {
+		pr_trace("Sending %zu bytes.", pdu->len);
+
+		pr_start(stdout, C_CYAN);
+		printf("Sending: ");
+		for (i = 0; i < pdu->len; i++) {
+			printf("%02x", pdu->buf[i]);
+			if ((i % 4) == 3)
+				printf(" ");
+		}
+		pr_end(stdout);
+
+		printer = get_print_pdu_cb(pdu->buf[1]);
+		if (printer) {
+			pr_start(stdout, C_CYAN);
+			printf("Sending: ");
+			pdu->offset = 8;
+			printer(pdu, pdu->buf);
+			printf("\n");
+			pr_end(stdout);
+		}
+	}
+
+	full_write(pdu->buf, pdu->len);
+
+	free(pdu);
 }
 
 static int
@@ -888,43 +1114,25 @@ send_infile_commands(void)
 {
 	struct line_reader rdr = { 0 };
 	char *token;
+	create_pdu_cb cb;
 	int error;
 
 	pr_trace("Ready.");
 
 	while (getline(&rdr.line, &rdr.lsize, infile) != -1) {
+		rdr.lvl = 0;
 		token = next_token(&rdr, true);
 		if (!token)
 			continue;
 
 		if (strcmp(token, "version") == 0)
 			next_u8(&rdr, "version", &version);
-		else if (strcmp(token, "reset-query") == 0 || strcmp(token, "reset") == 0)
-			send_reset_query(&rdr, 2, "zero", 0);
-		else if (strcmp(token, "serial-query") == 0 || strcmp(token, "serial") == 0)
-			send_serial_query(&rdr, 1);
-		else if (strcmp(token, "serial-notify") == 0)
-			send_serial_query(&rdr, 0);
-		else if (strcmp(token, "cache-response") == 0)
-			send_reset_query(&rdr, 3, "session", atomic_load(&session));
-		else if (strcmp(token, "ipv4-prefix") == 0)
-			send_ip_prefix(&rdr, AF_INET);
-		else if (strcmp(token, "ipv6-prefix") == 0)
-			send_ip_prefix(&rdr, AF_INET6);
-		else if (strcmp(token, "end-of-data") == 0)
-			send_end_of_data(&rdr);
-		else if (strcmp(token, "cache-reset") == 0)
-			send_reset_query(&rdr, 8, "zero", 0);
-		else if (strcmp(token, "router-key") == 0)
-			send_router_key(&rdr);
-//		else if (strcmp(token, "error-report") == 0)
-//			send_error_report(&rdr);
-//		else if (strcmp(token, "aspa-pdu") == 0)
-//			send_aspa_pdu(&rdr);
 		else if (strcmp(token, "help") == 0)
 			print_command_help();
 		else if (strcmp(token, "exit") == 0)
 			break;
+		else if ((cb = get_create_pdu_cb(token)) != NULL)
+			send_pdu(cb(&rdr));
 		else
 			pr_err("Unrecognized command: %s", token);
 	}
@@ -949,33 +1157,6 @@ send_infile_commands(void)
 	return 0; /* "exit" requested*/
 }
 
-static int
-full_read(unsigned char *buf, size_t size)
-{
-	ssize_t consumed;
-	int error;
-
-	do {
-		consumed = read(rtrfd, buf, size);
-		if (consumed < 0) {
-			error = errno;
-			pr_err("Cannot read server response: %s",
-			    strerror(error));
-			return error;
-		}
-		buf += consumed;
-		size -= consumed;
-	} while (size > 0);
-
-	return 0;
-}
-
-static uint8_t
-assemble_u8(unsigned char *bytes)
-{
-	return bytes[0];
-}
-
 static uint16_t
 assemble_u16(unsigned char *bytes)
 {
@@ -992,34 +1173,110 @@ assemble_u32(unsigned char *bytes)
 }
 
 static int
-print_u8(char const *pfx, size_t *remainder)
+ensure_bytes(struct pdu *pdu, size_t need)
 {
-	unsigned char buf[1];
+	ssize_t n;
+
+	if (need > sizeof(pdu->buf))
+		panic("Requested %zu bytes, buffer has %zu.",
+		    need, sizeof(pdu->buf));
+
+	if (pdu->len - pdu->offset >= need)
+		return 0;
+
+	pdu->len -= pdu->offset;
+	memmove(pdu->buf, pdu->buf + pdu->offset, pdu->len);
+	pdu->offset = 0;
+
+	do {
+		n = read(pdu->fd, pdu->buf + pdu->len,
+		    sizeof(pdu->buf) - pdu->len);
+		if (n < 0) {
+			pr_err("Can't read PDU: %s", strerror(errno));
+			print_stack_trace();
+			return errno;
+		}
+		if (n == 0)
+			return ENOENT;
+		pdu->len += n;
+	} while (pdu->len < need);
+
+	return 0;
+}
+
+static int
+read_u8(struct pdu *pdu, uint8_t *res)
+{
 	int error;
 
-	error = full_read(buf, sizeof(buf));
+	error = ensure_bytes(pdu, 1);
 	if (error)
 		return error;
 
-	printf("%s %u ", pfx, assemble_u8(buf));
+	*res = pdu->buf[pdu->offset++];
+	return 0;
+}
+
+static int
+read_u32(struct pdu *pdu, uint32_t *res)
+{
+	int error;
+
+	error = ensure_bytes(pdu, 4);
+	if (error)
+		return error;
+
+	*res = assemble_u32(&pdu->buf[pdu->offset]);
+	pdu->offset += 4;
+	return 0;
+}
+
+static int
+read_bytes(struct pdu *pdu, unsigned char *res, size_t size)
+{
+	int error;
+
+	error = ensure_bytes(pdu, size);
+	if (error)
+		return error;
+
+	memcpy(res, &pdu->buf[pdu->offset], size);
+	pdu->offset += size;
+	return 0;
+
+}
+
+static int
+print_u8(struct pdu *pdu, char const *pfx, size_t *remainder)
+{
+	uint8_t u8;
+	int error;
+
+	error = read_u8(pdu, &u8);
+	if (error)
+		return error;
+
+	printf("%s %u ", pfx, u8);
+
 	*remainder -= 1;
 	return 0;
 }
 
 static int
-print_u32(char const *pfx, size_t *remainder)
+print_u32(struct pdu *pdu, char const *pfx, size_t *remainder)
 {
-	unsigned char buf[4];
+	uint32_t u32;
 	int error;
 
-	error = full_read(buf, sizeof(buf));
+	error = read_u32(pdu, &u32);
 	if (error)
 		return error;
 
 	if (pfx)
-		printf("%s %u ", pfx, assemble_u32(buf));
+		printf("%s %u ", pfx, u32);
 	else
-		printf("%u ", assemble_u32(buf));
+		printf("%u ", u32);
+
 	*remainder -= 4;
 	return 0;
 }
@@ -1039,12 +1296,12 @@ __print_addr4(unsigned char *buf)
 }
 
 static int
-print_addr4(char const *pfx, size_t *remainder)
+print_addr4(struct pdu *pdu, char const *pfx, size_t *remainder)
 {
 	unsigned char buf[4];
 	int error;
 
-	error = full_read(buf, sizeof(buf));
+	error = read_bytes(pdu, buf, 4);
 	if (error)
 		return error;
 
@@ -1073,12 +1330,12 @@ __print_addr6(unsigned char *buf)
 }
 
 static int
-print_addr6(char const *pfx, size_t *remainder)
+print_addr6(struct pdu *pdu, char const *pfx, size_t *remainder)
 {
 	unsigned char buf[16];
 	int error;
 
-	error = full_read(buf, sizeof(buf));
+	error = read_bytes(pdu, buf, 16);
 	if (error)
 		return error;
 
@@ -1090,18 +1347,16 @@ print_addr6(char const *pfx, size_t *remainder)
 }
 
 static int
-print_str(char const *pfx, size_t *remainder)
+print_str(struct pdu *pdu, char const *pfx, size_t *remainder)
 {
-	unsigned char buf[1024];
 	uint32_t len;
-	ssize_t consumed;
+	size_t room;
+	size_t printable;
 	int error;
 
-	error = full_read(buf, 4);
+	error = read_u32(pdu, &len);
 	if (error)
 		return error;
-
-	len = assemble_u32(buf);
 	printf("%s-length %u ", pfx, len);
 	*remainder -= 4;
 
@@ -1111,62 +1366,73 @@ print_str(char const *pfx, size_t *remainder)
 
 	if (len > 0) {
 		printf("%s ", pfx);
-		while (len > 0) {
-			consumed = read(rtrfd, buf, 1024 < len ? 1024 : len);
-			if (consumed < 0) {
-				error = errno;
-				pr_err("Cannot read server response: %s",
-				    strerror(error));
+		do {
+			error = ensure_bytes(pdu,
+			    len < sizeof(pdu->buf) ? len : sizeof(pdu->buf));
+			if (error)
 				return error;
-			}
-			printf("%.*s", (int)consumed, buf);
-			len -= consumed;
-		}
+
+			room = pdu->len - pdu->offset;
+			printable = (room < len) ? room : len;
+			printf("%.*s", (int)printable, &pdu->buf[pdu->offset]);
+
+			pdu->offset += printable;
+			len -= printable;
+		} while (len > 0);
 		printf(" ");
 	}
 
 	return 0;
 }
 
-static int print_pdu(unsigned char *);
+static int print_pdu(struct pdu *, unsigned char *);
 
-/* Returns the payload length */
+/* Result will be the payload length, *ACCORDING TO THE HEADER*. */
 static size_t
-print_hdr1(unsigned char *bytes, char const *field3_what)
-{
-	uint8_t v;
-	uint16_t field3;
-	uint32_t length;
-
-	v = assemble_u8(&bytes[0]);
-	field3 = assemble_u16(&bytes[2]);
-	length = assemble_u32(&bytes[4]);
-	printf("version %u %s %u length %u ", v, field3_what, field3, length);
-
-	return (length >= 8) ? (length - 8) : 0;
-}
-
-static size_t
-print_hdr2(unsigned char *bytes, char const *field3_what, char const *field4_what)
+print_hdr1(unsigned char *hdr, char const *key3)
 {
 	uint32_t length;
 
-	length = assemble_u32(&bytes[4]);
-	printf("version %u %s %u %s %u length %u ",
-	    assemble_u8(&bytes[0]),
-	    field3_what, assemble_u8(&bytes[2]),
-	    field4_what, assemble_u8(&bytes[3]),
+	length = assemble_u32(hdr + 4);
+	printf("version %u %s %u length %u ",
+	    hdr[0],
+	    key3, assemble_u16(hdr + 2),
 	    length);
 
 	return (length >= 8) ? (length - 8) : 0;
 }
 
-static int
-print_hex(char const *pfx, size_t len)
+static size_t
+print_hdr2(unsigned char *hdr, char const *key3, char const *key4)
 {
-	unsigned char buf[1024];
-	ssize_t consumed;
-	ssize_t i;
+	uint32_t length;
+
+	length = assemble_u32(hdr + 4);
+	printf("version %u %s %u %s %u length %u ",
+	    hdr[0],
+	    key3, hdr[2],
+	    key4, hdr[3],
+	    length);
+
+	return (length >= 8) ? (length - 8) : 0;
+}
+
+static void
+__print_hex(struct pdu *pdu, size_t n)
+{
+	size_t i;
+
+	for (i = 0; i < n; i++)
+		printf("%02x", pdu->buf[pdu->offset + i]);
+
+	pdu->offset += n;
+}
+
+static int
+print_hex(struct pdu *pdu, char const *pfx, size_t len)
+{
+	size_t room;
+	size_t printable;
 	int error;
 
 	if (len == 0)
@@ -1174,30 +1440,29 @@ print_hex(char const *pfx, size_t len)
 
 	printf("%s ", pfx);
 	while (len > 0) {
-		consumed = read(rtrfd, buf, len < sizeof(buf) ? len : sizeof(buf));
-		if (consumed < 0) {
-			error = errno;
-			pr_err("Cannot read server response: %s",
-			    strerror(error));
+		error = ensure_bytes(pdu,
+		    len < sizeof(pdu->buf) ? len : sizeof(pdu->buf));
+		if (error)
 			return error;
-		}
-		for (i = 0; i < consumed; i++)
-			printf("%02x", buf[i]);
-		len -= consumed;
-	}
+
+		room = pdu->len - pdu->offset;
+		printable = (room < len) ? room : len;
+		__print_hex(pdu, printable);
+		len -= printable;
+	};
 	printf(" ");
 
 	return 0;
 }
 
 static int
-print_remainder(size_t remainder)
+print_remainder(struct pdu *pdu, size_t remainder)
 {
-	return print_hex("remainder", remainder);
+	return print_hex(pdu, "remainder", remainder);
 }
 
 static int
-print_pdu_serial_notify(unsigned char *hdr)
+print_pdu_serial_notify(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -1207,15 +1472,15 @@ print_pdu_serial_notify(unsigned char *hdr)
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("serial", &remainder);
+	error = print_u32(pdu, "serial", &remainder);
 	if (error)
 		return error;
 
-done:	return print_remainder(remainder);
+done:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_serial_query(unsigned char *hdr)
+print_pdu_serial_query(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -1225,29 +1490,29 @@ print_pdu_serial_query(unsigned char *hdr)
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("serial", &remainder);
+	error = print_u32(pdu, "serial", &remainder);
 	if (error)
 		return error;
 
-done:	return print_remainder(remainder);
+done:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_reset_query(unsigned char *hdr)
+print_pdu_reset_query(struct pdu *pdu, unsigned char *hdr)
 {
 	printf("reset-query    ");
-	return print_remainder(print_hdr1(hdr, "zero"));
+	return print_remainder(pdu, print_hdr1(hdr, "zero"));
 }
 
 static int
-print_pdu_cache_response(unsigned char *hdr)
+print_pdu_cache_response(struct pdu *pdu, unsigned char *hdr)
 {
 	printf("cache-response ");
-	return print_remainder(print_hdr1(hdr, "session"));
+	return print_remainder(pdu, print_hdr1(hdr, "session"));
 }
 
 static int
-print_pdu_ipv4_prefix(unsigned char *hdr)
+print_pdu_ipv4_prefix(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -1257,45 +1522,45 @@ print_pdu_ipv4_prefix(unsigned char *hdr)
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("flags", &remainder);
+	error = print_u8(pdu, "flags", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("plen", &remainder);
+	error = print_u8(pdu, "plen", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("maxlen", &remainder);
+	error = print_u8(pdu, "maxlen", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("zero2", &remainder);
+	error = print_u8(pdu, "zero2", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 4)
 		goto done;
-	error = print_addr4("prefix", &remainder);
+	error = print_addr4(pdu, "prefix", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("as", &remainder);
+	error = print_u32(pdu, "as", &remainder);
 	if (error)
 		return error;
 
-done:	return print_remainder(remainder);
+done:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_ipv6_prefix(unsigned char *hdr)
+print_pdu_ipv6_prefix(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -1305,45 +1570,45 @@ print_pdu_ipv6_prefix(unsigned char *hdr)
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("flags", &remainder);
+	error = print_u8(pdu, "flags", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("plen", &remainder);
+	error = print_u8(pdu, "plen", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("maxlen", &remainder);
+	error = print_u8(pdu, "maxlen", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 1)
 		goto done;
-	error = print_u8("zero2", &remainder);
+	error = print_u8(pdu, "zero2", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 16)
 		goto done;
-	error = print_addr6("prefix", &remainder);
+	error = print_addr6(pdu, "prefix", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("as", &remainder);
+	error = print_u32(pdu, "as", &remainder);
 	if (error)
 		return error;
 
-done:	return print_remainder(remainder);
+done:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_end_of_data(unsigned char *hdr)
+print_pdu_end_of_data(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -1353,40 +1618,40 @@ print_pdu_end_of_data(unsigned char *hdr)
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("serial", &remainder);
+	error = print_u32(pdu, "serial", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("refresh", &remainder);
+	error = print_u32(pdu, "refresh", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("retry", &remainder);
+	error = print_u32(pdu, "retry", &remainder);
 	if (error)
 		return error;
 
 	if (remainder < 4)
 		goto done;
-	error = print_u32("expire", &remainder);
+	error = print_u32(pdu, "expire", &remainder);
 	if (error)
 		return error;
 
-done:	return print_remainder(remainder);
+done:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_cache_reset(unsigned char *hdr)
+print_pdu_cache_reset(struct pdu *pdu, unsigned char *hdr)
 {
 	printf("cache-reset    ");
-	return print_remainder(print_hdr1(hdr, "zero"));
+	return print_remainder(pdu, print_hdr1(hdr, "zero"));
 }
 
 static int
-print_pdu_router_key(unsigned char *hdr)
+print_pdu_router_key(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -1396,24 +1661,24 @@ print_pdu_router_key(unsigned char *hdr)
 
 	if (remainder < 24)
 		goto end;
-	error = print_hex("ski", 20);
+	error = print_hex(pdu, "ski", 20);
 	if (error)
 		return error;
 	remainder -= 20;
 
 	if (remainder < 4)
 		goto end;
-	error = print_u32("as", &remainder);
+	error = print_u32(pdu, "as", &remainder);
 	if (error)
 		return error;
 
-	return print_hex("spki", remainder);
+	return print_hex(pdu, "spki", remainder);
 
-end:	return print_remainder(remainder);
+end:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_aspa_pdu(unsigned char *hdr)
+print_pdu_aspa_pdu(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	int error;
@@ -1423,7 +1688,7 @@ print_pdu_aspa_pdu(unsigned char *hdr)
 
 	if (remainder < 4)
 		goto end;
-	error = print_u32("customer", &remainder);
+	error = print_u32(pdu, "customer", &remainder);
 	if (error)
 		return error;
 
@@ -1431,20 +1696,21 @@ print_pdu_aspa_pdu(unsigned char *hdr)
 		goto end;
 	printf("providers [ ");
 	do {
-		error = print_u32(NULL, &remainder);
+		error = print_u32(pdu, NULL, &remainder);
 		if (error)
 			return error;
 	} while (remainder >= 4);
 	printf("]");
 
-end:	return print_remainder(remainder);
+end:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_error_report(unsigned char *hdr)
+print_pdu_error_report(struct pdu *pdu, unsigned char *hdr)
 {
-	size_t remainder, sublen;
-	unsigned char subhdr[1024];
+	size_t remainder;
+	uint32_t sublen;
+	unsigned char subhdr[8];
 	int error;
 
 	printf("error-report   ");
@@ -1452,43 +1718,77 @@ print_pdu_error_report(unsigned char *hdr)
 
 	if (remainder < 4)
 		goto end;
-	error = print_u32("encapsulated-pdu-length", &remainder);
+	error = read_u32(pdu, &sublen);
 	if (error)
 		return error;
+	printf("encapsulated-pdu-length %u ", sublen);
+	remainder -= 4;
 
-	if (remainder < 8)
-		goto end;
-	error = full_read(subhdr, 8);
-	if (error)
-		return error;
-	sublen = assemble_u32(&subhdr[4]);
-	if (remainder < sublen)
-		goto end;
-	printf("encapsulated-pdu [ ");
-	error = print_pdu(subhdr);
-	if (error)
-		return error;
-	printf("] ");
+	if (sublen >= 8) {
+		if (remainder < 8)
+			goto end;
+		error = read_bytes(pdu, subhdr, sizeof(subhdr));
+		if (error)
+			return error;
+		if (assemble_u32(&subhdr[4]) != sublen) {
+			pr_err("sublen (%u) != hdrlen (%u)",
+			    sublen, assemble_u32(&subhdr[4]));
+			return EINVAL;
+		}
+		if (remainder < sublen) {
+			pr_err("remainder (%zu) < sublen(%u)",
+			    remainder, sublen);
+			return EINVAL;
+		}
+		printf("encapsulated-pdu [ ");
+		error = print_pdu(pdu, subhdr);
+		if (error)
+			return error;
+		printf("] ");
+	} else {
+		error = print_hex(pdu, "encapsulated-pdu", sublen);
+		if (error)
+			return error;
+	}
+
 	remainder -= sublen;
-
 	if (remainder < 4)
 		goto end;
-	error = print_str("error-text", &remainder);
+	error = print_str(pdu, "error-text", &remainder);
 	if (error)
 		return error;
 
-end:	return print_remainder(remainder);
+end:	return print_remainder(pdu, remainder);
 }
 
 static int
-print_pdu_unknown(unsigned char *hdr)
+print_pdu_unknown(struct pdu *pdu, unsigned char *hdr)
 {
 	printf("unknown        ");
-	return print_remainder(print_hdr1(hdr, "?"));
+	return print_remainder(pdu, print_hdr1(hdr, "?"));
+}
+
+static print_pdu_cb
+get_print_pdu_cb(unsigned char type)
+{
+	switch (type) {
+	case 0:  return print_pdu_serial_notify;
+	case 1:  return print_pdu_serial_query;
+	case 2:  return print_pdu_reset_query;
+	case 3:  return print_pdu_cache_response;
+	case 4:  return print_pdu_ipv4_prefix;
+	case 6:  return print_pdu_ipv6_prefix;
+	case 8:  return print_pdu_cache_reset;
+	case 7:  return print_pdu_end_of_data;
+	case 9:  return print_pdu_router_key;
+	case 10: return print_pdu_error_report;
+	case 11: return print_pdu_aspa_pdu;
+	default: return print_pdu_unknown;
+	}
 }
 
 static int
-print_rapport_vrp4(unsigned char *hdr)
+print_rapport_vrp4(struct pdu *pdu, unsigned char *hdr)
 {
 	uint32_t len;
 	unsigned char payload[12];
@@ -1500,11 +1800,11 @@ print_rapport_vrp4(unsigned char *hdr)
 		return EINVAL;
 	}
 
-	error = full_read(payload, sizeof(payload));
+	error = read_bytes(pdu, payload, sizeof(payload));
 	if (error)
 		return error;
 
-	switch (assemble_u8(&payload[0])) {
+	switch (payload[0]) {
 	case 0:
 		printf("VRP-\t");
 		break;
@@ -1517,14 +1817,14 @@ print_rapport_vrp4(unsigned char *hdr)
 
 	__print_addr4(&payload[4]);
 	printf("/%u-%u => %u",
-	    assemble_u8(&payload[1]),
-	    assemble_u8(&payload[2]),
-	    assemble_u32(&payload[8]));
+	   payload[1],
+	   payload[2],
+	   assemble_u32(&payload[8]));
 	return 0;
 }
 
 static int
-print_rapport_vrp6(unsigned char *hdr)
+print_rapport_vrp6(struct pdu *pdu, unsigned char *hdr)
 {
 	uint32_t len;
 	unsigned char payload[24];
@@ -1536,11 +1836,11 @@ print_rapport_vrp6(unsigned char *hdr)
 		return EINVAL;
 	}
 
-	error = full_read(payload, sizeof(payload));
+	error = read_bytes(pdu, payload, sizeof(payload));
 	if (error)
 		return error;
 
-	switch (assemble_u8(&payload[0])) {
+	switch (payload[0]) {
 	case 0:
 		printf("VRP-\t");
 		break;
@@ -1553,14 +1853,14 @@ print_rapport_vrp6(unsigned char *hdr)
 
 	__print_addr6(&payload[4]);
 	printf("/%u-%u => %u",
-	    assemble_u8(&payload[1]),
-	    assemble_u8(&payload[2]),
+	    payload[1],
+	    payload[2],
 	    assemble_u32(&payload[20]));
 	return 0;
 }
 
 static int
-print_rapport_errpdu(unsigned char *hdr)
+print_rapport_errpdu(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t len, sublen, msglen;
 	unsigned char buf[1024];
@@ -1578,7 +1878,7 @@ print_rapport_errpdu(unsigned char *hdr)
 		return EINVAL;
 	}
 
-	error = full_read(buf, len);
+	error = read_bytes(pdu, buf, len);
 	if (error)
 		return error;
 
@@ -1601,7 +1901,7 @@ print_rapport_errpdu(unsigned char *hdr)
 }
 
 static int
-print_rapport_aspa(unsigned char *hdr)
+print_rapport_aspa(struct pdu *pdu, unsigned char *hdr)
 {
 	uint32_t len;
 	unsigned char buf[4];
@@ -1620,13 +1920,13 @@ print_rapport_aspa(unsigned char *hdr)
 	}
 	len -= 12;
 
-	error = full_read(buf, sizeof(buf));
+	error = read_bytes(pdu, buf, sizeof(buf));
 	if (error)
 		return error;
 
 	printf("ASPA\t%u:[", assemble_u32(buf));
 	for (p = 0; p < len; p += 4) {
-		error = full_read(buf, sizeof(buf));
+		error = read_bytes(pdu, buf, sizeof(buf));
 		if (error)
 			return error;
 		printf("%u", assemble_u32(buf));
@@ -1639,11 +1939,11 @@ print_rapport_aspa(unsigned char *hdr)
 }
 
 static int
-skip_pdu(unsigned char *hdr)
+skip_pdu(struct pdu *pdu, unsigned char *hdr)
 {
 	uint32_t len;
-	unsigned char buf[128];
-	size_t n;
+	size_t room;
+	size_t waste;
 	int error;
 
 	len = assemble_u32(&hdr[4]);
@@ -1651,23 +1951,35 @@ skip_pdu(unsigned char *hdr)
 		pr_err("PDU length too small: %u", len);
 		return EINVAL;
 	}
+	len -= 8;
 
-	for (len -= 8; len != 0; len -= n) {
-		n = len < sizeof(buf) ? len : sizeof(buf);
-		error = full_read(buf, n);
+	room = pdu->len - pdu->offset;
+	if (room >= len) {
+		pdu->offset += len;
+		return 0;
+	}
+
+	pdu->len = 0;
+	pdu->offset = 0;
+
+	for (len -= room; len != 0; len -= waste) {
+		waste = len < sizeof(pdu->buf) ? len : sizeof(pdu->buf);
+		error = ensure_bytes(pdu, waste);
 		if (error)
 			return error;
+		pdu->len = 0;
 	}
 
 	return 0;
 }
 
 static int
-print_pdu(unsigned char *hdr)
+print_pdu(struct pdu *pdu, unsigned char *hdr)
 {
 	int error = EINVAL;
 
 	/* Pre-print */
+	/* TODO happening for internal PDUs too */
 	switch (hdr[1]) {
 	case 0:
 	case 1:
@@ -1678,30 +1990,17 @@ print_pdu(unsigned char *hdr)
 
 	switch (format) {
 	case OF_PDU:
-		switch (hdr[1]) {
-		case 0:  error = print_pdu_serial_notify(hdr);	break;
-		case 1:  error = print_pdu_serial_query(hdr);	break;
-		case 2:  error = print_pdu_reset_query(hdr);	break;
-		case 3:  error = print_pdu_cache_response(hdr);	break;
-		case 4:  error = print_pdu_ipv4_prefix(hdr);	break;
-		case 6:  error = print_pdu_ipv6_prefix(hdr);	break;
-		case 8:  error = print_pdu_cache_reset(hdr);	break;
-		case 7:  error = print_pdu_end_of_data(hdr);	break;
-		case 9:  error = print_pdu_router_key(hdr);	break;
-		case 10: error = print_pdu_error_report(hdr);	break;
-		case 11: error = print_pdu_aspa_pdu(hdr);	break;
-		default: error = print_pdu_unknown(hdr);	break;
-		}
+		error = get_print_pdu_cb(hdr[1])(pdu, hdr);
 		break;
 
 	case OF_RAPPORT:
 		switch (hdr[1]) {
-		case 4:  error = print_rapport_vrp4(hdr);	break;
-		case 6:  error = print_rapport_vrp6(hdr);	break;
-		case 10: error = print_rapport_errpdu(hdr);	break;
-		case 11: error = print_rapport_aspa(hdr);	break;
+		case 4:  error = print_rapport_vrp4(pdu, hdr);		break;
+		case 6:  error = print_rapport_vrp6(pdu, hdr);		break;
+		case 10: error = print_rapport_errpdu(pdu, hdr);	break;
+		case 11: error = print_rapport_aspa(pdu, hdr);		break;
 		case 9:  /* Format still undecided */
-		default: return skip_pdu(hdr);
+		default: return skip_pdu(pdu, hdr);
 		}
 	}
 
@@ -1718,13 +2017,14 @@ is_terminating_pdu(unsigned char type)
 static void
 print_server_response(void)
 {
+	struct pdu pdu = { .fd = rtrfd };
 	unsigned char hdr[8];
 
 	do {
-		if (full_read(hdr, sizeof(hdr)) != 0)
+		if (read_bytes(&pdu, hdr, sizeof(hdr)) != 0)
 			return;
 		pr_trace("PDU received.");
-		if (print_pdu(hdr) != 0)
+		if (print_pdu(&pdu, hdr) != 0)
 			return;
 		printf("\n");
 	} while (!is_terminating_pdu(hdr[1]));
@@ -1733,13 +2033,14 @@ print_server_response(void)
 static void *
 handle_server_pdus(void *arg)
 {
+	struct pdu pdu = { .fd = rtrfd };
 	unsigned char hdr[8];
 
 	do {
-		if (full_read(hdr, sizeof(hdr)) != 0)
+		if (read_bytes(&pdu, hdr, sizeof(hdr)) != 0)
 			return NULL;
 		pr_trace("PDU received.");
-		if (print_pdu(hdr) != 0)
+		if (print_pdu(&pdu, hdr) != 0)
 			return NULL;
 		printf("\n");
 		/*
@@ -1775,6 +2076,7 @@ stop_socket_listener(void)
 int
 main(int argc, char **argv)
 {
+	struct pdu *pdu;
 	int error = 0;
 
 	infile = stdin;
@@ -1785,13 +2087,15 @@ main(int argc, char **argv)
 
 	if (strcmp(action, "reset") == 0) {
 		connect_socket();
-		__send_reset_query(version, 2, 0, 8);
+		send_pdu(create_pdu(8, version, 2, 0, 8));
 		print_server_response();
 		close_socket();
 
 	} else if (strcmp(action, "serial") == 0) {
 		connect_socket();
-		__send_serial_query(version, 1, atomic_load(&session), 12, serial);
+		pdu = create_pdu(12, version, 1, atomic_load(&session), 12);
+		add_u32(pdu, 8, serial);
+		send_pdu(pdu);
 		print_server_response();
 		close_socket();
 

@@ -71,6 +71,10 @@ void pr_end(FILE *);
 		pr_end(stdout);						\
 	} while (0)
 
+#ifdef BACKTRACE_ENABLED
+void print_stack_trace(void);
+#endif
+
 void register_signal_handlers(void);
 
 #endif /* SRC_PRINT_H_ */
