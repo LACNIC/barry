@@ -1122,6 +1122,7 @@ send_infile_commands(void)
 	pr_trace("Ready.");
 
 	while (getline(&rdr.line, &rdr.lsize, infile) != -1) {
+		rdr.saveptr = NULL;
 		rdr.first = true;
 		rdr.lvl = 0;
 		token = next_token(&rdr);
