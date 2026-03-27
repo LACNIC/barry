@@ -78,7 +78,7 @@ check_output_contains() {
 	shift
 	shift
 	while test $# -gt 0; do
-		grep $GREP_ARGS "$1" "$OUTPUT_FILE" > /dev/null
+		grep -q $GREP_ARGS "$1" "$OUTPUT_FILE"
 		if [ $? -eq 0 ]; then
 			SUCCESSES=$((SUCCESSES+1))
 		else
@@ -90,6 +90,44 @@ check_output_contains() {
 
 		shift
 	done
+}
+
+check_error() {
+	# $1: Test RD filename, without extension
+	TEST_RD="$1"
+	# $2: Arguments to grep
+	GREP_ARGS="$2"
+	# $3: Regular expression that describes the line that should be
+	# present in the test output
+	REGEX="$3"
+
+	OUTPUT_FILE="sandbox/output/$TEST_RD.log"
+	if [ ! -f "$OUTPUT_FILE" ]; then
+		$BARRY $BASIC_ARGS				\
+			--tal-path "sandbox/tal/$TEST_RD.tal"	\
+			--rsync-path "sandbox/rsync/$TEST_RD"	\
+			--rrdp-path "sandbox/rrdp/$TEST_RD"	\
+			"tests/$TEST_RD.rd"			\
+			> "$OUTPUT_FILE" 2>&1
+		RETVAL="$?"
+		if [ "$RETVAL" -ne 0 ]; then
+			SUCCESSES=$((SUCCESSES+1))
+		else
+			echo "ERR: Barry returned zero in test '$TEST_RD'"
+			echo "     (See $OUTPUT_FILE)"
+			FAILS=$((FAILS+1))
+			return
+		fi
+	fi
+
+	tail -1 "$OUTPUT_FILE" | grep -q $GREP_ARGS "$REGEX" -
+	if [ $? -eq 0 ]; then
+		SUCCESSES=$((SUCCESSES+1))
+	else
+		echo "ERR: Test '$TEST_RD' did not output '$3'"
+		echo "     See $OUTPUT_FILE"
+		FAILS=$((FAILS+1))
+	fi
 }
 
 SUCCESSES=0

@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <libasn1fort/GeneralizedTime.h>
-#include <libasn1fort/Time.h>
+#include <libasn1fort/X509Time.h>
 #include <libxml/globals.h>
 #include <libxml/xmlreader.h>
 #include <limits.h>
@@ -321,7 +321,7 @@ collect_publish(xmlChar *uri, xmlChar *content, void *_args)
 	free(bin);
 }
 
-typedef void (*snapshot_cb)();
+typedef void (*snapshot_cb)(xmlTextReaderPtr, void *);
 typedef void (*publish_cb)(xmlChar *, xmlChar *, void *);
 
 static void

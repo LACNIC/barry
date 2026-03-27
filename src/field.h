@@ -17,8 +17,7 @@
 
 struct field;
 
-typedef char const *error_msg;
-typedef error_msg (*field_parser)(struct field *, struct kv_value *, void *);
+typedef void (*field_parser)(struct field *, struct kv_value *, void *);
 typedef void (*print_field)(struct dynamic_string *, void *);
 typedef void (*prepare_cb)(void *);
 typedef bool (*conditional_cb)(void *);
