@@ -49,6 +49,7 @@ struct line_reader {
 	char *line;
 	size_t lsize;
 	char *saveptr;
+	bool first;
 	unsigned int lvl;
 };
 
@@ -74,12 +75,13 @@ streq(char const *str1, char const *str2)
 }
 
 static char *
-next_token(struct line_reader *rdr, bool first)
+next_token(struct line_reader *rdr)
 {
-	char *token;
-	token = strtok_r(first ? rdr->line : NULL, " \t\n", &rdr->saveptr);
-	pr_trace("Received token: %s", token);
-	return (rdr->lvl > 0 && streq(token, "]")) ? NULL : token;
+	char *tkn;
+	tkn = strtok_r(rdr->first ? rdr->line : NULL, " \t\n", &rdr->saveptr);
+	rdr->first = false;
+	pr_trace("Received token: %s", tkn);
+	return (rdr->lvl > 0 && streq(tkn, "]")) ? NULL : tkn;
 }
 
 static void
@@ -236,7 +238,7 @@ parse_u8(char const *what, char *str, uint8_t *value)
 static int
 next_u8(struct line_reader *rdr, char const *what, uint8_t *value)
 {
-	return parse_u8(what, next_token(rdr, false), value);
+	return parse_u8(what, next_token(rdr), value);
 }
 
 static int
@@ -254,7 +256,7 @@ parse_u16(char const *what, char const *str, uint16_t *result)
 static int
 next_u16(struct line_reader *rdr, char const *what, uint16_t *value)
 {
-	return parse_u16(what, next_token(rdr, false), value);
+	return parse_u16(what, next_token(rdr), value);
 }
 
 static int
@@ -272,13 +274,13 @@ parse_u32(char const *what, char const *str, uint32_t *result)
 static int
 next_u32(struct line_reader *rdr, char const *what, uint32_t *value)
 {
-	return parse_u32(what, next_token(rdr, false), value);
+	return parse_u32(what, next_token(rdr), value);
 }
 
 static int
 next_string(struct line_reader *rdr, char const *what, char const **value)
 {
-	*value = next_token(rdr, false); /* TODO Fast-assed */
+	*value = next_token(rdr); /* TODO Fast-assed */
 	return 0;
 }
 
@@ -288,7 +290,7 @@ next_addr(struct line_reader *rdr, char const *what, int af, void *value)
 	char *token;
 	int res;
 
-	token = next_token(rdr, false);
+	token = next_token(rdr);
 	res = inet_pton(af, token, value);
 	switch (res) {
 	case 1:
@@ -328,7 +330,7 @@ next_bytes(struct line_reader *rdr, char const *what,
 	size_t buflen;
 	size_t i;
 
-	token = next_token(rdr, false);
+	token = next_token(rdr);
 	token_len = strlen(token);
 	if (token_len & 1) {
 		pr_err("Byte array '%s' needs an even number of digits.", what);
@@ -646,7 +648,7 @@ create_8pdu(struct line_reader *rdr, uint8_t pdu_type,
 	char *token;
 	int error = 0;
 
-	while ((token = next_token(rdr, false)) != NULL) {
+	while ((token = next_token(rdr)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
 		else if (is_type(token))
@@ -677,7 +679,7 @@ create_12pdu(struct line_reader *rdr, uint8_t pdu_type)
 	struct pdu *pdu;
 	int error = 0;
 
-	while ((token = next_token(rdr, false)) != NULL) {
+	while ((token = next_token(rdr)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
 		else if (is_type(token))
@@ -722,7 +724,7 @@ create_ip_prefix_pdu(struct line_reader *rdr, int af)
 	size_t i;
 	int error = 0;
 
-	while ((token = next_token(rdr, false)) != NULL) {
+	while ((token = next_token(rdr)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
 		else if (is_type(token))
@@ -834,7 +836,7 @@ create_end_of_data_pdu(struct line_reader *rdr)
 	struct pdu *pdu;
 	int error = 0;
 
-	while ((token = next_token(rdr, false)) != NULL) {
+	while ((token = next_token(rdr)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
 		else if (is_type(token))
@@ -905,7 +907,7 @@ create_router_key_pdu(struct line_reader *rdr)
 	struct pdu *pdu;
 	int error = 0;
 
-	while ((token = next_token(rdr, false)) != NULL) {
+	while ((token = next_token(rdr)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, "version", &_version);
 		else if (is_type(token))
@@ -971,7 +973,7 @@ create_error_report_pdu(struct line_reader *rdr)
 	create_pdu_cb cb;
 	int error = 0;
 
-	while ((token = next_token(rdr, false)) != NULL) {
+	while ((token = next_token(rdr)) != NULL) {
 		if (strcmp(token, "version") == 0)
 			error = next_u8(rdr, token, &_version);
 		else if (is_type(token))
@@ -988,14 +990,14 @@ create_error_report_pdu(struct line_reader *rdr)
 			if (subpdu != NULL)
 				free(subpdu);
 
-			token = next_token(rdr, false);
+			token = next_token(rdr);
 			if (!streq(token, "[")) {
 				pr_err("Expected '[' after 'encapsulated-pdu'.");
 				goto fail;
 			}
 
 			rdr->lvl++;
-			token = next_token(rdr, false);
+			token = next_token(rdr);
 			if ((cb = get_create_pdu_cb(token)) == NULL) {
 				pr_err("Unknown PDU type: %s", token);
 				goto fail;
@@ -1120,8 +1122,9 @@ send_infile_commands(void)
 	pr_trace("Ready.");
 
 	while (getline(&rdr.line, &rdr.lsize, infile) != -1) {
+		rdr.first = true;
 		rdr.lvl = 0;
-		token = next_token(&rdr, true);
+		token = next_token(&rdr);
 		if (!token)
 			continue;
 
