@@ -74,6 +74,7 @@ streq(char const *str1, char const *str2)
 	return strcmp(str1, str2) == 0;
 }
 
+/* CAN RETURN NULL. */
 static char *
 next_token(struct line_reader *rdr)
 {
@@ -174,6 +175,13 @@ print_command_help(void)
 	printf("%srouter-key%s     [version %s<%s-V%s>%s] [type %s<9>%s] [flags %s<1>%s] [zero %s<0>%s] [length %s<auto>%s]\n",
 	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst, var, rst);
 	printf("               [ski %s<0x00/160>%s] [as %s<0>%s] [spki %s<>%s]\n", var, rst, var, rst, var, rst);
+	printf("%serror-report%s   [version %s<%s-V%s>%s] [type %s<10>%s] [error-code %s<1>%s] [length %s<auto>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst);
+	printf("               [encapsulated-pdu-length %s<auto>%s] [encapsulated-pdu %s<>%s]\n", var, rst, var, rst);
+	printf("               [error-text-length %s<auto>%s] [error-text %s<>%s]\n", var, rst, var, rst);
+	printf("%saspa-pdu%s       [version %s<%s-V%s>%s] [type %s<11>%s] [flags %s<1>%s] [zero %s<0>%s] [length %s<auto>%s]\n",
+	    cmd, rst, var, flg, var, rst, var, rst, var, rst, var, rst, var, rst);
+	printf("               [customer %s<0>%s] [providers %s<[ ]>%s]\n", var, rst, var, rst);
 	printf("\n");
 
 	printf("The default value of %s-V%s is the latest supported RTR version.\n", flg, rst);
@@ -190,6 +198,14 @@ print_command_help(void)
 	printf("\n");
 
 	printf("The default value of %srouter-key%s 'length' is 32 + 'ski' length.\n", enm, rst);
+	printf("\n");
+
+	printf("'encapsulated-pdu' is another PDU, surrounded by square brackets. Example:\n");
+	printf("    %serror-report%s encapsulated-pdu [ %sserial-query%s serial 2 ]\n", enm, rst, enm, rst);
+	printf("\n");
+
+	printf("'providers' is a sequence of u32s separated by whitespace, surrounded by square\n");
+	printf("brackets.\n");
 	printf("\n");
 }
 
@@ -278,6 +294,56 @@ next_u32(struct line_reader *rdr, char const *what, uint32_t *value)
 }
 
 static int
+next_u32_array(struct line_reader *rdr, char const *what,
+    uint32_t **_array, size_t *_len)
+{
+	char *tkn;
+	uint32_t *array;
+	size_t capacity;
+	size_t len;
+	int error;
+
+	if (*_array) {
+		free(*_array);
+		*_array = NULL;
+		*_len = 0;
+	}
+
+	tkn = next_token(rdr);
+	if (!tkn || !streq(tkn, "[")) {
+		pr_err("Expected '[' after '%s'.", what);
+		return EINVAL;
+	}
+
+	capacity = 16;
+	len = 0;
+	array = pmalloc(capacity);
+
+	while ((tkn = next_token(rdr)) != NULL) {
+		if (streq(tkn, "]"))
+			break;
+
+		if (len >= capacity) {
+			capacity *= 2;
+			array = prealloc(array, capacity);
+		}
+
+		error = parse_u32(what, tkn, &array[len]);
+		if (error)
+			goto fail;
+
+		len++;
+	}
+
+	*_array = array;
+	*_len = len;
+	return 0;
+
+fail:	free(array);
+	return error;
+}
+
+static int
 next_string(struct line_reader *rdr, char const *what, char const **value)
 {
 	*value = next_token(rdr); /* TODO Fast-assed */
@@ -291,6 +357,11 @@ next_addr(struct line_reader *rdr, char const *what, int af, void *value)
 	int res;
 
 	token = next_token(rdr);
+	if (!token) {
+		pr_err("Expected an IP address after '%s'.", what);
+		return EINVAL;
+	}
+
 	res = inet_pton(af, token, value);
 	switch (res) {
 	case 1:
@@ -331,6 +402,11 @@ next_bytes(struct line_reader *rdr, char const *what,
 	size_t i;
 
 	token = next_token(rdr);
+	if (!token) {
+		pr_err("Expected a hexadecimal string after '%s'.", what);
+		return EINVAL;
+	}
+
 	token_len = strlen(token);
 	if (token_len & 1) {
 		pr_err("Byte array '%s' needs an even number of digits.", what);
@@ -991,13 +1067,17 @@ create_error_report_pdu(struct line_reader *rdr)
 				free(subpdu);
 
 			token = next_token(rdr);
-			if (!streq(token, "[")) {
+			if (!token || !streq(token, "[")) {
 				pr_err("Expected '[' after 'encapsulated-pdu'.");
 				goto fail;
 			}
 
 			rdr->lvl++;
 			token = next_token(rdr);
+			if (!token) {
+				pr_err("Expected PDU name after '['.");
+				goto fail;
+			}
 			if ((cb = get_create_pdu_cb(token)) == NULL) {
 				pr_err("Unknown PDU type: %s", token);
 				goto fail;
@@ -1046,6 +1126,60 @@ fail:	if (subpdu != NULL)
 	return NULL;
 }
 
+static struct pdu *
+create_aspa_pdu_pdu(struct line_reader *rdr)
+{
+	uint8_t _version = version;
+	uint8_t type = 11;
+	uint8_t flags = 1;
+	uint8_t zero = 0;
+	uint32_t length = 12;
+	bool length_overridden = false;
+	uint32_t customer = 0;
+	uint32_t *providers = NULL;
+	size_t plen = 0;
+	char *token;
+	struct pdu *pdu = NULL;
+	size_t i;
+	int error;
+
+	while ((token = next_token(rdr)) != NULL) {
+		if (strcmp(token, "version") == 0)
+			error = next_u8(rdr, token, &_version);
+		else if (is_type(token))
+			error = next_u8(rdr, token, &type);
+		else if (strcmp(token, "flags") == 0)
+			error = next_u8(rdr, token, &flags);
+		else if (strcmp(token, "zero") == 0)
+			error = next_u8(rdr, token, &zero);
+		else if (strcmp(token, "length") == 0) {
+			error = next_u32(rdr, token, &length);
+			length_overridden = true;
+		} else if (strcmp(token, "customer") == 0)
+			error = next_u32(rdr, token, &customer);
+		else if (strcmp(token, "providers") == 0)
+			error = next_u32_array(rdr, token, &providers, &plen);
+		else {
+			pr_err("Unknown token: %s", token);
+			goto end;
+		}
+		if (error)
+			goto end;
+	}
+
+	if (!length_overridden)
+		length = 12 + 4 * plen;
+
+	pdu = create_pdu(12 + 4 * plen, _version, type,
+	    (((unsigned int)flags) << 8) | ((unsigned int)zero), length);
+	add_u32(pdu, 8, customer);
+	for (i = 0; i < plen; i++)
+		add_u32(pdu, 12 + 4 * i, providers[i]);
+
+end:	free(providers);
+	return pdu;
+}
+
 static create_pdu_cb
 get_create_pdu_cb(char const *name)
 {
@@ -1054,23 +1188,23 @@ get_create_pdu_cb(char const *name)
 	if (streq(name, "serial-query") || streq(name, "serial"))
 		return create_serial_query_pdu;
 	if (streq(name, "reset-query") || streq(name, "reset"))
-		return &create_reset_query_pdu;
+		return create_reset_query_pdu;
 	if (streq(name, "cache-response") || streq(name, "response"))
-		return &create_cache_response_pdu;
+		return create_cache_response_pdu;
 	if (streq(name, "ipv4-prefix") || streq(name, "4"))
-		return &create_ipv4_prefix_pdu;
+		return create_ipv4_prefix_pdu;
 	if (streq(name, "ipv6-prefix") || streq(name, "6"))
-		return &create_ipv6_prefix_pdu;
+		return create_ipv6_prefix_pdu;
 	if (streq(name, "end-of-data") || streq(name, "eod"))
-		return &create_end_of_data_pdu;
+		return create_end_of_data_pdu;
 	if (streq(name, "cache-reset"))
-		return &create_cache_reset_pdu;
+		return create_cache_reset_pdu;
 	if (streq(name, "router-key") || streq(name, "rk"))
-		return &create_router_key_pdu;
+		return create_router_key_pdu;
 	if (streq(name, "error-report") || streq(name, "error"))
-		return &create_error_report_pdu;
-//	if (streq(name, "aspa-pdu") || streq(name, "aspa"))
-//		return &aspa;
+		return create_error_report_pdu;
+	if (streq(name, "aspa-pdu") || streq(name, "aspa"))
+		return create_aspa_pdu_pdu;
 	return NULL;
 }
 
@@ -1699,7 +1833,7 @@ print_pdu_aspa_pdu(struct pdu *pdu, unsigned char *hdr)
 		if (error)
 			return error;
 	} while (remainder >= 4);
-	printf("]");
+	printf("] ");
 
 end:	return print_remainder(pdu, remainder);
 }

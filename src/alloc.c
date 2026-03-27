@@ -41,6 +41,16 @@ pcalloc(size_t n, size_t size)
 	return result;
 }
 
+void *
+prealloc(void *ptr, size_t newsize)
+{
+	ptr = realloc(ptr, newsize);
+	if (!ptr)
+		enomem;
+
+	return ptr;
+}
+
 char *
 pstrdup(char const *s)
 {
