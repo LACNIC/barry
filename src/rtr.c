@@ -399,20 +399,13 @@ chr2hex(char chr)
 }
 
 static int
-next_bytes(struct line_reader *rdr, char const *what,
+token2bytes(char const *token, char const *what,
     unsigned char **res, size_t *reslen)
 {
-	char *token;
 	size_t token_len;
 	unsigned char *buf;
 	size_t buflen;
 	size_t i;
-
-	token = next_token(rdr);
-	if (!token) {
-		pr_err("Expected a hexadecimal string after '%s'.", what);
-		return EINVAL;
-	}
 
 	token_len = strlen(token);
 	if (token_len & 1) {
@@ -428,6 +421,21 @@ next_bytes(struct line_reader *rdr, char const *what,
 	*res = buf;
 	*reslen = buflen;
 	return 0;
+}
+
+static int
+next_bytes(struct line_reader *rdr, char const *what,
+    unsigned char **res, size_t *reslen)
+{
+	char *token;
+
+	token = next_token(rdr);
+	if (!token) {
+		pr_err("Expected a hexadecimal string after '%s'.", what);
+		return EINVAL;
+	}
+
+	return token2bytes(token, what, res, reslen);
 }
 
 static void
@@ -1190,27 +1198,38 @@ end:	free(providers);
 static struct pdu *
 create_raw_pdu(struct line_reader *rdr)
 {
+	char *token;
 	unsigned char *bytes;
-	size_t size;
+	size_t n;
 	struct pdu *pdu;
-
-	if (next_bytes(rdr, "raw", &bytes, &size) != 0)
-		return NULL;
-
-	if (size > PDUBUFLEN) {
-		pr_err("Too many bytes: %zu > %u", size, PDUBUFLEN);
-		free(bytes);
-		return NULL;
-	}
 
 	pdu = pmalloc(sizeof(struct pdu));
 	pdu->fd = -1;
-	memcpy(pdu->buf, bytes, size);
-	pdu->len = size;
+	pdu->len = 0;
 	pdu->offset = 0;
 
-	free(bytes);
+	while ((token = next_token(rdr)) != NULL) {
+		if (token2bytes(token, "raw", &bytes, &n) != 0)
+			goto fail;
+
+		if (pdu->len + n > PDUBUFLEN) {
+			pr_err("Too many bytes: %zu > %u",
+			    pdu->len + n, PDUBUFLEN);
+			goto fail;
+		}
+
+		memcpy(pdu->buf + pdu->len, bytes, n);
+		pdu->len += n;
+
+		free(bytes);
+		bytes = NULL;
+	}
+
 	return pdu;
+
+fail:	free(bytes);
+	free(pdu);
+	return NULL;
 }
 
 static create_pdu_cb
