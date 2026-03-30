@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <getopt.h>
+#include <limits.h>
 #include <netdb.h>
 #include <pthread.h>
 #include <signal.h>
@@ -143,6 +144,8 @@ print_command_help(void)
 	printf("   Prints this wall of text.\n");
 	printf("%sraw%s hex       (Eg. \"%sraw%s 001122\")\n", cmd, rst, cmd, rst);
 	printf("   Send raw hexadecimal bytes.\n");
+	printf("%ssleep%s %s<1000>%s\n", cmd, rst, var, rst);
+	printf("   Wait the given amount of milliseconds.\n");
 	printf("%sexit%s\n", cmd, rst);
 	printf("   Quits.\n");
 	printf("\n");
@@ -1280,6 +1283,32 @@ send_pdu(struct pdu *pdu)
 }
 
 static int
+do_sleep(struct line_reader *rdr)
+{
+	char *token;
+	unsigned long millis = 1000;
+	struct timespec sleeptime;
+	int error = 0;
+
+	token = next_token(rdr);
+	if (token) {
+		error = str2ul("sleep", token, ULONG_MAX, &millis);
+		if (error)
+			return error;
+	}
+
+	sleeptime.tv_sec = millis / 1000;
+	sleeptime.tv_nsec = (millis % 1000) * 1000000;
+
+	if (nanosleep(&sleeptime, NULL) < 0) {
+		error = errno;
+		pr_err("Can't sleep: %s", strerror(error));
+	}
+
+	return error;
+}
+
+static int
 send_infile_commands(void)
 {
 	struct line_reader rdr = { 0 };
@@ -1301,7 +1330,10 @@ send_infile_commands(void)
 			next_u8(&rdr, "version", &version);
 		else if (strcmp(token, "help") == 0)
 			print_command_help();
-		else if (strcmp(token, "exit") == 0)
+		else if (strcmp(token, "sleep") == 0) {
+			if (do_sleep(&rdr) == EINTR)
+				break;
+		} else if (strcmp(token, "exit") == 0)
 			break;
 		else if ((cb = get_create_pdu_cb(token)) != NULL)
 			send_pdu(cb(&rdr));
