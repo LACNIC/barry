@@ -68,6 +68,8 @@ typedef int (*print_pdu_cb)(struct pdu *, unsigned char *);
 static create_pdu_cb get_create_pdu_cb(char const *);
 static print_pdu_cb get_print_pdu_cb(unsigned char);
 
+static int print_pdu_unknown(struct pdu *, unsigned char *);
+
 static bool
 streq(char const *str1, char const *str2)
 {
@@ -139,6 +141,8 @@ print_command_help(void)
 	printf("   Sets the default RTR version number sent by all subsequent PDUs.\n");
 	printf("%shelp%s\n", cmd, rst);
 	printf("   Prints this wall of text.\n");
+	printf("%sraw%s hex       (Eg. \"%sraw%s 001122\")\n", cmd, rst, cmd, rst);
+	printf("   Send raw hexadecimal bytes.\n");
 	printf("%sexit%s\n", cmd, rst);
 	printf("   Quits.\n");
 	printf("\n");
@@ -1180,6 +1184,32 @@ end:	free(providers);
 	return pdu;
 }
 
+static struct pdu *
+create_raw_pdu(struct line_reader *rdr)
+{
+	unsigned char *bytes;
+	size_t size;
+	struct pdu *pdu;
+
+	if (next_bytes(rdr, "raw", &bytes, &size) != 0)
+		return NULL;
+
+	if (size > PDUBUFLEN) {
+		pr_err("Too many bytes: %zu > %u", size, PDUBUFLEN);
+		free(bytes);
+		return NULL;
+	}
+
+	pdu = pmalloc(sizeof(struct pdu));
+	pdu->fd = -1;
+	memcpy(pdu->buf, bytes, size);
+	pdu->len = size;
+	pdu->offset = 0;
+
+	free(bytes);
+	return pdu;
+}
+
 static create_pdu_cb
 get_create_pdu_cb(char const *name)
 {
@@ -1205,6 +1235,8 @@ get_create_pdu_cb(char const *name)
 		return create_error_report_pdu;
 	if (streq(name, "aspa-pdu") || streq(name, "aspa"))
 		return create_aspa_pdu_pdu;
+	if (streq(name, "raw"))
+		return create_raw_pdu;
 	return NULL;
 }
 
@@ -1229,14 +1261,16 @@ send_pdu(struct pdu *pdu)
 		}
 		pr_end(stdout);
 
-		printer = get_print_pdu_cb(pdu->buf[1]);
-		if (printer) {
-			pr_start(stdout, C_CYAN);
-			printf("Sending: ");
-			pdu->offset = 8;
-			printer(pdu, pdu->buf);
-			printf("\n");
-			pr_end(stdout);
+		if (pdu->len >= 8) {
+			printer = get_print_pdu_cb(pdu->buf[1]);
+			if (printer && printer != print_pdu_unknown) {
+				pr_start(stdout, C_CYAN);
+				printf("Sending: ");
+				pdu->offset = 8;
+				printer(pdu, pdu->buf);
+				printf("\n");
+				pr_end(stdout);
+			}
 		}
 	}
 
@@ -1315,6 +1349,11 @@ ensure_bytes(struct pdu *pdu, size_t need)
 {
 	ssize_t n;
 
+	if (pdu->fd < 0) {
+		pr_warn("PDU is truncated.");
+		return EINVAL;
+	}
+
 	if (need > sizeof(pdu->buf))
 		panic("Requested %zu bytes, buffer has %zu.",
 		    need, sizeof(pdu->buf));
@@ -1331,7 +1370,6 @@ ensure_bytes(struct pdu *pdu, size_t need)
 		    sizeof(pdu->buf) - pdu->len);
 		if (n < 0) {
 			pr_err("Can't read PDU: %s", strerror(errno));
-			print_stack_trace();
 			return errno;
 		}
 		if (n == 0)
@@ -1571,7 +1609,8 @@ print_hex(struct pdu *pdu, char const *pfx, size_t len)
 	if (len == 0)
 		return 0;
 
-	printf("%s ", pfx);
+	if (pfx)
+		printf("%s ", pfx);
 	while (len > 0) {
 		error = ensure_bytes(pdu,
 		    len < sizeof(pdu->buf) ? len : sizeof(pdu->buf));
@@ -1839,11 +1878,46 @@ end:	return print_remainder(pdu, remainder);
 }
 
 static int
+print_subpdu(struct pdu *pdu, size_t remainder, uint32_t sublen)
+{
+	unsigned char subhdr[8];
+	size_t i;
+	int error;
+
+	if (sublen < 8)
+		goto hex;
+
+	if (remainder < 8)
+		goto hex;
+	error = read_bytes(pdu, subhdr, sizeof(subhdr));
+	if (error)
+		return error;
+	if (assemble_u32(&subhdr[4]) != sublen || remainder < sublen) {
+		printf("encapsulated-pdu [ ");
+		for (i = 0; i < 8; i++)
+			printf("%02x", subhdr[i]);
+		if (sublen > 8)
+			print_hex(pdu, NULL, sublen - 8);
+		else
+			printf(" ");
+		printf("] ");
+		return 0;
+	}
+
+	printf("encapsulated-pdu [ ");
+	error = print_pdu(pdu, subhdr);
+	printf("] ");
+
+	return error;
+
+hex:	return print_hex(pdu, "encapsulated-pdu", sublen);
+}
+
+static int
 print_pdu_error_report(struct pdu *pdu, unsigned char *hdr)
 {
 	size_t remainder;
 	uint32_t sublen;
-	unsigned char subhdr[8];
 	int error;
 
 	printf("error-report   ");
@@ -1857,32 +1931,9 @@ print_pdu_error_report(struct pdu *pdu, unsigned char *hdr)
 	printf("encapsulated-pdu-length %u ", sublen);
 	remainder -= 4;
 
-	if (sublen >= 8) {
-		if (remainder < 8)
-			goto end;
-		error = read_bytes(pdu, subhdr, sizeof(subhdr));
-		if (error)
-			return error;
-		if (assemble_u32(&subhdr[4]) != sublen) {
-			pr_err("sublen (%u) != hdrlen (%u)",
-			    sublen, assemble_u32(&subhdr[4]));
-			return EINVAL;
-		}
-		if (remainder < sublen) {
-			pr_err("remainder (%zu) < sublen(%u)",
-			    remainder, sublen);
-			return EINVAL;
-		}
-		printf("encapsulated-pdu [ ");
-		error = print_pdu(pdu, subhdr);
-		if (error)
-			return error;
-		printf("] ");
-	} else {
-		error = print_hex(pdu, "encapsulated-pdu", sublen);
-		if (error)
-			return error;
-	}
+	error = print_subpdu(pdu, remainder, sublen);
+	if (error)
+		return error;
 
 	remainder -= sublen;
 	if (remainder < 4)
@@ -1898,7 +1949,7 @@ static int
 print_pdu_unknown(struct pdu *pdu, unsigned char *hdr)
 {
 	printf("unknown        ");
-	return print_remainder(pdu, print_hdr1(hdr, "?"));
+	return print_hex(pdu, NULL, pdu->len);
 }
 
 static print_pdu_cb
@@ -2168,19 +2219,23 @@ handle_server_pdus(void *arg)
 {
 	struct pdu pdu = { .fd = rtrfd };
 	unsigned char hdr[8];
+	int error;
 
 	do {
 		if (read_bytes(&pdu, hdr, sizeof(hdr)) != 0)
 			return NULL;
 		pr_trace("PDU received.");
-		if (print_pdu(&pdu, hdr) != 0)
-			return NULL;
+		error = print_pdu(&pdu, hdr);
+
 		printf("\n");
 		/*
 		 * Newline does not always imply a flush, but we do need it
 		 * because interactive mode often terminates by SIGTERM.
 		 */
 		fflush(stdout);
+
+		if (error)
+			return NULL;
 	} while (true);
 }
 
