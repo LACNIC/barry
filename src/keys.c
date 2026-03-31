@@ -9,18 +9,17 @@
 #include "alloc.h"
 #include "print.h"
 
-static char *
-next_key(void)
-{
-	extern char const *keys_path;
-	static unsigned int k;
+extern char const *keys_path;
 
+static char *
+get_key_path(unsigned int k)
+{
 	char *path;
 	size_t pathlen;
 
 	pathlen = strlen(keys_path) + 16;
 	path = pzalloc(pathlen);
-	psnprintf(path, pathlen, "%s/%u.pem", keys_path, k++);
+	psnprintf(path, pathlen, "%s/%u.pem", keys_path, k);
 
 	return path;
 }
@@ -28,7 +27,7 @@ next_key(void)
 EVP_PKEY *
 keys_new(void)
 {
-	extern char const *keys_path;
+	static unsigned int k;
 
 	char *path;
 	FILE *file;
@@ -43,12 +42,19 @@ keys_new(void)
 		return result;
 	}
 
-	path = next_key();
+retry:	path = get_key_path(k);
 	pr_debug("- Loading keypair: %s", path);
 
 	file = fopen(path, "r");
-	if (!file)
-		panic("Cannot open %s: %s", path, strerror(errno));
+	if (!file) {
+		if (k == 0)
+			panic("Cannot open %s: %s", path, strerror(errno));
+		else
+			pr_debug("Cannot open %s: %s", path, strerror(errno));
+		k = 0;
+		goto retry;
+	}
+	k++;
 
 	result = NULL;
 	ctx = OSSL_DECODER_CTX_new_for_pkey(&result, "PEM", NULL, "RSA",
