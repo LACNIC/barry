@@ -674,21 +674,33 @@ add_u8(struct pdu *pdu, size_t offset, uint8_t u8)
 }
 
 static size_t
+__add_u16(unsigned char *buf, uint16_t u16)
+{
+	buf[0] = (u16 >> 8) & 0xFFu;
+	buf[1] = (u16 >> 0) & 0xFFu;
+	return 2;
+}
+
+static size_t
 add_u16(struct pdu *pdu, size_t offset, uint16_t u16)
 {
-	pdu->buf[offset    ] = (u16 >> 8) & 0xFFu;
-	pdu->buf[offset + 1] = (u16 >> 0) & 0xFFu;
-	return 2;
+	return __add_u16(&pdu->buf[offset], u16);
+}
+
+static size_t
+__add_u32(unsigned char *buf, uint32_t u32)
+{
+	buf[0] = (u32 >> 24) & 0xFFu;
+	buf[1] = (u32 >> 16) & 0xFFu;
+	buf[2] = (u32 >>  8) & 0xFFu;
+	buf[3] = (u32 >>  0) & 0xFFu;
+	return 4;
 }
 
 static size_t
 add_u32(struct pdu *pdu, size_t offset, uint32_t u32)
 {
-	pdu->buf[offset    ] = (u32 >> 24) & 0xFFu;
-	pdu->buf[offset + 1] = (u32 >> 16) & 0xFFu;
-	pdu->buf[offset + 2] = (u32 >>  8) & 0xFFu;
-	pdu->buf[offset + 3] = (u32 >>  0) & 0xFFu;
-	return 4;
+	return __add_u32(&pdu->buf[offset], u32);
 }
 
 static void
@@ -1209,8 +1221,15 @@ create_raw_pdu(struct line_reader *rdr)
 	pdu->offset = 0;
 
 	while ((token = next_token(rdr)) != NULL) {
-		if (token2bytes(token, "raw", &bytes, &n) != 0)
+		if (streq(token, "<session>")) {
+			bytes = pmalloc(2);
+			n = __add_u16(bytes, atomic_load(&session));
+		} else if (streq(token, "<serial>")) {
+			bytes = pmalloc(4);
+			n = __add_u32(bytes, serial);
+		} else if (token2bytes(token, "raw", &bytes, &n) != 0) {
 			goto fail;
+		}
 
 		if (pdu->len + n > PDUBUFLEN) {
 			pr_err("Too many bytes: %zu > %u",
@@ -1400,17 +1419,17 @@ ensure_bytes(struct pdu *pdu, size_t need)
 {
 	ssize_t n;
 
-	if (pdu->fd < 0) {
-		pr_warn("PDU is truncated.");
-		return EINVAL;
-	}
-
 	if (need > sizeof(pdu->buf))
 		panic("Requested %zu bytes, buffer has %zu.",
 		    need, sizeof(pdu->buf));
 
 	if (pdu->len - pdu->offset >= need)
 		return 0;
+
+	if (pdu->fd < 0) {
+		pr_warn("PDU is truncated.");
+		return EINVAL;
+	}
 
 	pdu->len -= pdu->offset;
 	memmove(pdu->buf, pdu->buf + pdu->offset, pdu->len);
