@@ -1659,14 +1659,11 @@ print_hdr2(unsigned char *hdr, char const *key3, char const *key4)
 }
 
 static void
-__print_hex(struct pdu *pdu, size_t n)
+__print_hex(unsigned char *buf, size_t n)
 {
 	size_t i;
-
 	for (i = 0; i < n; i++)
-		printf("%02x", pdu->buf[pdu->offset + i]);
-
-	pdu->offset += n;
+		printf("%02x", buf[i]);
 }
 
 static int
@@ -1689,7 +1686,8 @@ print_hex(struct pdu *pdu, char const *pfx, size_t len)
 
 		room = pdu->len - pdu->offset;
 		printable = (room < len) ? room : len;
-		__print_hex(pdu, printable);
+		__print_hex(&pdu->buf[pdu->offset], printable);
+		pdu->offset += printable;
 		len -= printable;
 	};
 	printf(" ");
@@ -1950,6 +1948,7 @@ end:	return print_remainder(pdu, remainder);
 static int
 print_subpdu(struct pdu *pdu, size_t remainder, uint32_t sublen)
 {
+	struct pdu subpdu;
 	unsigned char subhdr[8];
 	size_t i;
 	int error;
@@ -1974,8 +1973,13 @@ print_subpdu(struct pdu *pdu, size_t remainder, uint32_t sublen)
 		return 0;
 	}
 
+	subpdu.fd = -1;
+	memcpy(subpdu.buf, pdu->buf, PDUBUFLEN);
+	subpdu.len = sublen - 8;
+	subpdu.offset = pdu->offset;
+
 	printf("encapsulated-pdu [ ");
-	error = print_pdu(pdu, subhdr);
+	error = print_pdu(&subpdu, subhdr);
 	printf("] ");
 
 	return error;
@@ -2019,7 +2023,9 @@ static int
 print_pdu_unknown(struct pdu *pdu, unsigned char *hdr)
 {
 	printf("unknown        ");
-	return print_hex(pdu, NULL, pdu->len);
+	__print_hex(hdr, 8);
+	printf(" ");
+	return print_hex(pdu, "remainder", pdu->len);
 }
 
 static print_pdu_cb
