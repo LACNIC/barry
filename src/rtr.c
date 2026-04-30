@@ -1961,22 +1961,14 @@ print_subpdu(struct pdu *pdu, size_t remainder, uint32_t sublen)
 	error = read_bytes(pdu, subhdr, sizeof(subhdr));
 	if (error)
 		return error;
-	if (assemble_u32(&subhdr[4]) != sublen || remainder < sublen) {
-		printf("encapsulated-pdu [ ");
-		for (i = 0; i < 8; i++)
-			printf("%02x", subhdr[i]);
-		if (sublen > 8)
-			print_hex(pdu, NULL, sublen - 8);
-		else
-			printf(" ");
-		printf("] ");
-		return 0;
-	}
+	if (assemble_u32(&subhdr[4]) != sublen || remainder < sublen)
+		goto hdrhex;
 
 	subpdu.fd = -1;
-	memcpy(subpdu.buf, pdu->buf, PDUBUFLEN);
+	if (read_bytes(pdu, subpdu.buf, sublen - 8) != 0)
+		goto hdrhex;
 	subpdu.len = sublen - 8;
-	subpdu.offset = pdu->offset;
+	subpdu.offset = 0;
 
 	printf("encapsulated-pdu [ ");
 	error = print_pdu(&subpdu, subhdr);
@@ -1985,6 +1977,16 @@ print_subpdu(struct pdu *pdu, size_t remainder, uint32_t sublen)
 	return error;
 
 hex:	return print_hex(pdu, "encapsulated-pdu", sublen);
+
+hdrhex:	printf("encapsulated-pdu [ ");
+	for (i = 0; i < 8; i++)
+		printf("%02x", subhdr[i]);
+	if (sublen > 8)
+		print_hex(pdu, NULL, sublen - 8);
+	else
+		printf(" ");
+	printf("] ");
+	return 0;
 }
 
 static int
