@@ -13,8 +13,6 @@
 #include "field.h"
 #include "file.h"
 
-#define BUFSIZE (64 * 1024)
-
 void
 init_8str(OCTET_STRING_t *ostr, char const *value)
 {
@@ -197,32 +195,60 @@ init_gtime_later(GeneralizedTime_t *time)
 	*time = default_glater;
 }
 
+struct encode_buffer {
+	uint8_t *buf;
+	size_t offset;
+	size_t capacity;
+};
+
+static int
+buffer_bytes(const void *bytes, size_t size, void *arg)
+{
+	struct encode_buffer *buf = arg;
+	bool grown = false;
+
+	while (buf->offset + size > buf->capacity) {
+		if (buf->capacity == 0)
+			buf->capacity = 16;
+		else if (buf->capacity < 32768)
+			buf->capacity <<= 1;
+		else
+			buf->capacity += 32768;
+		grown = true;
+	}
+	if (grown)
+		buf->buf = prealloc(buf->buf, buf->capacity);
+
+	memcpy(buf->buf + buf->offset, bytes, size);
+	buf->offset += size;
+	return 0;
+}
+
 void
 der_encode_any(const asn_TYPE_descriptor_t *td, void *obj, ANY_t *any)
 {
+	struct encode_buffer buf = { 0 };
 	asn_enc_rval_t rval;
 
-	memset(any, 0, sizeof(*any));
-
-	any->buf = pmalloc(BUFSIZE);
-
-	rval = der_encode_to_buffer(td, obj, any->buf, BUFSIZE);
+	rval = der_encode(td, obj, buffer_bytes, &buf);
 	if (rval.encoded < 0)
 		panic("Cannot encode %s: %zd", td->name, rval.encoded);
+	if (rval.encoded != buf.offset)
+		panic("Broken ANY encoding: rval:%zu offset:%zu",
+		    rval.encoded, buf.offset);
 
-	any->size = rval.encoded;
+	memset(any, 0, sizeof(*any));
+	any->buf = buf.buf;
+	any->size = buf.offset;
 }
 
 void
 der_encode_8str(const asn_TYPE_descriptor_t *td, void *obj, OCTET_STRING_t *os)
 {
+	struct encode_buffer buf = { 0 };
 	asn_enc_rval_t rval;
 
-	memset(os, 0, sizeof(*os));
-
-	os->buf = pmalloc(BUFSIZE);
-
-	rval = der_encode_to_buffer(td, obj, os->buf, BUFSIZE);
+	rval = der_encode(td, obj, buffer_bytes, &buf);
 	if (rval.encoded < 0) {
 		if (rval.failed_type)
 			panic("Cannot encode %s's %s: %zd", td->name,
@@ -230,8 +256,13 @@ der_encode_8str(const asn_TYPE_descriptor_t *td, void *obj, OCTET_STRING_t *os)
 		else
 			panic("Cannot encode %s: %zd", td->name, rval.encoded);
 	}
+	if (rval.encoded != buf.offset)
+		panic("Broken OCTET STRING encoding: rval:%zu offset:%zu",
+		    rval.encoded, buf.offset);
 
-	os->size = rval.encoded;
+	memset(os, 0, sizeof(*os));
+	os->buf = buf.buf;
+	os->size = buf.offset;
 }
 
 void
