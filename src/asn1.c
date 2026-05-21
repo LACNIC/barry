@@ -123,6 +123,8 @@ str2tm(char const *str, struct tm *tm)
 void
 init_time_tm(X509Time_t *time, struct tm *tm)
 {
+	memset(&time->choice, 0, sizeof(time->choice));
+
 	if (tm->tm_year < 150) {
 		time->present = X509Time_PR_utcTime;
 		if (asn_time2UT(&time->choice.utcTime, tm, true) == NULL)
@@ -177,6 +179,7 @@ init_gtime_str(GeneralizedTime_t *time, char const *str)
 void
 init_gtime_tm(GeneralizedTime_t *time, struct tm *tm)
 {
+	memset(time, 0, sizeof(*time));
 	if (asn_time2GT(time, tm, true) == NULL)
 		panic("GeneralizedTime");
 }
