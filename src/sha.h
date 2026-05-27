@@ -11,4 +11,6 @@ void hash_sha256(uint8_t *, size_t, OCTET_STRING_t *);
 void sha256_file(char const *, unsigned char *, unsigned int *);
 char *sha256_file_str(char const *);
 
+char hash_b2c(unsigned char);
+
 #endif /* SRC_SHA_H_ */

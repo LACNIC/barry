@@ -34,7 +34,7 @@ INTEGER_t *intmax2INTEGER(intmax_t);
 void init_INTEGER(INTEGER_t *, intmax_t);
 void init_oid(OBJECT_IDENTIFIER_t *, int);
 ANY_t *create_null(void);
-void init_name(Name_t *, char const *);
+void init_subject(Name_t *, char const *);
 void init_any_str(ANY_t *, char const *);
 void init_time_str(X509Time_t *, char const *);
 void init_time_tm(X509Time_t *, struct tm *);

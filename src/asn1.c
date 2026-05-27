@@ -12,6 +12,7 @@
 
 #include "field.h"
 #include "file.h"
+#include "sha.h"
 
 void
 init_8str(OCTET_STRING_t *ostr, char const *value)
@@ -76,11 +77,13 @@ create_null(void)
 }
 
 void
-init_name(Name_t *name, char const *value)
+init_subject(Name_t *name, char const *value)
 {
 	struct RelativeDistinguishedName *rdn;
 	struct AttributeTypeAndValue *atv;
+	OCTET_STRING_t hash;
 	PrintableString_t ps;
+	size_t i;
 
 	name->present = Name_PR_rdnSequence;
 	INIT_ASN1_ARRAY(&name->choice.rdnSequence.list, 1, RelativeDistinguishedName_t);
@@ -90,8 +93,18 @@ init_name(Name_t *name, char const *value)
 
 	atv = rdn->list.array[0];
 	init_oid(&atv->type, NID_commonName);
-	init_8str(&ps, value);
+
+	hash_sha256((uint8_t *)value, strlen(value), &hash);
+	ps.size = 2 * hash.size;
+	ps.buf = pmalloc(ps.size);
+	for (i = 0; i < hash.size; i++) {
+		ps.buf[2 * i + 0] = hash_b2c(hash.buf[i] >> 4);
+		ps.buf[2 * i + 1] = hash_b2c(hash.buf[i]);
+	}
 	der_encode_any(&asn_DEF_PrintableString, &ps, &atv->value);
+
+	free(hash.buf);
+	free(ps.buf);
 }
 
 void

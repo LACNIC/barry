@@ -136,7 +136,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	field_add(valf, "notBefore", &ft_time, &tbs->validity.notBefore, 0);
 	field_add(valf, "notAfter", &ft_time, &tbs->validity.notAfter, 0);
 
-	init_name(&tbs->subject, meta->name);
+	init_subject(&tbs->subject, meta->name);
 	field_add_name(tbsf, "subject", &tbs->subject);
 
 	pubkey2asn1(cer->keys, &tbs->subjectPublicKeyInfo);
@@ -337,7 +337,7 @@ cer_finish_ca(struct rpki_certificate *ca)
 
 	if (ca->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ca->obj.tbsCertificate.issuer, parent->meta->name);
+		ca->obj.tbsCertificate.issuer = parent->obj.tbsCertificate.subject;
 	}
 	finish_extensions(ca, CT_CA, NULL);
 	update_signature(ca, parent->keys);
@@ -354,7 +354,7 @@ cer_finish_ee(struct rpki_certificate *ee, struct rpki_object *so)
 
 	if (ee->obj.tbsCertificate.issuer.present == Name_PR_NOTHING) {
 		pr_debug("- Autofilling Issuer");
-		init_name(&ee->obj.tbsCertificate.issuer, parent->meta->name);
+		ee->obj.tbsCertificate.issuer = parent->obj.tbsCertificate.subject;
 	}
 	finish_extensions(ee, CT_EE, so);
 	update_signature(ee, parent->keys);

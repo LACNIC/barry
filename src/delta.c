@@ -309,8 +309,6 @@ collect_publish(xmlChar *uri, xmlChar *content, void *_args)
 	decode_base64((char *)content, &bin, &binlen);
 
 	hash_sha256(bin, binlen, &hash);
-	if (hash.size != HASHSIZE)
-		panic("Hash lengths %zu bytes.", hash.size);
 
 	pbl = pzalloc(sizeof(struct publish));
 	pbl->uri = pstrdup((char *)uri);

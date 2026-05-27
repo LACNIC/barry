@@ -2,7 +2,7 @@
 
 check_output_contains "tutorial-name" -Fx \
 	"ta.cer,obj.tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
-	"ta.cer,obj.tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,ta.cer" \
+	"ta.cer,obj.tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,82c4e3a924923005b4f2c7ea2376fde4d7e24b2334127a89ca8f60bfe526d202" \
 	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.0.0.type,OBJECT IDENTIFIER,2.5.4.3 (commonName)" \
 	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.0.0.value,PrintableString in ANY,aaa" \
 	"ca1.cer,obj.tbsCertificate.subject.rdnSequence.0.1.type,OBJECT IDENTIFIER,2.5.4.5 (serialNumber)" \

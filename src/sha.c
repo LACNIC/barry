@@ -49,6 +49,8 @@ void
 hash_sha256(uint8_t *buf, size_t buflen, OCTET_STRING_t *hash)
 {
 	do_hash("SHA256", buf, buflen, hash);
+	if (hash->size != 32)
+		panic("Hash lengths %zu bytes.", hash->size);
 }
 
 static void
@@ -100,7 +102,7 @@ sha256_file(char const *path, unsigned char *result, unsigned int *rlen)
 }
 
 /* binary to char */
-static char
+char
 hash_b2c(unsigned char bin)
 {
 	bin &= 0xF;
