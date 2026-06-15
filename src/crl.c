@@ -50,7 +50,6 @@ crl_new(struct rpki_tree_node *node)
 	init_time_later(tbs->nextUpdate);
 	field_add(tbsf, "nextUpdate", &ft_time, &tbs->nextUpdate, sizeof(struct X509Time));
 
-	/* revokedCertificates: TODO not implemented yet */
 	field_add(tbsf, "revokedCertificates", &ft_revoked,
 	    &tbs->revokedCertificates,
 	    sizeof(struct TBSCertList__revokedCertificates));

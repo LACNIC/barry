@@ -1646,7 +1646,8 @@ print_asns(struct dynamic_string *dstr, void *arg)
 static void
 parse_revoked_list(struct field *field, struct kv_value *src, void *arg)
 {
-	struct TBSCertList__revokedCertificates *rcs;
+	struct TBSCertList__revokedCertificates *rcs = arg;
+	struct TBSCertList__revokedCertificates__Member *rc;
 	struct kv_node *node;
 	int n;
 
@@ -1657,9 +1658,6 @@ parse_revoked_list(struct field *field, struct kv_value *src, void *arg)
 	STAILQ_FOREACH(node, &src->v.set, hook)
 		n++;
 
-	rcs = pzalloc(sizeof(struct TBSCertList__revokedCertificates));
-	*((struct TBSCertList__revokedCertificates **)arg) = rcs;
-
 	INIT_ASN1_ARRAY(
 	    &rcs->list, n,
 	    struct TBSCertList__revokedCertificates__Member
@@ -1667,11 +1665,9 @@ parse_revoked_list(struct field *field, struct kv_value *src, void *arg)
 
 	n = 0;
 	STAILQ_FOREACH(node, &src->v.set, hook) {
-		__parse_int(
-		    field,
-		    &node->value,
-		    &rcs->list.array[n]->userCertificate
-		);
+		rc = rcs->list.array[n];
+		__parse_int(field, &node->value, &rc->userCertificate);
+		init_time_now(&rc->revocationDate);
 		n++;
 	}
 }
@@ -1679,11 +1675,10 @@ parse_revoked_list(struct field *field, struct kv_value *src, void *arg)
 static void
 print_revokeds(struct dynamic_string *dstr, void *arg)
 {
-	struct TBSCertList__revokedCertificates *rcs;
+	struct TBSCertList__revokedCertificates *rcs = arg;
 	struct TBSCertList__revokedCertificates__Member *rc;
 	int i;
 
-	rcs = *((struct TBSCertList__revokedCertificates **)arg);
 	if (!rcs)
 		return;
 
