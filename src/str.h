@@ -1,9 +1,12 @@
 #ifndef SRC_STR_H_
 #define SRC_STR_H_
 
+#include <stdbool.h>
 #include <stddef.h>
 
 char *concat(char const *, char const *);
+bool str_has_suffix(char const *, char const *);
+char *path_join(char const *, char const *);
 
 struct dynamic_string {
 	char *buf;

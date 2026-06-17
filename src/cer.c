@@ -112,7 +112,7 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 	struct field *extsf;
 
 	cer->meta = meta;
-	cer->keys = keys_new();
+	cer->keys = keys_new(meta->name);
 
 	tbs = &cer->obj.tbsCertificate;
 	tbsf = field_add(cer->objf, "tbsCertificate", &ft_obj, tbs, 0);

@@ -4,7 +4,7 @@
 #include <openssl/evp.h>
 #include <stddef.h>
 
-EVP_PKEY *keys_new(void);
+EVP_PKEY *keys_new(char const *);
 void pubkey2der(EVP_PKEY *, unsigned char **, size_t *);
 
 #endif /* SRC_KEYS_H_ */

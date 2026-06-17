@@ -21,6 +21,37 @@ concat(char const *s1, char const *s2)
 	return result;
 }
 
+bool
+str_has_suffix(char const *str, char const *suffix)
+{
+	size_t str_len;
+	size_t suffix_len;
+
+	str_len = strlen(str);
+	suffix_len = strlen(suffix);
+	if (str_len < suffix_len)
+		return false;
+
+	return strncmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
+}
+
+char *
+path_join(char const *str1, char const *str2)
+{
+	char *str3;
+	size_t len3;
+	int ret;
+
+	len3 = strlen(str1) + strlen(str2) + 2;
+	str3 = pmalloc(len3);
+
+	ret = snprintf(str3, len3, "%s/%s", str1, str2);
+	if (ret < 0 || len3 <= ret)
+		panic("snprintf(%s, %s): %d", str1, str2, ret);
+
+	return str3;
+}
+
 static size_t
 next_power_of_2(size_t src)
 {

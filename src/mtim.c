@@ -12,6 +12,7 @@
 
 #include "alloc.h"
 #include "print.h"
+#include "str.h"
 
 #define OPTLONG_VERBOSE		"verbose"
 #define OPTLONG_HELP		"help"
@@ -106,23 +107,6 @@ skip_prefix(char const *str, char const *pfx)
 	}
 
 	return str;
-}
-
-char *
-path_join(char const *str1, char const *str2)
-{
-	char *str3;
-	size_t len3;
-	int ret;
-
-	len3 = strlen(str1) + strlen(str2) + 2;
-	str3 = pmalloc(len3);
-
-	ret = snprintf(str3, len3, "%s/%s", str1, str2);
-	if (ret < 0 || len3 <= ret)
-		panic("snprintf(%s, %s): %d", str1, str2, ret);
-
-	return str3;
 }
 
 /* Not thread-safe! */

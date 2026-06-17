@@ -50,6 +50,7 @@ barry_delta_LDADD  = ${XML2_LIBS}
 barry_mtim_SOURCES = mtim.c
 barry_mtim_SOURCES += alloc.c alloc.h
 barry_mtim_SOURCES += print.c print.h
+barry_mtim_SOURCES += str.c str.h
 barry_mtim_CFLAGS = ${common_CFLAGS}
 
 barry_rtr_SOURCES = rtr.c

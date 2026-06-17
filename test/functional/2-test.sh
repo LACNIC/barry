@@ -20,7 +20,7 @@ mkdir -p "sandbox/rsync"
 mkdir -p "sandbox/tal"
 
 if [ -z "$(ls -A sandbox/keys)" ]; then    # "If sandbox/keys is empty"
-	for i in $(seq 0 20); do
+	for i in $(seq 0 15); do
 		echo "Creating sandbox/keys/$i.pem"
 		openssl genrsa -out "sandbox/keys/$i.pem" 2048
 	done
@@ -48,13 +48,9 @@ $BARRY $BASIC_ARGS						\
 	"tests/root-only.rd"					\
 	> "$DEFAULT_OUTPUT_FILE" 2>&1
 
-check_output_contains() {
-	# $1: Test RD filename, without extension
+run_barry() {
+	# $1: RD filename, without extension
 	TEST_RD="$1"
-	# $2: Arguments to grep
-	GREP_ARGS="$2"
-	# $3-$n: Regular expression that describes the line that should be
-	# present in the test output
 
 	OUTPUT_FILE="sandbox/output/$TEST_RD.log"
 	if [ ! -f "$OUTPUT_FILE" ]; then
@@ -74,9 +70,20 @@ check_output_contains() {
 			return
 		fi
 	fi
+}
 
+check_output_contains() {
+	# $1: Test RD filename, without extension
+	TEST_RD="$1"
+	# $2: Arguments to grep
+	GREP_ARGS="$2"
+	# $3-$n: Regular expression that describes the line that should be
+	# present in the test output
 	shift
 	shift
+
+	run_barry "$TEST_RD"
+
 	while test $# -gt 0; do
 		grep -q $GREP_ARGS "$1" "$OUTPUT_FILE"
 		if [ $? -eq 0 ]; then
