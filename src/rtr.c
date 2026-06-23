@@ -82,10 +82,21 @@ static char *
 next_token(struct line_reader *rdr)
 {
 	char *tkn;
-	tkn = strtok_r(rdr->first ? rdr->line : NULL, " \t\n", &rdr->saveptr);
+	tkn = strtok_r(rdr->first ? rdr->line : NULL, " \t\n\r\v\f", &rdr->saveptr);
 	rdr->first = false;
 	pr_trace("Received token: %s", tkn);
 	return (rdr->lvl > 0 && streq(tkn, "]")) ? NULL : tkn;
+}
+
+static bool
+is_whitespace(char c)
+{
+	/*
+	 * Note: Needs to be consistent with next_token().
+	 * (Plus null character)
+	 */
+	return c == ' '  || c == 0    || c == '\t' || c == '\n'
+	    || c == '\r' || c == '\v' || c == '\f';
 }
 
 static void
@@ -235,6 +246,10 @@ str2ul(char const *what, char const *str, unsigned long max, unsigned long *ul)
 	}
 	if (str == tailptr) {
 		pr_err("Cannot convert %s to int.", what);
+		return EINVAL;
+	}
+	if (!is_whitespace(*tailptr)) {
+		pr_err("Number has suffix garbage: %s", str);
 		return EINVAL;
 	}
 	if (v > max) {
