@@ -232,14 +232,25 @@ str2ul(char const *what, char const *str, unsigned long max, unsigned long *ul)
 {
 	unsigned long v;
 	char *tailptr;
+	int base;
 
 	if (!str) {
 		pr_err("Expected token after '%s'.", what);
 		return EINVAL;
 	}
 
+	if (str[0] == '0' && str[1] == 'x') {
+		base = 16;
+		str += 2;
+	} else if (str[0] == '0' && str[1] == 'b') {
+		base = 2;
+		str += 2;
+	} else {
+		base = 10;
+	}
+
 	errno = 0;
-	v = strtoul(str, &tailptr, 10);
+	v = strtoul(str, &tailptr, base);
 	if (errno) {
 		pr_err("Cannot convert %s to int: %s", what, strerror(errno));
 		return EINVAL;
