@@ -18,11 +18,11 @@
 #include "oid.h"
 #include "sha.h"
 
-struct ext_list_node *
+static struct ext_list_node *
 add_extension(struct extensions *exts,
     enum ext_type type, const asn_TYPE_descriptor_t *td,
     char const *name, int nid,
-    bool critical)
+    int critical)
 {
 	struct ext_list_node *ext;
 
@@ -44,6 +44,18 @@ add_extension(struct extensions *exts,
 	return ext;
 }
 
+#define ADD_BC(exts, name, crit)  add_extension(exts, EXT_BC, &asn_DEF_BasicConstraints, name, NID_basic_constraints, crit)
+#define ADD_SKI(exts, name, crit) add_extension(exts, EXT_SKI, &asn_DEF_SubjectKeyIdentifier, name, NID_subject_key_identifier, crit)
+#define ADD_AKI(exts, name, crit) add_extension(exts, EXT_AKI, &asn_DEF_AuthorityKeyIdentifier, name, NID_authority_key_identifier, crit)
+#define ADD_KU(exts, name, crit)  add_extension(exts, EXT_KU, &asn_DEF_KeyUsage, name, NID_key_usage, crit)
+#define ADD_CDP(exts, name, crit)  add_extension(exts, EXT_CRLDP, &asn_DEF_CRLDistributionPoints, name, NID_crl_distribution_points, crit)
+#define ADD_AIA(exts, name, crit) add_extension(exts, EXT_AIA, &asn_DEF_AuthorityInfoAccessSyntax, name, NID_info_access, crit)
+#define ADD_SIA(exts, name, crit) add_extension(exts, EXT_SIA, &asn_DEF_SubjectInfoAccessSyntax, name, NID_sinfo_access, crit)
+#define ADD_CP(exts, name, crit)  add_extension(exts, EXT_CP, &asn_DEF_CertificatePolicies, name, NID_certificate_policies, crit)
+#define ADD_IP(exts, name, crit)  add_extension(exts, EXT_IP, &asn_DEF_IPAddrBlocks, name, NID_sbgp_ipAddrBlock, crit)
+#define ADD_AS(exts, name, crit)  add_extension(exts, EXT_ASN, &asn_DEF_ASIdentifiers, name, NID_sbgp_autonomousSysNum, crit)
+#define ADD_CN(exts, name, crit)  add_extension(exts, EXT_CRLN, &asn_DEF_CRLNumber, name, NID_crl_number, crit)
+
 static void
 add_bc_fields(struct field *parent, struct ext_list_node *ext)
 {
@@ -63,8 +75,7 @@ exts_add_bc(struct extensions *exts, char const *name, struct field *extsf)
 {
 	struct ext_list_node *ext;
 
-	ext = add_extension(exts, EXT_BC, &asn_DEF_BasicConstraints, name,
-	    NID_basic_constraints, true);
+	ext = ADD_BC(exts, name, 0xFF);
 	ext->v.bc.cA = 0xFF;
 
 	add_bc_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
@@ -81,11 +92,7 @@ add_ski_fields(struct field *parent, struct ext_list_node *ext)
 void
 exts_add_ski(struct extensions *exts, char const *name, struct field *extsf)
 {
-	struct ext_list_node *ext;
-
-	ext = add_extension(exts, EXT_SKI, &asn_DEF_SubjectKeyIdentifier, name,
-	    NID_subject_key_identifier, false);
-
+	struct ext_list_node *ext = ADD_SKI(exts, name, 0);
 	add_ski_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
@@ -113,11 +120,7 @@ add_aki_fields(struct field *parent, struct ext_list_node *ext)
 void
 exts_add_aki(struct extensions *exts, char const *name, struct field *extsf)
 {
-	struct ext_list_node *ext;
-
-	ext = add_extension(exts, EXT_AKI, &asn_DEF_AuthorityKeyIdentifier,
-	    name, NID_authority_key_identifier, false);
-
+	struct ext_list_node *ext = ADD_AKI(exts, name, 0);
 	add_aki_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
@@ -132,11 +135,7 @@ add_ku_fields(struct field *parent, struct ext_list_node *ext)
 void
 exts_add_ku(struct extensions *exts, char const *name, struct field *extsf)
 {
-	struct ext_list_node *ext;
-
-	ext = add_extension(exts, EXT_KU, &asn_DEF_KeyUsage, name,
-	    NID_key_usage, true);
-
+	struct ext_list_node *ext = ADD_KU(exts, name, 0xFF);
 	add_ku_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
@@ -151,11 +150,7 @@ add_cdp_fields(struct field *parent, struct ext_list_node *ext)
 void
 exts_add_cdp(struct extensions *exts, char const *name, struct field *extsf)
 {
-	struct ext_list_node *ext;
-
-	ext = add_extension(exts, EXT_CRLDP, &asn_DEF_CRLDistributionPoints,
-	    name, NID_crl_distribution_points, false);
-
+	struct ext_list_node *ext = ADD_CDP(exts, name, 0);
 	add_cdp_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
@@ -188,10 +183,7 @@ exts_add_aia(struct extensions *exts, char const *name, struct field *extsf)
 	struct field *aiaf;
 	struct field *extnValuef;
 
-	ext = add_extension(exts,
-	    EXT_AIA, &asn_DEF_AuthorityInfoAccessSyntax,
-	    name, NID_info_access,
-	    false);
+	ext = ADD_AIA(exts, name, 0);
 	INIT_ASN1_ARRAY(&ext->v.aia.list, 1, AccessDescription_t);
 
 	aiaf = field_add(extsf, name, &ft_obj, &ext->v, 0);
@@ -241,10 +233,7 @@ exts_add_sia(struct extensions *exts, char const *name, struct field *extsf,
 	struct field *siaf;
 	struct field *extnValuef;
 
-	ext = add_extension(exts,
-	    EXT_SIA, &asn_DEF_SubjectInfoAccessSyntax,
-	    name, NID_sinfo_access,
-	    false);
+	ext = ADD_SIA(exts, name, 0);
 	adn = defaults(NULL, NULL);
 	INIT_ASN1_ARRAY(&ext->v.sia.list, adn, AccessDescription_t);
 
@@ -265,11 +254,7 @@ add_cp_fields(struct field *parent, struct ext_list_node *ext)
 void
 exts_add_cp(struct extensions *exts, char const *name, struct field *extsf)
 {
-	struct ext_list_node *ext;
-
-	ext = add_extension(exts, EXT_CP, &asn_DEF_CertificatePolicies, name,
-	    NID_certificate_policies, true);
-
+	struct ext_list_node *ext = ADD_CP(exts, name, 0xFF);
 	add_cp_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
@@ -284,11 +269,7 @@ add_ip_fields(struct field *parent, struct ext_list_node *ext)
 void
 exts_add_ip(struct extensions *exts, char const *name, struct field *extsf)
 {
-	struct ext_list_node *ext;
-
-	ext = add_extension(exts, EXT_IP, &asn_DEF_IPAddrBlocks, name,
-	    NID_sbgp_ipAddrBlock, true);
-
+	struct ext_list_node *ext = ADD_IP(exts, name, 0xFF);
 	add_ip_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
@@ -310,11 +291,7 @@ add_as_fields(struct field *parent, struct ext_list_node *ext)
 void
 exts_add_as(struct extensions *exts, char const *name, struct field *extsf)
 {
-	struct ext_list_node *ext;
-
-	ext = add_extension(exts, EXT_ASN, &asn_DEF_ASIdentifiers, name,
-	    NID_sbgp_autonomousSysNum, true);
-
+	struct ext_list_node *ext = ADD_AS(exts, name, 0xFF);
 	add_as_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
@@ -331,8 +308,7 @@ exts_add_crln(struct extensions *exts, char const *name, struct field *extsf)
 {
 	struct ext_list_node *ext;
 
-	ext = add_extension(exts, EXT_CRLN, &asn_DEF_CRLNumber, name,
-	    NID_crl_number, false);
+	ext = ADD_CN(exts, name, 0);
 	init_INTEGER(&ext->v.cn, 1);
 
 	add_crln_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
@@ -687,7 +663,7 @@ ext_finish_as(ASIdentifiers_t *as, struct rpki_certificate *cer)
 }
 
 void
-ext_compile(struct extensions *src, Extensions_t **_dst)
+exts_encode(struct extensions *src, Extensions_t **_dst)
 {
 	Extensions_t *dst;
 	Extension_t *ext;
@@ -710,4 +686,45 @@ ext_compile(struct extensions *src, Extensions_t **_dst)
 	}
 
 	*_dst = dst;
+}
+
+void
+exts_decode(Extensions_t *src_list, struct extensions *dst_list)
+{
+	struct Extension *src;
+	struct ext_list_node *dst;
+	int e;
+
+	STAILQ_INIT(dst_list);
+
+	for (e = 0; e < src_list->list.count; e++) {
+		src = src_list->list.array[e];
+
+		if (is_oid(&src->extnID, OID_BC))
+			dst = ADD_BC(dst_list, "bc", src->critical);
+		else if (is_oid(&src->extnID, OID_SKI))
+			dst = ADD_SKI(dst_list, "ski", src->critical);
+		else if (is_oid(&src->extnID, OID_AKI))
+			dst = ADD_AKI(dst_list, "aki", src->critical);
+		else if (is_oid(&src->extnID, OID_KU))
+			dst = ADD_KU(dst_list, "ku", src->critical);
+		else if (is_oid(&src->extnID, OID_CRLDP))
+			dst = ADD_CDP(dst_list, "cdp", src->critical);
+		else if (is_oid(&src->extnID, OID_AIA))
+			dst = ADD_AIA(dst_list, "aia", src->critical);
+		else if (is_oid(&src->extnID, OID_SIA))
+			dst = ADD_SIA(dst_list, "sia", src->critical);
+		else if (is_oid(&src->extnID, OID_CP))
+			dst = ADD_CP(dst_list, "cp", src->critical);
+		else if (is_oid(&src->extnID, OID_IP))
+			dst = ADD_IP(dst_list, "ip", src->critical);
+		else if (is_oid(&src->extnID, OID_ASN))
+			dst = ADD_AS(dst_list, "as", src->critical);
+		else if (is_oid(&src->extnID, OID_CRLN))
+			dst = ADD_CN(dst_list, "cn", src->critical);
+		else
+			panic("Unrecognized extension.");
+
+		os2asn1(&src->extnValue, dst->td, &dst->v);
+	}
 }

@@ -51,6 +51,7 @@ init_filelist(Manifest_t *mft, struct rpki_tree_node *node, struct field *field)
 struct signed_object *
 mft_new(struct rpki_tree_node *node)
 {
+	extern unsigned long default_serial;
 	struct signed_object *so;
 	Manifest_t *mft;
 	struct field *eContent, *fileList;
@@ -61,7 +62,7 @@ mft_new(struct rpki_tree_node *node)
 	mft->version = intmax2INTEGER(0);
 	field_add(eContent, "version", &ft_int, &mft->version, sizeof(INTEGER_t));
 
-	init_INTEGER(&mft->manifestNumber, 1);
+	init_INTEGER(&mft->manifestNumber, default_serial);
 	field_add(eContent, "manifestNumber", &ft_int, &mft->manifestNumber, 0);
 
 	init_gtime_now(&mft->thisUpdate);
@@ -77,6 +78,12 @@ mft_new(struct rpki_tree_node *node)
 	init_filelist(mft, node, fileList);
 
 	return so;
+}
+
+void *
+mft_load(char const *filepath, struct rpki_object *meta)
+{
+	return signed_object_load(filepath, meta, SO_MFT, &asn_DEF_Manifest);
 }
 
 bool

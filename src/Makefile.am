@@ -56,6 +56,7 @@ barry_mtim_CFLAGS = ${common_CFLAGS}
 barry_rtr_SOURCES = rtr.c
 barry_rtr_SOURCES += alloc.c alloc.h
 barry_rtr_SOURCES += print.c print.h
+barry_rtr_SOURCES += str.c str.h
 barry_rtr_CFLAGS = ${common_CFLAGS}
 
 barry_ncu_SOURCES = ncu.c

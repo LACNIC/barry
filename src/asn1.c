@@ -1,5 +1,7 @@
 #include "asn1.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <libasn1fort/AttributeTypeAndValue.h>
 #include <libasn1fort/PrintableString.h>
 #include <libasn1fort/RelativeDistinguishedName.h>
@@ -9,6 +11,7 @@
 #include <openssl/asn1.h>
 #include <openssl/obj_mac.h>
 #include <openssl/objects.h>
+#include <unistd.h>
 
 #include "field.h"
 #include "file.h"
@@ -288,8 +291,68 @@ ber2asn1(const void *ber, size_t berlen,
 	asn_dec_rval_t rval;
 
 	rval = ber_decode(NULL, td, &asn1, ber, berlen);
-	if (rval.code != RC_OK)
-		panic("Cannot decode %s: %u", td->name, rval.code);
+	switch (rval.code) {
+	case RC_OK:
+		break;
+	case RC_WMORE:
+		panic("Cannot decode %s: Need more bytes (got %zu)",
+		    td->name, berlen);
+	case RC_FAIL:
+		panic("Cannot decode %s: Decode failure", td->name);
+	}
+}
+
+void
+os2asn1(OCTET_STRING_t *os, const asn_TYPE_descriptor_t *td, void *asn1)
+{
+	ber2asn1(os->buf, os->size, td, asn1);
+}
+
+void
+any2asn1(ANY_t *any, const asn_TYPE_descriptor_t *td, void *asn1)
+{
+	ber2asn1(any->buf, any->size, td, asn1);
+}
+
+void
+ber_decode_file(char const *filepath, const asn_TYPE_descriptor_t *def, void *obj)
+{
+	unsigned char *buf;
+	static const size_t bufsize = 4096; /* capacity */
+	ssize_t bufbytes;
+	int fd;
+	asn_dec_rval_t parse;
+	size_t offset;
+
+	buf = pmalloc(bufsize);
+
+	fd = open(filepath, O_RDONLY);
+	if (fd < 0)
+		panic("Cannot open %s: %s", filepath, strerror(errno));
+
+	offset = 0;
+	do {
+		bufbytes = read(fd, buf + offset, bufsize - offset);
+		if (bufbytes < 0)
+			panic("Cannot read %s: %s", filepath, strerror(errno));
+		if (bufbytes == 0)
+			panic("%s: Premature EOF", filepath);
+
+		parse = ber_decode(NULL, def, &obj, buf, bufbytes);
+		switch (parse.code) {
+		case RC_OK:
+			close(fd);
+			free(buf);
+			return;
+		case RC_WMORE:
+			break;
+		case RC_FAIL:
+			panic("Cannot decode %s.", filepath);
+		}
+
+		offset = bufbytes - parse.consumed;
+		memmove(buf, buf + parse.consumed, offset);
+	} while (true);
 }
 
 static int

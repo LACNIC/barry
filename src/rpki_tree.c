@@ -13,6 +13,23 @@
 #define BADCFG(rdr, fmt, ...) panic("Line %u: " fmt, rdr->line, ##__VA_ARGS__)
 #define UNEXPECTED_TOKEN(rdr, tkn) BADCFG(rdr, "Unexpected token: %s", tkn)
 
+enum token_type {
+	TKNT_STR,
+	TKNT_ASSIGNMENT = '=',
+	TKNT_SET_START = '[',
+	TKNT_SET_END = ']',
+	TKNT_MAP_START = '{',
+	TKNT_MAP_END = '}',
+	TKNT_SEPARATOR = ',',
+	TKNT_PROTECT,
+	TKNT_EOF,
+};
+
+struct token {
+	enum token_type type;
+	char *str;
+};
+
 struct rd_parse_context {
 	/* File descriptor for reading into @buf */
 	int fd;
@@ -27,18 +44,13 @@ struct rd_parse_context {
 	/* Total meaningful bytes in @buf, since buf[0] */
 	size_t size;
 
-	struct rpki_tree *result;
-};
+	bool has_next;
+	struct token next; /* For peeking */
 
-enum token_type {
-	TKNT_STR,
-	TKNT_ASSIGNMENT = '=',
-	TKNT_SET_START = '[',
-	TKNT_SET_END = ']',
-	TKNT_MAP_START = '{',
-	TKNT_MAP_END = '}',
-	TKNT_SEPARATOR = ',',
-	TKNT_EOF,
+	unsigned int indent;
+	bool indent_stop;
+
+	struct rpki_tree *result;
 };
 
 static struct rpki_tree_node *
@@ -114,11 +126,38 @@ refresh_reader(struct rd_parse_context *ctx)
 static unsigned char *
 next_char(struct rd_parse_context *ctx)
 {
+	unsigned char *chr;
+
 	if (ctx->offset >= ctx->size && !refresh_reader(ctx))
 		return NULL;
 
 	/* pr_trace("	Character '%c'", reader.buf[reader.offset]); */
-	return ctx->buf + ctx->offset++;
+	chr = ctx->buf + ctx->offset++;
+
+	if (ctx->indent_stop) {
+		if (*chr == '\n') {
+			ctx->indent = 0;
+			ctx->indent_stop = false;
+		}
+	} else {
+		switch (*chr) {
+		case ' ':
+			ctx->indent++;
+			break;
+		case '\t':
+			ctx->indent = (ctx->indent & ~7u) + 8;
+			break;
+		case '\n':
+			ctx->indent = 0;
+			ctx->indent_stop = false;
+			break;
+		default:
+			ctx->indent_stop = true;
+			break;
+		}
+	}
+
+	return chr;
 }
 
 static bool
@@ -280,6 +319,7 @@ tknt2str(enum token_type type)
 	case TKNT_MAP_START:	return "{";
 	case TKNT_MAP_END:	return "}";
 	case TKNT_SEPARATOR:	return ",";
+	case TKNT_PROTECT:	return ":shield:";
 	case TKNT_EOF:		return "EOF";
 	}
 
@@ -306,11 +346,6 @@ is_quoted_string_chr(char chr)
 	return chr != '"';
 }
 
-struct token {
-	enum token_type type;
-	char *str;
-};
-
 static enum token_type
 init_token(struct token *tkn, enum token_type type, char *str)
 {
@@ -320,11 +355,53 @@ init_token(struct token *tkn, enum token_type type, char *str)
 	return type;
 }
 
+static bool
+token_raw_equals(struct rd_parse_context *ctx, unsigned char first, ...)
+{
+	va_list ap;
+	int expected;
+	unsigned char *actual;
+
+	va_start(ap, first);
+
+	expected = va_arg(ap, int);
+	if (expected != first)
+		goto no;
+
+	while ((expected = va_arg(ap, int)) != -1) {
+		actual = next_char(ctx);
+		if (!actual || (*actual) != expected)
+			goto no;
+	}
+
+	va_end(ap);
+	return true;
+
+no:	va_end(ap);
+	return false;
+}
+
+static enum token_type
+try_emoji(struct rd_parse_context *ctx, struct token *tkn, unsigned char first)
+{
+	/* UTF-8 shield emoji */
+	if (token_raw_equals(ctx, first, 0xF0, 0x9F, 0x9B, 0xA1, 0xEF, 0xB8, 0x8F, -1))
+		return init_token(tkn, TKNT_PROTECT, ":shield:");
+
+	BADCFG(ctx, "Unexpected character: %c (0x%x)", first, first);
+}
+
 static enum token_type
 next_token(struct rd_parse_context *ctx, struct token *tkn)
 {
 	unsigned char *_chr, chr;
 	char *token;
+
+	if (ctx->has_next) {
+		*tkn = ctx->next;
+		ctx->has_next = false;
+		return tkn->type;
+	}
 
 	do {
 		_chr = next_char(ctx);
@@ -347,8 +424,6 @@ next_token(struct rd_parse_context *ctx, struct token *tkn)
 				return init_token(tkn, TKNT_EOF, "EOF");
 			/* No break */
 		case '\n':
-			ctx->line++;
-			/* No break */
 		case ' ':
 		case '\t':
 			break;
@@ -378,9 +453,21 @@ next_token(struct rd_parse_context *ctx, struct token *tkn)
 			return init_token(tkn, TKNT_SEPARATOR, ",");
 
 		default:
-			BADCFG(ctx, "Unexpected character: %c (0x%x)", chr, chr);
+			return try_emoji(ctx, tkn, chr);
 		}
 	} while (true);
+}
+
+static enum token_type
+peek_token(struct rd_parse_context *ctx, struct token *tkn)
+{
+	if (!ctx->has_next) {
+		next_token(ctx, &ctx->next);
+		ctx->has_next = true;
+	}
+
+	*tkn = ctx->next;
+	return tkn->type;
 }
 
 static char *
@@ -540,45 +627,11 @@ again:
 	goto again;
 }
 
-static unsigned int
-count_indentation(struct rd_parse_context *ctx)
-{
-	unsigned int indent;
-	unsigned char *chr;
-
-	indent = 0;
-
-	do {
-		chr = next_char(ctx);
-		if (!chr)
-			return indent;
-
-		switch (*chr) {
-		case ' ':
-			indent++;
-			break;
-		case '\t':
-			indent = (indent & ~7u) + 8;
-			break;
-		case '#':
-			if (!skip_until(ctx, '\n'))
-				return indent;
-			/* No break */
-		case '\n':
-			ctx->line++;
-			indent = 0;
-			break;
-		default:
-			ctx->offset--;
-			return indent;
-		}
-	} while (true);
-}
-
 static void
 read_tree(struct rd_parse_context *ctx)
 {
-	unsigned int indent;
+	extern char const *prev_output_dir;
+
 	struct token tkn;
 
 	struct rpki_tree_node *last;
@@ -588,8 +641,6 @@ read_tree(struct rd_parse_context *ctx)
 
 	ctx->result->root = last = NULL;
 	do {
-		indent = count_indentation(ctx);
-
 		switch (next_token(ctx, &tkn)) {
 		case TKNT_STR:
 			current = pzalloc(sizeof(struct rpki_tree_node));
@@ -597,8 +648,17 @@ read_tree(struct rd_parse_context *ctx)
 			current->meta.tree = ctx->result;
 			current->meta.node = current;
 			current->fields = pzalloc(sizeof(struct field));
-			current->indent = indent;
+			current->indent = ctx->indent;
 			STAILQ_INIT(&current->props);
+
+			if (peek_token(ctx, &tkn) == TKNT_PROTECT) {
+				if (prev_output_dir == NULL)
+					BADCFG(ctx, "'%s' is protected, but you didn't specify a previous output directory.",
+					    current->meta.name);
+
+				current->protect = true;
+				next_token(ctx, &tkn); /* Throw it away */
+			}
 
 			add_node(ctx, current);
 
@@ -662,6 +722,8 @@ rpkitree_load(char const *rd_path, struct rpki_tree *result)
 	pr_debug("Reading keyvals from input...");
 	read_keyvals(&ctx);
 	pr_debug("Done.\n");
+
+	rpkitree_print(result);
 }
 
 static void
@@ -712,7 +774,10 @@ print_node(struct rpki_tree_node *node, unsigned int indent)
 	STAILQ_FOREACH(kv, &node->props, hook)
 		i++;
 
-	printf("%s (%zu props)\n", node->meta.name, i);
+	printf("%s ", node->meta.name);
+	printf("(%zu props) ", i);
+	printf("%s", node->protect ? ":shield:" : "");
+	printf("\n");
 
 	indent++;
 	HASH_ITER(phook, node->children, child, tmp)
@@ -748,13 +813,14 @@ replace_basename(char const *path, char const *new_name)
 static void
 default_paths(struct rrdp_notification *notif, char *notif_uri)
 {
+	extern unsigned long default_serial; /* --serial */
 	extern char const *rrdp_uri; /* --rrdp-uri */
 	size_t rrdp_uri_len;
 
 	notif->uri = pstrdup(notif_uri);
 	notif->snapshot.uri = replace_basename(notif_uri, "snapshot.xml");
 	notif->session = "1";
-	init_INTEGER(&notif->serial, 1);
+	init_INTEGER(&notif->serial, default_serial);
 
 	rrdp_uri_len = strlen(rrdp_uri);
 	if (strncmp(notif_uri, rrdp_uri, rrdp_uri_len) != 0)

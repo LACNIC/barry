@@ -11,7 +11,7 @@
 struct rpki_certificate {
 	struct rpki_object *meta;
 	struct rpp rpp;
-	EVP_PKEY *keys;
+	EVP_PKEY *keys; /* Can be NULL! */
 
 #define SPKI obj.tbsCertificate.subjectPublicKeyInfo
 	Certificate_t obj;
@@ -23,6 +23,8 @@ struct rpki_certificate {
 
 struct rpki_certificate *cer_new(struct rpki_tree_node *, enum cer_type);
 void cer_init(struct rpki_certificate *, struct rpki_object *, enum cer_type);
+void *cer_load(char const *, struct rpki_tree_node *);
+void cer_load_ee(ANY_t *, struct rpki_certificate *, struct rpki_object *);
 void cer_finish_rpp(struct rpki_certificate *);
 void cer_finish_ta(struct rpki_certificate *);
 void cer_finish_ca(struct rpki_certificate *);

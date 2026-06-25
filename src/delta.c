@@ -96,6 +96,7 @@ static char const *notif3_path;
 static char const *delta_uri;
 static char const *delta_path;
 
+char const *prev_output_dir;
 unsigned int verbosity;
 bool print_colors;
 

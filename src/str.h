@@ -8,6 +8,8 @@ char *concat(char const *, char const *);
 bool str_has_suffix(char const *, char const *);
 char *path_join(char const *, char const *);
 
+int str2ul(char const *, char const *, unsigned long, unsigned long *);
+
 struct dynamic_string {
 	char *buf;
 	size_t len;

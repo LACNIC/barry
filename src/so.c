@@ -38,7 +38,7 @@ finish_signer_info(SignerInfo_t *si, struct rpki_certificate *ee,
 	if (si->signature.buf == NULL) {
 		pr_debug("- Signing");
 		si->signature = do_sign(si->signedAttrs,
-		    &asn_DEF_SignedAttributes, ee->keys, true);
+		    &asn_DEF_SignedAttributes, ee, true);
 	}
 }
 
@@ -231,6 +231,34 @@ signed_object_new(struct rpki_tree_node *node, int nid, struct field **eContent)
 	sisf = field_add(sdf, "signerInfos", NULL, NULL, 0);
 	sif = field_add(sisf, "0", &ft_obj, &so->si, 0);
 	init_signer_info(&so->si, nid, sif);
+
+	return so;
+}
+
+struct signed_object *
+signed_object_load(char const *filepath, struct rpki_object *meta,
+    enum so_type type, asn_TYPE_descriptor_t *td)
+{
+	struct signed_object *so;
+	struct CertificateSet *certs;
+	SignerInfos_t *sis;
+
+	so = pzalloc(sizeof(struct signed_object));
+	so->meta = meta;
+	so->type = type;
+	ber_decode_file(filepath, &asn_DEF_ContentInfo, &so->ci);
+	any2asn1(&so->ci.content, &asn_DEF_SignedData, &so->sd);
+	os2asn1(so->sd.encapContentInfo.eContent, td, &so->obj);
+
+	certs = so->sd.certificates;
+	if (certs->list.count != 1)
+		panic("Weird certificate count: %d", certs->list.count);
+	cer_load_ee(certs->list.array[0], &so->ee, &so->ee_meta);
+
+	sis = &so->sd.signerInfos;
+	if (sis->list.count != 1)
+		panic("Weird signerInfo count: %d", sis->list.count);
+	so->si = *sis->list.array[0];
 
 	return so;
 }

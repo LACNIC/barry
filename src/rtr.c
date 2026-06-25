@@ -15,6 +15,7 @@
 
 #include "alloc.h"
 #include "print.h"
+#include "str.h"
 
 enum output_format {
 	OF_PDU,
@@ -86,17 +87,6 @@ next_token(struct line_reader *rdr)
 	rdr->first = false;
 	pr_trace("Received token: %s", tkn);
 	return (rdr->lvl > 0 && streq(tkn, "]")) ? NULL : tkn;
-}
-
-static bool
-is_whitespace(char c)
-{
-	/*
-	 * Note: Needs to be consistent with next_token().
-	 * (Plus null character)
-	 */
-	return c == ' '  || c == 0    || c == '\t' || c == '\n'
-	    || c == '\r' || c == '\v' || c == '\f';
 }
 
 static void
@@ -225,51 +215,6 @@ print_command_help(void)
 	printf("'providers' is a sequence of u32s separated by whitespace, surrounded by square\n");
 	printf("brackets.\n");
 	printf("\n");
-}
-
-static int
-str2ul(char const *what, char const *str, unsigned long max, unsigned long *ul)
-{
-	unsigned long v;
-	char *tailptr;
-	int base;
-
-	if (!str) {
-		pr_err("Expected token after '%s'.", what);
-		return EINVAL;
-	}
-
-	if (str[0] == '0' && str[1] == 'x') {
-		base = 16;
-		str += 2;
-	} else if (str[0] == '0' && str[1] == 'b') {
-		base = 2;
-		str += 2;
-	} else {
-		base = 10;
-	}
-
-	errno = 0;
-	v = strtoul(str, &tailptr, base);
-	if (errno) {
-		pr_err("Cannot convert %s to int: %s", what, strerror(errno));
-		return EINVAL;
-	}
-	if (str == tailptr) {
-		pr_err("Cannot convert %s to int.", what);
-		return EINVAL;
-	}
-	if (!is_whitespace(*tailptr)) {
-		pr_err("Number has suffix garbage: %s", str);
-		return EINVAL;
-	}
-	if (v > max) {
-		pr_err("%s cannot be > %lu.", what, max);
-		return EINVAL;
-	}
-
-	*ul = v;
-	return 0;
 }
 
 static int

@@ -4,6 +4,7 @@
 #include "so.h"
 
 struct signed_object *mft_new(struct rpki_tree_node *);
+void *mft_load(char const *, struct rpki_object *);
 void mft_finish(struct signed_object *, struct rpki_tree_node *);
 void mft_write(struct signed_object *);
 

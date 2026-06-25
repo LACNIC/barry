@@ -4,6 +4,7 @@
 #include "so.h"
 
 struct signed_object *asa_new(struct rpki_tree_node *);
+void *asa_load(char const *, struct rpki_object *);
 void asa_finish(struct signed_object *);
 void asa_write(struct signed_object *);
 

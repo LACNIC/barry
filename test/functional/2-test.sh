@@ -51,6 +51,8 @@ $BARRY $BASIC_ARGS						\
 run_barry() {
 	# $1: RD filename, without extension
 	TEST_RD="$1"
+	# $2-$n: Extra arguments for Barry
+	shift
 
 	OUTPUT_FILE="sandbox/output/$TEST_RD.log"
 	if [ ! -f "$OUTPUT_FILE" ]; then
@@ -58,6 +60,7 @@ run_barry() {
 			--tal-path "sandbox/tal/$TEST_RD.tal"	\
 			--rsync-path "sandbox/rsync/$TEST_RD"	\
 			--rrdp-path "sandbox/rrdp/$TEST_RD"	\
+			"$@"					\
 			"tests/$TEST_RD.rd"			\
 			> "$OUTPUT_FILE" 2>&1
 		RETVAL="$?"
@@ -133,6 +136,15 @@ check_error() {
 	else
 		echo "ERR: Test '$TEST_RD' did not output '$3'"
 		echo "     See $OUTPUT_FILE"
+		FAILS=$((FAILS+1))
+	fi
+}
+
+check_result() {
+	if [ $1 -eq 0 ]; then
+		SUCCESSES=$((SUCCESSES+1))
+	else
+		echo "$2"
 		FAILS=$((FAILS+1))
 	fi
 }

@@ -27,6 +27,13 @@ roa_new(struct rpki_tree_node *node)
 	return so;
 }
 
+void *
+roa_load(char const *filepath, struct rpki_object *meta)
+{
+	return signed_object_load(filepath, meta, SO_ROA,
+	    &asn_DEF_RouteOriginAttestation);
+}
+
 static bool
 OCTET_STRING_cmp(OCTET_STRING_t *str1, OCTET_STRING_t *str2)
 {

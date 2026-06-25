@@ -50,6 +50,9 @@ void der_encode_any(const asn_TYPE_descriptor_t *, void *, ANY_t *);
 void der_encode_8str(const asn_TYPE_descriptor_t *, void *, OCTET_STRING_t *);
 
 void ber2asn1(const void *, size_t, const asn_TYPE_descriptor_t *, void *);
+void os2asn1(OCTET_STRING_t *, const asn_TYPE_descriptor_t *, void *);
+void any2asn1(ANY_t *, const asn_TYPE_descriptor_t *, void *);
+void ber_decode_file(char const *, const asn_TYPE_descriptor_t *, void *);
 
 void asn1_write(char *, const asn_TYPE_descriptor_t *, const void *);
 

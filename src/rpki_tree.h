@@ -22,6 +22,7 @@ struct rpki_tree_node {
 	struct rpki_object meta;
 
 	enum file_type type;
+	bool protect;		/* Preserve file's previous version? */
 	void *obj;
 
 	/* All the tweakable fields in the object */

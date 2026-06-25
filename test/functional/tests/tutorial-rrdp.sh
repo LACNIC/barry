@@ -19,18 +19,37 @@ check_output_contains "tutorial-rrdp2" -Fx \
 	"https://lettuce/rrdp/notification.xml,snapshot.files,Snapshot Files,\"[ B2a.roa, B2.mft, B2.crl ]\""
 
 check_tutorial_delta() {
-	$BARRY $KEYS $PRINTS $TIMES \
+	# Generate first version of the repository
+	$BARRY $KEYS $PRINTS \
+		--serial 1 \
 		--tal-path "sandbox/tal/delta.old.tal" \
-		--rsync-path sandbox/rsync/delta/old/ \
-		--rrdp-path sandbox/rrdp/delta/old/ \
-		tests/tutorial-rrdp-delta-old.rd \
-		> /dev/null 2> /dev/null
-	$BARRY $KEYS $PRINTS $TIMES \
+		--rsync-path "sandbox/rsync/delta/old/" \
+		--rrdp-path "sandbox/rrdp/delta/old/" \
+		"tests/tutorial-rrdp-delta-old.rd" \
+		> "sandbox/output/tutorial-rrdp-step1.log" 2>&1
+	check_output_contains "tutorial-rrdp-step1" -Fx \
+		"ca1.mft,obj.content.encapContentInfo.eContent.manifestNumber,INTEGER,0x01" \
+		"ca2.mft,obj.content.encapContentInfo.eContent.manifestNumber,INTEGER,0x01" \
+		"ta.mft,obj.content.encapContentInfo.eContent.manifestNumber,INTEGER,0x01" \
+		"https://your-server.net/rrdp/notif.xml,serial,INTEGER,0x01"
+
+	# Exploit default dates to ensure non-shielded files are dated one second later
+	# (Alternatively, just override --now and --later.)
+	sleep 1
+
+	# Generate second version of the repository
+	$BARRY $KEYS $PRINTS \
+		--serial 2 \
 		--tal-path "sandbox/tal/delta.new.tal" \
-		--rsync-path sandbox/rsync/delta/new/ \
-		--rrdp-path sandbox/rrdp/delta/new/ \
-		tests/tutorial-rrdp-delta-new.rd \
-		> /dev/null 2> /dev/null
+		--rsync-path "sandbox/rsync/delta/new/" \
+		--rrdp-path "sandbox/rrdp/delta/new/" \
+		--previous-path "sandbox/rsync/delta/old/" \
+		"tests/tutorial-rrdp-delta-new.rd" \
+		> "sandbox/output/tutorial-rrdp-step2.log" 2>&1
+	check_output_contains "tutorial-rrdp-step2" -Fx \
+		"ca1.mft,obj.content.encapContentInfo.eContent.manifestNumber,INTEGER,0x02" \
+		"https://your-server.net/rrdp/notif.xml,serial,INTEGER,0x02"
+
 	mkdir -p sandbox/rrdp/fusion/
 	${BARRY}-delta -v \
 		--old.notification    sandbox/rrdp/delta/old/notif.xml \

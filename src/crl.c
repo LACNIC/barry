@@ -68,6 +68,19 @@ crl_new(struct rpki_tree_node *node)
 	return crl;
 }
 
+void *
+crl_load(char const *filepath, struct rpki_object *meta)
+{
+	struct rpki_crl *crl;
+
+	crl = pzalloc(sizeof(struct rpki_crl));
+	crl->meta = meta;
+	ber_decode_file(filepath, &asn_DEF_CertificateList, &crl->obj);
+	exts_decode(crl->obj.tbsCertList.crlExtensions, &crl->exts);
+
+	return crl;
+}
+
 static void
 update_signature(struct rpki_crl *crl)
 {
@@ -80,7 +93,7 @@ update_signature(struct rpki_crl *crl)
 
 	pr_debug("- Signing");
 	signature = do_sign(&crl->obj.tbsCertList, &asn_DEF_TBSCertList,
-	    crl_parent(crl)->keys, false);
+	    crl_parent(crl), false);
 	crl->obj.signature.buf = signature.buf;
 	crl->obj.signature.size = signature.size;
 }
@@ -115,7 +128,7 @@ finish_extensions(struct rpki_crl *crl)
 				finish_aki(&ext->v.aki, crl);
 	}
 
-	ext_compile(&crl->exts, &crl->obj.tbsCertList.crlExtensions);
+	exts_encode(&crl->exts, &crl->obj.tbsCertList.crlExtensions);
 }
 
 void

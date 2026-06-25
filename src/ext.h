@@ -98,6 +98,7 @@ void ext_finish_cp(CertificatePolicies_t *);
 void ext_finish_ip(IPAddrBlocks_t *, struct rpki_certificate *);
 void ext_finish_as(ASIdentifiers_t *, struct rpki_certificate *);
 
-void ext_compile(struct extensions *, Extensions_t **);
+void exts_encode(struct extensions *, Extensions_t **);
+void exts_decode(Extensions_t *, struct extensions *);
 
 #endif /* SRC_EXT_H_ */

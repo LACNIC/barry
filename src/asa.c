@@ -49,6 +49,13 @@ asa_new(struct rpki_tree_node *node)
 	return so;
 }
 
+void *
+asa_load(char const *filepath, struct rpki_object *meta)
+{
+	return signed_object_load(filepath, meta, SO_ASA,
+	    &asn_DEF_ASProviderAttestation);
+}
+
 static ASId_t
 find_first_asnum(struct ASIdentifierChoice__asIdsOrRanges *aiors)
 {

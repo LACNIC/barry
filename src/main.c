@@ -8,6 +8,7 @@
 #include "crl.h"
 #include "file.h"
 #include "global.h"
+#include "keys.h"
 #include "mft.h"
 #include "roa.h"
 #include "rrdp.h"
@@ -21,6 +22,8 @@
 #define OPTLONG_TAL_PATH	"tal-path"
 #define OPTLONG_NOW		"now"
 #define OPTLONG_LATER		"later"
+#define OPTLONG_SERIAL		"serial"
+#define OPTLONG_PREV		"previous-path"
 #define OPTLONG_KEYS		"keys"
 #define OPTLONG_PR_OBJS		"print-objects"
 #define OPTLONG_VERBOSE		"verbose"
@@ -86,6 +89,8 @@ parse_options(int argc, char **argv)
 		{ OPTLONG_TAL_PATH,   required_argument, 0, 't' },
 		{ OPTLONG_NOW,        required_argument, 0, 'P' },
 		{ OPTLONG_LATER,      required_argument, 0, 1026 },
+		{ OPTLONG_SERIAL,     required_argument, 0, 's' },
+		{ OPTLONG_PREV,       required_argument, 0, 1029 },
 		{ OPTLONG_KEYS,       required_argument, 0, 'k' },
 		{ OPTLONG_PR_OBJS,    required_argument, 0, 'p' },
 		{ OPTLONG_VERBOSE,    no_argument,       0, 'v' },
@@ -96,6 +101,7 @@ parse_options(int argc, char **argv)
 	int opt;
 	char *optnow = NULL;
 	char *optlater = NULL;
+	char *optserial = NULL;
 
 	while ((opt = getopt_long(argc, argv, "t:P:k:p:vch", opts, NULL)) != -1) {
 		switch (opt) {
@@ -119,6 +125,12 @@ parse_options(int argc, char **argv)
 			break;
 		case 1026:
 			optlater = optarg;
+			break;
+		case 's':
+			optserial = optarg;
+			break;
+		case 1029:
+			prev_output_dir = optarg;
 			break;
 		case 'k':
 			keys_path = optarg;
@@ -150,6 +162,9 @@ parse_options(int argc, char **argv)
 	if (tal_path == NULL)
 		tal_path = tal_autogenerate_path(repo_descriptor);
 	init_times(optnow, optlater);
+	if (optserial)
+		if (str2ul("serial", optserial, UINT32_MAX, &default_serial))
+			exit(EXIT_FAILURE);
 
 	pr_debug("Configuration:");
 	pr_debug("   Repository Descriptor"          ": %s", repo_descriptor);
@@ -160,6 +175,8 @@ parse_options(int argc, char **argv)
 	pr_debug("   --" OPTLONG_TAL_PATH "       (-t): %s", tal_path);
 	pr_debug("   --" OPTLONG_NOW "            (-P): %s", optnow);
 	pr_debug("   --" OPTLONG_LATER "              : %s", optlater);
+	pr_debug("   --" OPTLONG_SERIAL "             : %lu", default_serial);
+	pr_debug("   --" OPTLONG_PREV          "      : %s", prev_output_dir);
 	pr_debug("   --" OPTLONG_KEYS "               : %s", keys_path);
 	pr_debug("   --" OPTLONG_PR_OBJS       "  (-p): %s", print_format);
 	pr_debug("   --" OPTLONG_VERBOSE "        (-v): %u", verbosity);
@@ -237,6 +254,9 @@ init_object(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	field_add(node->fields, "uri", &ft_cstr, &node->meta.uri, 0);
 	field_add(node->fields, "path", &ft_cstr, &node->meta.path, 0);
 
+	if (node->protect)
+		return;
+
 	switch (node->type) {
 	case FT_TA:
 		node->obj = cer_new(node, CT_TA);
@@ -304,6 +324,38 @@ create_missing_node(struct rpki_tree *tree, struct rpki_tree_node *parent,
 }
 
 static void
+load_protected(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
+{
+	struct filepath_ht *prev_files = arg;
+	char const *old_path;
+
+	if (!node->protect)
+		return;
+
+	if (prev_files->nodes == NULL) {
+		if (!prev_output_dir)
+			panic("Node '%s' has a shield, but --" OPTLONG_PREV
+			    " is unset.", node->meta.name);
+		dir_index(prev_files, prev_output_dir);
+	}
+
+	old_path = dir_find(prev_files, node->meta.name);
+	if (!old_path)
+		panic("Node '%s' has a shield, but I can't find it in %s.",
+		    node->meta.name, prev_output_dir);
+
+	switch (node->type) {
+	case FT_TA:
+	case FT_CER: node->obj = cer_load(old_path, node); break;
+	case FT_CRL: node->obj = crl_load(old_path, &node->meta); break;
+	case FT_MFT: node->obj = mft_load(old_path, &node->meta); break;
+	case FT_ROA: node->obj = roa_load(old_path, &node->meta); break;
+	case FT_ASA: node->obj = asa_load(old_path, &node->meta); break;
+	default: panic("Unknown file type: %s", node->meta.name);
+	}
+}
+
+static void
 add_missing_objs(struct rpki_tree *tree, struct rpki_tree_node *parent,
     void *arg)
 {
@@ -342,6 +394,9 @@ apply_notification_fields(struct rpki_tree *tree)
 static void
 finish_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
+	if (node->protect)
+		return;
+
 	pr_debug("Finishing (unless it's a manifest): %s", node->meta.name);
 
 	switch (node->type) {
@@ -370,7 +425,7 @@ finish_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 static void
 finish_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
-	if (node->type != FT_MFT)
+	if (node->protect || node->type != FT_MFT)
 		return;
 
 	pr_debug("Finishing: %s", node->meta.name);
@@ -380,7 +435,23 @@ finish_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 static void
 write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 {
+	char const *oldpath;
+	char *newpath;
+
 	pr_debug("Writing file (unless it's a manifest): %s", node->meta.name);
+
+	if (node->protect) {
+		oldpath = dir_find(arg, node->meta.name);
+		newpath = join_paths(rsync_path, node->meta.path);
+
+		exec_mkdir_p(newpath, false);
+		if (link(oldpath, newpath) < 0)
+			panic("Cannot clone %s into %s: %s",
+			    oldpath, newpath, strerror(errno));
+
+		free(newpath);
+		return;
+	}
 
 	switch (node->type) {
 	case FT_TA:
@@ -593,6 +664,7 @@ int
 main(int argc, char **argv)
 {
 	struct rpki_tree tree = { 0 };
+	struct filepath_ht prev_files = { 0 };
 
 	register_signal_handlers();
 
@@ -600,11 +672,19 @@ main(int argc, char **argv)
 
 	rpkitree_load(repo_descriptor, &tree);
 
+	keys_init();
+
 	pr_debug("Figuring out object types...");
 	rpkitree_pre_order(&tree, init_type, NULL);
 	if (tree.root->type != FT_TA)
 		panic("The root of the tree is not a certificate.");
 	pr_debug("Done.\n");
+
+	if (prev_output_dir) {
+		pr_debug("Loading protected files...");
+		rpkitree_pre_order(&tree, load_protected, &prev_files);
+		pr_debug("Done.\n");
+	}
 
 	pr_debug("Adding missing CRLs and Manifests...");
 	rpkitree_pre_order(&tree, add_missing_objs, NULL);
@@ -633,7 +713,7 @@ main(int argc, char **argv)
 	pr_debug("Done.\n");
 
 	pr_debug("Writing files (except manifests)...");
-	rpkitree_pre_order(&tree, write_not_mfts, NULL);
+	rpkitree_pre_order(&tree, write_not_mfts, &prev_files);
 	pr_debug("Done.\n");
 
 	pr_debug("Post-processing (manifests)...");

@@ -790,8 +790,14 @@ ta.cer
 	ca1.cer
 		roa1A.roa
 		roa1B.roa
+		ca1.mft
+		ca1.crl
 	ca2.cer
 		roa2.roa
+		ca2.mft
+		ca2.crl
+	ta.mft
+	ta.crl
 
 [node: ta.cer]
 rpp.notification = https://your-server.net/rrdp/notif.xml
@@ -802,15 +808,21 @@ snapshot.uri = https://your-server.net/rrdp/snapshot.xml
 snapshot.path = snapshot.xml
 ```
 
-RD `new.repo` contains a subsequent version of the same repository:
+RD `new.repo` contains a subsequent version of the same repository, in which `roa1B.roa` has been removed, and new ROA `roa1C.roa` is added:
 
 ```
-ta.cer
-	ca1.cer
-		roa1A.roa
+ta.cer 🛡️
+	ca1.cer 🛡️
+		roa1A.roa 🛡️
 		roa1C.roa
-	ca2.cer
-		roa2.roa
+		ca1.mft
+		ca1.crl 🛡️
+	ca2.cer 🛡️
+		roa2.roa 🛡️
+		ca2.mft 🛡️
+		ca2.crl 🛡️
+	ta.mft 🛡️
+	ta.crl 🛡️
 
 [node: ta.cer]
 rpp.notification = https://your-server.net/rrdp/notif.xml
@@ -820,27 +832,56 @@ path = notif.xml
 snapshot.uri = https://your-server.net/rrdp/snapshot.xml
 snapshot.path = snapshot.xml
 ```
+
+The shield emoji means "preserve this file from the previous version of this repository." It must be in its UTF-8 representation (0xF0, 0x9F, 0x9B, 0xA1, 0xEF, 0xB8, 0x8F). It prevents fields prone to change (such as dates and manifestNumbers) from inducing unnecessary deltas.
+
+In this case, `ca1.mft` also needs to change, because its `fileList` needs to be updated.
 
 First, compile both repositories into separate directories:
 
 ```sh
-mkdir -p keys/
-for i in $(seq 0 8); do
-	openssl genrsa -out "keys/$i.pem" 2048
-done
-# Consistent shared keys and dates ensure hashes and signatures
-# do not change if they don't have to
-COMMON_ARGS="--keys keys/ --now 2025-01-01T00:00:00Z --later 2026-01-01T00:00:00Z"
+# Generate first version of the repository
+barry --serial 1 --rsync-path rsync-old/ --rrdp-path rrdp-old/ old.repo
 
-barry $COMMON_ARGS --rsync-path rsync-old/ --rrdp-path rrdp-old/ old.repo
-barry $COMMON_ARGS --rsync-path rsync-new/ --rrdp-path rrdp-new/ new.repo
+# Exploit default dates to ensure non-shielded files are dated one second later
+# (Alternatively, just override --now and --later.)
+sleep 1
+
+# Generate second version of the repository
+barry --serial 2 --rsync-path rsync-new/ --rrdp-path rrdp-new/ --previous-path rsync-old/ new.repo
 ```
+
+`--previous-path` tells `barry` where to find the previous version of the repository. At the moment, it may only point to an rsync repository; allowing it to parse a snapshot is future work.
+
+`--serial` is used as the default value for all manifest `manifestNumber`s and RRDP serials. In our current example, the two `--serial`s have the same effect as declaring
+
+```
+[node: ca1.mft]
+obj.content.encapContentInfo.eContent.manifestNumber = 1
+[node: ca2.mft]
+obj.content.encapContentInfo.eContent.manifestNumber = 1
+[node: ta.mft]
+obj.content.encapContentInfo.eContent.manifestNumber = 1
+[notification: https://your-server.net/rrdp/notif.xml]
+serial = 1
+```
+
+in `old.repo`, and
+
+```
+[node: ca1.mft]
+obj.content.encapContentInfo.eContent.manifestNumber = 2
+[notification: https://your-server.net/rrdp/notif.xml]
+serial = 2
+```
+
+in `new.repo`.
 
 Take a look at Barry's RRDP output:
 
 ```sh
 $ ls rrdp-old/
-notif.xml  snapshot.xml
+notif.xml  snapshot.xml  ta.cer
 $ 
 $ ls rrdp-new/
 notif.xml  snapshot.xml

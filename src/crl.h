@@ -15,6 +15,7 @@ struct rpki_crl {
 };
 
 struct rpki_crl *crl_new(struct rpki_tree_node *);
+void *crl_load(char const *, struct rpki_object *);
 void crl_finish(struct rpki_crl *);
 void crl_write(struct rpki_crl *);
 

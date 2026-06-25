@@ -15,6 +15,8 @@ X509Time_t default_now;
 X509Time_t default_later;
 GeneralizedTime_t default_gnow;
 GeneralizedTime_t default_glater;
+unsigned long int default_serial = 1;
+char const *prev_output_dir;
 char const *keys_path;
 char const *print_format;
 unsigned int verbosity;

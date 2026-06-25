@@ -68,6 +68,9 @@ tal_write(struct rpki_certificate *ta, char const *path)
 
 	pr_debug("Writing TAL: %s", path);
 
+	if (!ta->keys)
+		panic("Cannot write TAL %s: Keys missing.", ta->meta->name);
+
 	fd = write_open(path);
 
 	if (rrdp_uri[0]) {
@@ -86,5 +89,6 @@ tal_write(struct rpki_certificate *ta, char const *path)
 	pubkey2der(ta->keys, &der, &size);
 	base64_pubkey(der, size, fd);
 
+	OPENSSL_free(der);
 	close(fd);
 }

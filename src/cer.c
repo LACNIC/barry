@@ -74,32 +74,27 @@ init_extensions_ee(struct rpki_certificate *ee, struct field *extf)
 	}
 }
 
+static void
+add_rpp_fields(struct rpki_tree_node *node, struct rpki_certificate *cer)
+{
+	cer->rppf = field_add(node->fields, "rpp", &ft_obj, &cer->rpp, 0);
+	field_add(cer->rppf, "uri", &ft_cstr, &cer->rpp.uri, 0);
+	field_add(cer->rppf, "path", &ft_cstr, &cer->rpp.path, 0);
+	field_add(cer->rppf, "notification", &ft_cstr, &cer->rpp.notification, 0);
+}
+
 struct rpki_certificate *
 cer_new(struct rpki_tree_node *node, enum cer_type type)
 {
 	struct rpki_certificate *cer;
 
 	cer = pzalloc(sizeof(struct rpki_certificate));
-
-	cer->rppf = field_add(node->fields, "rpp", &ft_obj, &cer->rpp, 0);
-	field_add(cer->rppf, "uri", &ft_cstr, &cer->rpp.uri, 0);
-	field_add(cer->rppf, "path", &ft_cstr, &cer->rpp.path, 0);
-	field_add(cer->rppf, "notification", &ft_cstr, &cer->rpp.notification, 0);
+	add_rpp_fields(node, cer);
 	cer->objf = field_add(node->fields, "obj", &ft_obj, &cer->obj, 0);
 
 	cer_init(cer, &node->meta, type);
 
 	return cer;
-}
-
-static void
-pubkey2asn1(EVP_PKEY *pubkey, SubjectPublicKeyInfo_t *asn1)
-{
-	unsigned char *der;
-	size_t derlen;
-
-	pubkey2der(pubkey, &der, &derlen);
-	ber2asn1(der, derlen, &asn_DEF_SubjectPublicKeyInfo, asn1);
 }
 
 void
@@ -158,6 +153,30 @@ cer_init(struct rpki_certificate *cer, struct rpki_object *meta,
 
 	/* cer->signature: Postpone (needs all other fields ready) */
 	field_add(cer->objf, "signature", &ft_bitstr, &cer->obj.signature, 0);
+}
+
+void *
+cer_load(char const *filepath, struct rpki_tree_node *node)
+{
+	struct rpki_certificate *cer;
+
+	cer = pzalloc(sizeof(struct rpki_certificate));
+	cer->meta = &node->meta;
+	ber_decode_file(filepath, &asn_DEF_Certificate, &cer->obj);
+	cer->keys = keys_find(node->meta.name, &cer->obj.tbsCertificate.subjectPublicKeyInfo);
+	exts_decode(cer->obj.tbsCertificate.extensions, &cer->exts);
+	add_rpp_fields(node, cer);
+
+	return cer;
+}
+
+void
+cer_load_ee(ANY_t *any, struct rpki_certificate *ee, struct rpki_object *meta)
+{
+	ee->meta = meta;
+	any2asn1(any, &asn_DEF_Certificate, &ee->obj);
+	ee->keys = keys_find(meta->name, &ee->obj.tbsCertificate.subjectPublicKeyInfo);
+	exts_decode(ee->obj.tbsCertificate.extensions, &ee->exts);
 }
 
 static void
@@ -263,11 +282,11 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 		}
 	}
 
-	ext_compile(&cer->exts, &cer->obj.tbsCertificate.extensions);
+	exts_encode(&cer->exts, &cer->obj.tbsCertificate.extensions);
 }
 
 static void
-update_signature(struct rpki_certificate *cer, EVP_PKEY *keys)
+update_signature(struct rpki_certificate *cer, struct rpki_certificate *parent)
 {
 	SignatureValue_t signature;
 
@@ -277,8 +296,13 @@ update_signature(struct rpki_certificate *cer, EVP_PKEY *keys)
 	}
 
 	pr_debug("- Signing");
+
+	if (parent->keys == NULL)
+		panic("Cannot sign %s: Parent (%s) lacks keys.",
+		    cer->meta->name, parent->meta->name);
+
 	signature = do_sign(&cer->obj.tbsCertificate, &asn_DEF_TBSCertificate,
-	    keys, false);
+	    parent, false);
 	cer->obj.signature.buf = signature.buf;
 	cer->obj.signature.size = signature.size;
 }
@@ -323,7 +347,7 @@ cer_finish_ta(struct rpki_certificate *ta)
 		ta->obj.tbsCertificate.issuer = ta->obj.tbsCertificate.subject;
 	}
 	finish_extensions(ta, CT_TA, NULL);
-	update_signature(ta, ta->keys);
+	update_signature(ta, ta);
 }
 
 void
@@ -340,7 +364,7 @@ cer_finish_ca(struct rpki_certificate *ca)
 		ca->obj.tbsCertificate.issuer = parent->obj.tbsCertificate.subject;
 	}
 	finish_extensions(ca, CT_CA, NULL);
-	update_signature(ca, parent->keys);
+	update_signature(ca, parent);
 }
 
 void
@@ -357,7 +381,7 @@ cer_finish_ee(struct rpki_certificate *ee, struct rpki_object *so)
 		ee->obj.tbsCertificate.issuer = parent->obj.tbsCertificate.subject;
 	}
 	finish_extensions(ee, CT_EE, so);
-	update_signature(ee, parent->keys);
+	update_signature(ee, parent);
 }
 
 void

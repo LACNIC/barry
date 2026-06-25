@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <ftw.h>
 #include <string.h>
+#include <sys/queue.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -177,4 +178,86 @@ exec_rm_rf_content(char const *path)
 
 	closedir(dir);
 	pr_trace("Directory removed.");
+}
+
+struct pending_path {
+	char *path;
+	SLIST_ENTRY(pending_path) lh;
+};
+
+SLIST_HEAD(pending_paths, pending_path);
+
+void
+dir_index(struct filepath_ht *index, char const *path)
+{
+	struct filepath_node *node;
+	struct pending_paths todos;
+	struct pending_path *todo, *newtodo;
+	DIR *dir;
+	struct dirent *file;
+	char *subpath;
+	struct stat st;
+	size_t namelen;
+	int error;
+
+	SLIST_INIT(&todos);
+	todo = pmalloc(sizeof(struct pending_path));
+	todo->path = pstrdup(path);
+	SLIST_INSERT_HEAD(&todos, todo, lh);
+
+	do {
+		todo = SLIST_FIRST(&todos);
+		SLIST_REMOVE_HEAD(&todos, lh);
+
+		dir = opendir(todo->path);
+		if (dir == NULL)
+			panic("Cannot open %s: %s", todo->path, strerror(errno));
+
+		for (errno = 0, file = readdir(dir); file; errno = 0, file = readdir(dir)) {
+			if (is_dots(file->d_name))
+				continue;
+
+			subpath = join_paths(todo->path, file->d_name);
+			if (stat(subpath, &st) < 0)
+				panic("Cannot stat %s: %s", todo->path, strerror(errno));
+
+			switch (st.st_mode & S_IFMT) {
+			case S_IFREG:
+				node = pzalloc(sizeof(struct filepath_node));
+				node->name = pstrdup(file->d_name);
+				node->path = subpath;
+				namelen = strlen(node->name);
+				// TODO might be duplicate
+				HASH_ADD_KEYPTR(hh, index->nodes, node->name, namelen, node);
+				break;
+			case S_IFDIR:
+				newtodo = pmalloc(sizeof(struct pending_path));
+				newtodo->path = subpath;
+				SLIST_INSERT_HEAD(&todos, newtodo, lh);
+				break;
+			default:
+				free(subpath);
+			}
+		}
+
+		error = errno;
+		if (error)
+			panic("%s traversal interrupted: %s", todo->path, strerror(error));
+		closedir(dir);
+
+		free(todo->path);
+		free(todo);
+	} while (!SLIST_EMPTY(&todos));
+}
+
+char const *
+dir_find(struct filepath_ht *index, char const *name)
+{
+	struct filepath_node *node;
+	size_t namelen;
+
+	namelen = strlen(name);
+	HASH_FIND(hh, index->nodes, name, namelen, node);
+
+	return node ? node->path : NULL;
 }

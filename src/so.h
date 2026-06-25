@@ -13,6 +13,7 @@
 enum so_type {
 	SO_MFT,
 	SO_ROA,
+	SO_ASA,
 };
 
 struct signed_object {
@@ -36,6 +37,8 @@ struct signed_object {
 
 struct signed_object *signed_object_new(struct rpki_tree_node *, int,
     struct field **);
+struct signed_object *signed_object_load(char const *, struct rpki_object *,
+    enum so_type, asn_TYPE_descriptor_t *);
 void content_info_finish(struct signed_object *, asn_TYPE_descriptor_t *);
 
 #endif /* SRC_SO_H_ */

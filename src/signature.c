@@ -40,8 +40,8 @@ der2sign(const void *der, size_t size, void *_args)
 }
 
 SignatureValue_t
-do_sign(void *obj, const struct asn_TYPE_descriptor_s *td, EVP_PKEY *keys,
-    bool replace_0x31)
+do_sign(void *obj, const struct asn_TYPE_descriptor_s *td,
+    struct rpki_certificate *parent, bool replace_0x31)
 {
 	struct signing_args args;
 	asn_enc_rval_t encode_result;
@@ -49,12 +49,15 @@ do_sign(void *obj, const struct asn_TYPE_descriptor_s *td, EVP_PKEY *keys,
 	size_t siglen;
 	SignatureValue_t result;
 
+	if (!parent->keys)
+		panic("Cannot sign: Parent (%s) lacks keys.", parent->meta->name);
+
 	args.ctx = EVP_MD_CTX_create();
 	if (!args.ctx)
 		panic("EVP_MD_CTX_create");
 	args.replace_0x31 = replace_0x31;
 
-	if (1 != EVP_DigestSignInit(args.ctx, NULL, EVP_sha256(), NULL, keys))
+	if (1 != EVP_DigestSignInit(args.ctx, NULL, EVP_sha256(), NULL, parent->keys))
 		panic("EVP_DigestSignInit");
 
 	encode_result = der_encode(td, obj, der2sign, &args);
