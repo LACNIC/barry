@@ -3,6 +3,7 @@
 #include <getopt.h>
 #include <limits.h>
 #include <netdb.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -31,7 +32,7 @@ static atomic_uint session;
 static uint32_t serial;
 static char const *input;
 
-static FILE *infile; /* (Interactive) input file */
+static int infile; /* (Interactive) Input File (fd) */
 
 unsigned int verbosity;
 bool print_colors;
@@ -548,7 +549,6 @@ open_infile(void)
 {
 	struct sigaction action;
 	struct sockaddr_un srv;
-	int clientfd;
 
 	if (!input || strcmp(input, "-") == 0) {
 		input = NULL;
@@ -573,13 +573,11 @@ open_infile(void)
 		pr_err("SIGTERM handler registration failure: %s",
 		    strerror(errno));
 
-	clientfd = socket(AF_UNIX, SOCK_DGRAM, 0);
-	if (clientfd < 0)
+	infile = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (infile < 0)
 		panic("Unable to create socket: %s", strerror(errno));
-	if (bind(clientfd, (struct sockaddr *)&srv, sizeof(srv)) < 0)
+	if (bind(infile, (struct sockaddr *)&srv, sizeof(srv)) < 0)
 		panic("Cannot bind socket: %s", strerror(errno));
-	if ((infile = fdopen(clientfd, "r")) == NULL)
-		panic("Cannot convert fd to in FILE: %s", strerror(errno));
 }
 
 static void
@@ -587,7 +585,7 @@ close_infile(void)
 {
 	if (input) {
 		pr_trace("Closing input socket.");
-		fclose(infile);
+		close(infile);
 		unlink(input);
 	}
 }
@@ -683,6 +681,7 @@ full_write(unsigned char *msg, size_t len)
 		written = write(rtrfd, msg, len);
 		if (written < 0)
 			panic("write(): %s", strerror(errno));
+		msg += written;
 	}
 }
 
@@ -1317,57 +1316,180 @@ do_sleep(struct line_reader *rdr)
 	return error;
 }
 
+#define BUFSIZE 4096u
+
+struct in_buffer {
+	char buf[BUFSIZE];
+	size_t len;
+	bool eof;
+};
+
+struct out_buffer {
+	int fd;
+	unsigned char buf[BUFSIZE];
+	size_t len;
+};
+
+static int
+flush_out(struct out_buffer *out)
+{
+	unsigned char *buf;
+	ssize_t written;
+	int error;
+
+	pr_trace("Flushing PDUs to server: %zu bytes", out->len);
+
+	buf = out->buf;
+	while (out->len > 0) {
+		written = write(out->fd, buf, out->len);
+		if (written < 0) {
+			error = errno;
+			pr_err("Cannot write to server: %s", strerror(error));
+			return error;
+		}
+
+		buf += written;
+		out->len -= written;
+	}
+
+	return 0;
+}
+
+static int
+write_pdu(struct out_buffer *out, struct pdu *pdu)
+{
+	int error;
+
+	if (pdu == NULL)
+		return 0;
+
+	if (pdu->len > BUFSIZE) {
+		pr_err("Buffer is too small for PDU: %zu > %u",
+		    pdu->len, BUFSIZE);
+		return ENOSPC;
+	}
+
+	if (pdu->len > BUFSIZE - out->len) {
+		error = flush_out(out);
+		if (error)
+			return error;
+	}
+
+	memcpy(out->buf + out->len, pdu->buf, pdu->len);
+	out->len += pdu->len;
+	return 0;
+}
+
+static char *
+find_newline(struct in_buffer *in)
+{
+	size_t i;
+
+	for (i = 0; i < in->len; i++)
+		if (in->buf[i] == '\n')
+			return in->buf + i;
+
+	return NULL;
+}
+
 static int
 send_infile_commands(void)
 {
-	struct line_reader rdr = { 0 };
+	struct in_buffer *in;
+	struct line_reader rdr;
+	struct out_buffer *out;
+
+	ssize_t consumed;
+	char *nl;
+
 	char *token;
 	create_pdu_cb cb;
-	int error;
+	struct pdu *pdu;
+	int error, error2;
+
+	in = pmalloc(sizeof(struct in_buffer));
+	in->len = 0;
+	in->eof = false;
+
+	out = pmalloc(sizeof(struct out_buffer));
+	out->fd = rtrfd;
+	out->len = 0;
 
 	pr_trace("Ready.");
 
-	while (getline(&rdr.line, &rdr.lsize, infile) != -1) {
-		rdr.saveptr = NULL;
-		rdr.first = true;
-		rdr.lvl = 0;
-		token = next_token(&rdr);
-		if (!token)
-			continue;
+	do {
+		consumed = read(infile, in->buf + in->len, BUFSIZE - in->len);
+		if (consumed == -1) {
+			error = errno;
+			pr_err("Input read error: %s", strerror(error));
+			return error;
+		}
+		if (consumed == 0) {
+			pr_trace("End of input stream reached.");
+			return 0;
+		}
 
-		if (strcmp(token, "version") == 0)
-			next_u8(&rdr, "version", &version);
-		else if (strcmp(token, "help") == 0)
-			print_command_help();
-		else if (strcmp(token, "sleep") == 0) {
-			if (do_sleep(&rdr) == EINTR)
-				break;
-		} else if (strcmp(token, "exit") == 0)
-			break;
-		else if ((cb = get_create_pdu_cb(token)) != NULL)
-			send_pdu(cb(&rdr));
-		else
-			pr_err("Unrecognized command: %s", token);
-	}
-	free(rdr.line);
+		pr_trace("Got %zd bytes of text from input.\n", consumed);
 
-	pr_trace("Canceling socket thread.");
-	error = pthread_cancel(socket_thread);
-	if (error)
+		/*
+		 * If the user inputs several lines at once,
+		 * we want to try to send all included PDUs in a single packet.
+		 */
+
+		in->len += consumed;
+		while ((nl = find_newline(in)) != NULL) {
+			*nl = 0;
+
+			rdr.line = in->buf;
+			rdr.lsize = nl - rdr.line;
+			rdr.saveptr = NULL;
+			rdr.first = true;
+			rdr.lvl = 0;
+			token = next_token(&rdr);
+			if (!token)
+				continue;
+
+			if (strcmp(in->buf, "version") == 0)
+				next_u8(&rdr, "version", &version);
+			else if (strcmp(in->buf, "help") == 0)
+				print_command_help();
+			else if (strcmp(in->buf, "sleep") == 0) {
+				error = flush_out(out);
+				if (error)
+					goto end;
+				if (do_sleep(&rdr) == EINTR) {
+					error = EINTR;
+					goto end;
+				}
+			} else if (strcmp(in->buf, "exit") == 0) {
+				error = flush_out(out);
+				goto end;
+			} else if ((cb = get_create_pdu_cb(in->buf)) != NULL) {
+				pdu = cb(&rdr);
+				error = write_pdu(out, pdu);
+				free(pdu);
+				if (error)
+					goto end;
+			} else
+				pr_err("Unrecognized command: %s", in->buf);
+
+			in->len = in->len - (nl - in->buf) - 1;
+			memmove(in->buf, nl + 1, in->len);
+		}
+
+		error = flush_out(out);
+		if (error)
+			goto end;
+	} while (true);
+
+end:	pr_trace("Canceling socket thread.");
+	error2 = pthread_cancel(socket_thread);
+	if (error2)
 		pr_err("Cound not cancel socket thread: %s. "
 		    "IDK; try interrupting the process.",
-		    strerror(error));
+		    strerror(error2));
 
-	if (feof(infile)) {
-		pr_trace("End of input stream reached.");
-		return 0;
-	}
-	if (ferror(infile)) {
-		pr_err("Looks like there was some error reading the input stream.");
-		return EINVAL;
-	}
-
-	return 0; /* "exit" requested*/
+	return error;
 }
 
 static uint16_t
@@ -2316,7 +2438,7 @@ main(int argc, char **argv)
 	struct pdu *pdu;
 	int error = 0;
 
-	infile = stdin;
+	infile = STDIN_FILENO;
 
 	register_signal_handlers();
 
