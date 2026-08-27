@@ -1028,6 +1028,8 @@ add_ext(char const *type, char const *name,
 		exts_add_aki(exts, name, field);
 	else if (strncmp(type, "ku", 2) == 0)
 		exts_add_ku(exts, name, field);
+	else if (strncmp(type, "eku", 3) == 0)
+		exts_add_eku(exts, name, field);
 	else if (strncmp(type, "cdp", 3) == 0)
 		exts_add_cdp(exts, name, field);
 	else if (strncmp(type, "aia", 3) == 0)
@@ -1131,6 +1133,48 @@ parse_ads(struct field *field, struct kv_value *src, void *dst)
 
 		a++;
 	}
+}
+
+static void
+parse_eku(struct field *field, struct kv_value *src, void *dst)
+{
+	ExtKeyUsageSyntax_t *eku = dst;
+	struct kv_node *src_node;
+	size_t a;
+
+	if (src->type != VALT_SET)
+		NEED_SET(field->key);
+
+	a = 0;
+	STAILQ_FOREACH(src_node, &src->v.set, hook)
+		a++;
+	INIT_ASN1_ARRAY(&eku->list, a, KeyPurposeId_t);
+
+	a = 0;
+	STAILQ_FOREACH(src_node, &src->v.set, hook)
+		parse_oid(field, &src_node->value, eku->list.array[a++]);
+}
+
+static void
+print_array_separator(struct dynamic_string *dstr, int index, int count)
+{
+	if (index != count - 1)
+		dstr_append(dstr, ",");
+	dstr_append(dstr, " ");
+}
+
+static void
+print_eku(struct dynamic_string *dstr, void *_eku)
+{
+	ExtKeyUsageSyntax_t *eku = _eku;
+	size_t e;
+
+	dstr_append(dstr, "[ ");
+	for (e = 0; e < eku->list.count; e++) {
+		print_oid(dstr, eku->list.array[e]);
+		print_array_separator(dstr, e, eku->list.count);
+	}
+	dstr_append(dstr, "]");
 }
 
 STAILQ_HEAD(ip_list, ip_list_node);
@@ -1351,14 +1395,6 @@ static void
 print_pref_unknown(struct dynamic_string *dstr, IPAddress_t *addr)
 {
 	print_bitstr(dstr, addr);
-}
-
-static void
-print_array_separator(struct dynamic_string *dstr, int index, int count)
-{
-	if (index != count - 1)
-		dstr_append(dstr, ",");
-	dstr_append(dstr, " ");
 }
 
 static void
@@ -1893,6 +1929,7 @@ const struct field_type ft_gtime = { "GeneralizedTime", parse_gtime, print_gtime
 const struct field_type ft_filetype = { "File Type", parse_filetype, print_filetype };
 const struct field_type ft_exts = { "Extensions", parse_exts, print_exts };
 const struct field_type ft_ads = { "Access Descriptions", parse_ads, NULL };
+const struct field_type ft_eku = { "Extended Key Usage", parse_eku, print_eku };
 const struct field_type ft_ip_roa = { "IP Resources (ROA)", parse_ips_roa, print_roa_ips };
 const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_cer, print_cer_ips };
 const struct field_type ft_as_cer = { "AS Resources", parse_asns, print_asns };

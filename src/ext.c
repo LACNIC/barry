@@ -48,7 +48,8 @@ add_extension(struct extensions *exts,
 #define ADD_SKI(exts, name, crit) add_extension(exts, EXT_SKI, &asn_DEF_SubjectKeyIdentifier, name, NID_subject_key_identifier, crit)
 #define ADD_AKI(exts, name, crit) add_extension(exts, EXT_AKI, &asn_DEF_AuthorityKeyIdentifier, name, NID_authority_key_identifier, crit)
 #define ADD_KU(exts, name, crit)  add_extension(exts, EXT_KU, &asn_DEF_KeyUsage, name, NID_key_usage, crit)
-#define ADD_CDP(exts, name, crit)  add_extension(exts, EXT_CRLDP, &asn_DEF_CRLDistributionPoints, name, NID_crl_distribution_points, crit)
+#define ADD_EKU(exts, name, crit) add_extension(exts, EXT_EKU, &asn_DEF_ExtKeyUsageSyntax, name, NID_ext_key_usage, crit)
+#define ADD_CDP(exts, name, crit) add_extension(exts, EXT_CRLDP, &asn_DEF_CRLDistributionPoints, name, NID_crl_distribution_points, crit)
 #define ADD_AIA(exts, name, crit) add_extension(exts, EXT_AIA, &asn_DEF_AuthorityInfoAccessSyntax, name, NID_info_access, crit)
 #define ADD_SIA(exts, name, crit) add_extension(exts, EXT_SIA, &asn_DEF_SubjectInfoAccessSyntax, name, NID_sinfo_access, crit)
 #define ADD_CP(exts, name, crit)  add_extension(exts, EXT_CP, &asn_DEF_CertificatePolicies, name, NID_certificate_policies, crit)
@@ -137,6 +138,21 @@ exts_add_ku(struct extensions *exts, char const *name, struct field *extsf)
 {
 	struct ext_list_node *ext = ADD_KU(exts, name, 0xFF);
 	add_ku_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
+}
+
+static void
+add_eku_fields(struct field *parent, struct ext_list_node *ext)
+{
+	field_add(parent, "extnID", &ft_oid, &ext->extnID, 0);
+	field_add(parent, "critical", &ft_bool, &ext->critical, 0);
+	field_add(parent, "extnValue", &ft_eku, &ext->v.eku, 0);
+}
+
+void
+exts_add_eku(struct extensions *exts, char const *name, struct field *extsf)
+{
+	struct ext_list_node *ext = ADD_EKU(exts, name, 0);
+	add_eku_fields(field_add(extsf, name, &ft_obj, &ext->v, 0), ext);
 }
 
 static void
@@ -708,6 +724,8 @@ exts_decode(Extensions_t *src_list, struct extensions *dst_list)
 			dst = ADD_AKI(dst_list, "aki", src->critical);
 		else if (is_oid(&src->extnID, OID_KU))
 			dst = ADD_KU(dst_list, "ku", src->critical);
+		else if (is_oid(&src->extnID, OID_EKU))
+			dst = ADD_EKU(dst_list, "eku", src->critical);
 		else if (is_oid(&src->extnID, OID_CRLDP))
 			dst = ADD_CDP(dst_list, "cdp", src->critical);
 		else if (is_oid(&src->extnID, OID_AIA))

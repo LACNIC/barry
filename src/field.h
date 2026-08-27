@@ -100,6 +100,7 @@ extern const struct field_type ft_gtime;	/* GeneralizedTime */
 extern const struct field_type ft_filetype;
 extern const struct field_type ft_exts;
 extern const struct field_type ft_ads;		/* AccessDescriptions array */
+extern const struct field_type ft_eku;
 extern const struct field_type ft_ip_roa;
 extern const struct field_type ft_ip_cer;
 extern const struct field_type ft_as_cer;

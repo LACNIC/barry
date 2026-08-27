@@ -9,6 +9,7 @@
 #include <libasn1fort/CRLDistributionPoints.h>
 #include <libasn1fort/CRLNumber.h>
 #include <libasn1fort/CertificatePolicies.h>
+#include <libasn1fort/ExtKeyUsageSyntax.h>
 #include <libasn1fort/Extensions.h>
 #include <libasn1fort/IPAddrBlocks.h>
 #include <libasn1fort/KeyUsage.h>
@@ -30,7 +31,7 @@ enum ext_type {
 	EXT_SKI,
 	EXT_AKI,
 	EXT_KU,
-//	EXT_EKU,
+	EXT_EKU,
 	EXT_CRLDP,
 	EXT_AIA,
 	EXT_SIA,
@@ -53,6 +54,7 @@ struct ext_list_node {
 		SubjectKeyIdentifier_t ski;
 		AuthorityKeyIdentifier_t aki;
 		KeyUsage_t ku;
+		ExtKeyUsageSyntax_t eku;
 		CRLDistributionPoints_t cdp;
 		AuthorityInfoAccessSyntax_t aia;
 		SubjectInfoAccessSyntax_t sia;
@@ -76,6 +78,7 @@ void exts_add_bc(struct extensions *, char const *, struct field *);
 void exts_add_ski(struct extensions *, char const *, struct field *);
 void exts_add_aki(struct extensions *, char const *, struct field *);
 void exts_add_ku(struct extensions *, char const *, struct field *);
+void exts_add_eku(struct extensions *, char const *, struct field *);
 void exts_add_cdp(struct extensions *, char const *, struct field *);
 void exts_add_aia(struct extensions *, char const *, struct field *);
 void exts_add_sia(struct extensions *, char const *, struct field *, sia_defaults);

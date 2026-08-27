@@ -247,6 +247,9 @@ finish_extensions(struct rpki_certificate *cer, enum cer_type type,
 				ext_finish_ku(&ext->v.ku, type);
 			break;
 
+		case EXT_EKU:
+			break;
+
 		case EXT_CRLDP:
 			if (!fields_overridden(extnValuef, NULL))
 				finish_cdp(&ext->v.cdp, cer);

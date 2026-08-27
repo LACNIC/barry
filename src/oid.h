@@ -8,6 +8,7 @@ extern const int OID_BC[];
 extern const int OID_SKI[];
 extern const int OID_AKI[];
 extern const int OID_KU[];
+extern const int OID_EKU[];
 extern const int OID_CRLDP[];
 extern const int OID_AIA[];
 extern const int OID_SIA[];
