@@ -1050,7 +1050,6 @@ Add Github issues:
 	- CRLs
 		- revokedCertificates
 	- Certificate/CRL extensions
-		- AKI authorityCertIssuer
 		- CRLDP extnValue
 		- CP extnValue
 	- Manifests, ROAs

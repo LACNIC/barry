@@ -1136,6 +1136,43 @@ parse_ads(struct field *field, struct kv_value *src, void *dst)
 }
 
 static void
+parse_gnames(struct field *field, struct kv_value *src, void *dst)
+{
+	GeneralNames_t *sia = dst;
+	struct kv_node *src_node;
+	GeneralName_t *dst_gn;
+	struct field *gnf;
+	char namebuf[16];
+	size_t a;
+	int written;
+
+	if (src->type != VALT_SET)
+		NEED_SET(field->key);
+
+	field->children = NULL;
+
+	a = 0;
+	STAILQ_FOREACH(src_node, &src->v.set, hook)
+		a++;
+	INIT_ASN1_ARRAY(&sia->list, a, GeneralName_t);
+
+	a = 0;
+	STAILQ_FOREACH(src_node, &src->v.set, hook) {
+		dst_gn = sia->list.array[a];
+		dst_gn->present = GeneralName_PR_uniformResourceIdentifier;
+
+		written = snprintf(namebuf, 16, "%zu", a);
+		if (written >= 16)
+			panic("Key too long: %zu, %d", a, written);
+
+		gnf = field_add_gname(field, pstrdup(namebuf), dst_gn);
+		parse_obj(gnf, &src_node->value, dst_gn);
+
+		a++;
+	}
+}
+
+static void
 parse_eku(struct field *field, struct kv_value *src, void *dst)
 {
 	ExtKeyUsageSyntax_t *eku = dst;
@@ -1929,6 +1966,7 @@ const struct field_type ft_gtime = { "GeneralizedTime", parse_gtime, print_gtime
 const struct field_type ft_filetype = { "File Type", parse_filetype, print_filetype };
 const struct field_type ft_exts = { "Extensions", parse_exts, print_exts };
 const struct field_type ft_ads = { "Access Descriptions", parse_ads, NULL };
+const struct field_type ft_gnames = { "General Names", parse_gnames, NULL };
 const struct field_type ft_eku = { "Extended Key Usage", parse_eku, print_eku };
 const struct field_type ft_ip_roa = { "IP Resources (ROA)", parse_ips_roa, print_roa_ips };
 const struct field_type ft_ip_cer = { "IP Resources (Certificate)", parse_ips_cer, print_cer_ips };

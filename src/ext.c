@@ -109,10 +109,9 @@ add_aki_fields(struct field *parent, struct ext_list_node *ext)
 	field_add(value, "keyIdentifier", &ft_8str,
 	    &ext->v.aki.keyIdentifier,
 	    sizeof(KeyIdentifier_t));
-//	TODO not implemented yet
-//	field_add_leaf(value, "authorityCertIssuer", ,
-//	    &ext->v.aki.authorityCertIssuer,
-//	    sizeof(GeneralNames_t));
+	field_add(value, "authorityCertIssuer", &ft_gnames,
+	    &ext->v.aki.authorityCertIssuer,
+	    sizeof(GeneralNames_t));
 	field_add(value, "authorityCertSerialNumber", &ft_int,
 	    &ext->v.aki.authorityCertSerialNumber,
 	    sizeof(CertificateSerialNumber_t));
