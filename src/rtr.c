@@ -1415,7 +1415,8 @@ send_infile_commands(void)
 	out->fd = rtrfd;
 	out->len = 0;
 
-	pr_trace("Ready.");
+	printf("Ready.\n");
+	fflush(stdout);
 
 	do {
 		consumed = read(infile, in->buf + in->len, BUFSIZE - in->len);
