@@ -433,23 +433,32 @@ finish_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 }
 
 static void
-write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
+write_protected(struct rpki_tree_node *node, struct filepath_ht *prev_files)
 {
 	char const *oldpath;
 	char *newpath;
 
-	pr_debug("Writing file (unless it's a manifest): %s", node->meta.name);
+	oldpath = dir_find(prev_files, node->meta.name);
+	newpath = join_paths(rsync_path, node->meta.path);
+
+	exec_mkdir_p(newpath, false);
+	if (link(oldpath, newpath) < 0)
+		panic("Cannot clone %s into %s: %s",
+		    oldpath, newpath, strerror(errno));
+
+	free(newpath);
+}
+
+static void
+write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
+{
+	if (node->type == FT_MFT)
+		return;
+
+	pr_debug("Writing file: %s", node->meta.name);
 
 	if (node->protect) {
-		oldpath = dir_find(arg, node->meta.name);
-		newpath = join_paths(rsync_path, node->meta.path);
-
-		exec_mkdir_p(newpath, false);
-		if (link(oldpath, newpath) < 0)
-			panic("Cannot clone %s into %s: %s",
-			    oldpath, newpath, strerror(errno));
-
-		free(newpath);
+		write_protected(node, arg);
 		return;
 	}
 
@@ -460,8 +469,6 @@ write_not_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 		break;
 	case FT_CRL:
 		crl_write(node->obj);
-		break;
-	case FT_MFT:
 		break;
 	case FT_ROA:
 		roa_write(node->obj);
@@ -480,7 +487,12 @@ write_mfts(struct rpki_tree *tree, struct rpki_tree_node *node, void *arg)
 	if (node->type != FT_MFT)
 		return;
 
-	pr_debug("Writing: %s", node->meta.name);
+	if (node->protect) {
+		write_protected(node, arg);
+		return;
+	}
+
+	pr_debug("Writing file: %s", node->meta.name);
 	mft_write(node->obj);
 }
 
@@ -721,7 +733,7 @@ main(int argc, char **argv)
 	pr_debug("Done.\n");
 
 	pr_debug("Writing files (manifests)...");
-	rpkitree_pre_order(&tree, write_mfts, NULL);
+	rpkitree_pre_order(&tree, write_mfts, &prev_files);
 	pr_debug("Done.\n");
 
 	if (rrdp_uri[0] && rrdp_path[0]) {
