@@ -431,7 +431,7 @@ parse_getopt_format(void)
 	else if (strcmp(optarg, "rapport") == 0)
 		format = OF_RAPPORT;
 	else {
-		pr_err("-f (--format) must be 'pdu' (default) or 'rapport).");
+		pr_err("-f (--format) must be 'pdu' (default) or 'rapport'.");
 		exit(EXIT_FAILURE);
 	}
 }
@@ -1632,7 +1632,7 @@ __print_addr4(unsigned char *buf)
 	addr_str = inet_ntop(AF_INET, &addr, addr_strbuf, sizeof(addr_strbuf));
 	if (!addr_str)
 		pr_warn("Cannot convert addr4 to string: %s", strerror(errno));
-	printf("%s ", addr_str ? addr_str : "null");
+	printf("%s", addr_str ? addr_str : "null");
 }
 
 static int
@@ -1647,6 +1647,7 @@ print_addr4(struct pdu *pdu, char const *pfx, size_t *remainder)
 
 	printf("%s ", pfx);
 	__print_addr4(buf);
+	printf(" ");
 
 	*remainder -= 4;
 	return 0;
@@ -1661,7 +1662,7 @@ __print_addr6(unsigned char *buf)
 	addr_str = inet_ntop(AF_INET6, buf, addr_strbuf, sizeof(addr_strbuf));
 	if (!addr_str)
 		pr_warn("Cannot convert addr6 to string: %s", strerror(errno));
-	printf("%s ", addr_str ? addr_str : "null");
+	printf("%s", addr_str ? addr_str : "null");
 }
 
 static int
@@ -1676,6 +1677,7 @@ print_addr6(struct pdu *pdu, char const *pfx, size_t *remainder)
 
 	printf("%s ", pfx);
 	__print_addr6(buf);
+	printf(" ");
 
 	*remainder -= 16;
 	return 0;
@@ -2172,7 +2174,7 @@ print_rapport_vrp4(struct pdu *pdu, unsigned char *hdr)
 	}
 
 	__print_addr4(&payload[4]);
-	printf("/%u-%u => %u",
+	printf("/%u-%u => AS%u",
 	   payload[1],
 	   payload[2],
 	   assemble_u32(&payload[8]));
@@ -2208,7 +2210,7 @@ print_rapport_vrp6(struct pdu *pdu, unsigned char *hdr)
 	}
 
 	__print_addr6(&payload[4]);
-	printf("/%u-%u => %u",
+	printf("/%u-%u => AS%u",
 	    payload[1],
 	    payload[2],
 	    assemble_u32(&payload[20]));
